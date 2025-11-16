@@ -132,7 +132,387 @@ gdjs.PlayonlineCode.GDLongNoteOppObjects2= [];
 gdjs.PlayonlineCode.GDLongNoteOppObjects3= [];
 
 
+gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
+"use strict";
+// WATCHER: sempre que selectedTrackKey mudar, para o que estiver e baixa a nova track+chart
+(async function(runtimeScene){
+  // --- Helpers e configurações ---
+  const GITHUB_OWNER = "LucyYuih";
+  const GITHUB_REPO = "gdev-custom-charts";
+  const GITHUB_BRANCH = "main";
+  const MANIFEST_CDN_URL = `https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/manifest.json`;
+
+  function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+  function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
+  function isJsonFile(name){ return /\.json$/i.test(name); }
+  function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
+
+  // game var helpers
+  const gg = runtimeScene.getGame().getVariables();
+  function getVarString(name){ try { return gg.get(name).getAsString(); } catch(e){ return ""; } }
+  function setVarString(name, v){ try { gg.get(name).setString(String(v)); } catch(e){} }
+  function ensureVarString(name, def=""){ try { if(!gg.has(name)) gg.get(name).setString(def); } catch(e){} }
+  function ensureVarNumber(name, def=0){ try { if(!gg.has(name)) gg.get(name).setNumber(def); } catch(e){} }
+  function setVarNumber(name, n){ try { gg.get(name).setNumber(Number(n) || 0); } catch(e){} }
+
+  ensureVarString("selectedTrackKey","");
+  ensureVarString("BfChartJsonLoader","");
+  ensureVarString("OppChartJsonLoader","");
+  ensureVarString("metadatajson","");
+  ensureVarString("SongName","");
+  ensureVarNumber("jsmusicoffset",0);
+  ensureVarNumber("jsmusicfinish",0);
+  ensureVarNumber("Pause",0);
+
+  window.gdjsCustomAudio = window.gdjsCustomAudio || {};
+  window.gdjsChannels = window.gdjsChannels || {};
+  window._gdjs_manifest = window._gdjs_manifest || undefined;
+
+  // --- util: stop + cleanup (revoga blob URLs e limpa referências) ---
+  function stopAndCleanupAll(revokeBlobUrls = true){
+    try {
+      if (window.gdjsChannels) {
+        Object.keys(window.gdjsChannels).forEach(k=>{
+          try {
+            const a = window.gdjsChannels[k];
+            if (!a) return;
+            try{ a.pause(); }catch(e){}
+            try{ a.currentTime = 0; }catch(e){}
+            if (a._gdjs_ended_handler) { try{ a.removeEventListener('ended', a._gdjs_ended_handler); }catch(e){} a._gdjs_ended_handler = null; }
+            if (revokeBlobUrls && a.src && a.src.startsWith('blob:')) {
+              try{ URL.revokeObjectURL(a.src); }catch(e){}
+            }
+          } catch(e){}
+        });
+      }
+      if (window.gdjsCustomAudio) {
+        Object.keys(window.gdjsCustomAudio).forEach(folder=>{
+          try {
+            const entry = window.gdjsCustomAudio[folder] || {};
+            const audios = entry.audios || {};
+            Object.keys(audios).forEach(name=>{
+              try {
+                const info = audios[name] || {};
+                if (info && info.blobUrl && revokeBlobUrls) try{ URL.revokeObjectURL(info.blobUrl); }catch(e){}
+              } catch(e){}
+            });
+            // remove entry
+            try{ delete window.gdjsCustomAudio[folder]; } catch(e){}
+          } catch(e){}
+        });
+      }
+    } catch(e){}
+    window.gdjsChannels = {};
+  }
+
+  // --- manifest loaders (game var -> resource -> CDN) ---
+  async function tryManifestFromGameVar() {
+    try { if (runtimeScene && runtimeScene.getGame) { const v = runtimeScene.getGame().getVariables(); if (v.has("manifestjson")) { const s = v.get("manifestjson").getAsString(); if (s && s.trim()) { try { return JSON.parse(s); } catch(e){ return null; } } } } } catch(e){} return null;
+  }
+  async function tryManifestFromProjectResource() {
+    try {
+      if (runtimeScene && runtimeScene.getGame && runtimeScene.getGame().getResourcesManager) {
+        const rm = runtimeScene.getGame().getResourcesManager();
+        if (rm.getResourceFullUrl) {
+          try {
+            const url = rm.getResourceFullUrl("manifest.json");
+            if (url) { const r = await fetch(url, {cache:"no-cache"}); if (r.ok) return await r.json(); }
+          } catch(e){}
+        }
+      }
+    } catch(e){}
+    // fallback common paths
+    const tries = ["manifest.json","resources/manifest.json","res/manifest.json","./manifest.json"];
+    for (const p of tries) {
+      try { const r = await fetch(p, {cache:"no-cache"}); if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
+    }
+    return null;
+  }
+  async function tryManifestFromCDN() {
+    try { const r = await fetch(MANIFEST_CDN_URL, {cache:"no-cache"}); if (r.ok) return await r.json(); } catch(e){} return null;
+  }
+  async function loadManifestPreferLocal(){
+    if (typeof window._gdjs_manifest !== "undefined") return window._gdjs_manifest;
+    const a = await tryManifestFromGameVar(); if (a) { window._gdjs_manifest = a; return a; }
+    const b = await tryManifestFromProjectResource(); if (b) { window._gdjs_manifest = b; return b; }
+    const c = await tryManifestFromCDN(); if (c) { window._gdjs_manifest = c; return c; }
+    window._gdjs_manifest = null; return null;
+  }
+
+  // --- GitHub listing fallback (respects token in localStorage or game var GitHubToken) ---
+  async function ghListApi(path="") {
+    const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(path)}?ref=${GITHUB_BRANCH}`;
+    let token = "";
+    try { token = localStorage.getItem("gdjs_github_token") || ""; } catch(e){}
+    try { if ((!token || token.trim()==="") && runtimeScene && runtimeScene.getGame) { const gv = runtimeScene.getGame().getVariables(); if (gv.has("GitHubToken")) token = gv.get("GitHubToken").getAsString(); } } catch(e){}
+    const headers = token ? { "Authorization": "token " + token } : {};
+    const r = await fetch(apiUrl, { headers });
+    if (!r.ok) throw new Error(`GitHub API: ${r.status}`);
+    const json = await r.json();
+    return json.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
+  }
+
+  // --- attach ended watcher to channel 0 ---
+  function attachEndedWatcherToChannel0(){
+    const ch0 = window.gdjsChannels && window.gdjsChannels[0];
+    if (!ch0) return;
+    if (ch0._gdjs_ended_handler) { try{ ch0.removeEventListener('ended', ch0._gdjs_ended_handler); }catch(e){} ch0._gdjs_ended_handler = null; }
+    ch0.loop = false;
+    const handler = ()=> { setVarNumber("jsmusicfinish", 1); };
+    ch0.addEventListener('ended', handler);
+    ch0._gdjs_ended_handler = handler;
+  }
+
+  // --- ensure audio context & connect elements (best-effort) ---
+  async function ensureAudioContext(){
+    try {
+      if (!window._gdjs_audio_ctx) window._gdjs_audio_ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = window._gdjs_audio_ctx;
+      if (ctx.state === "suspended") { try { await ctx.resume(); } catch(e){} }
+      Object.keys(window.gdjsChannels).forEach(k=>{
+        try {
+          const a = window.gdjsChannels[k];
+          if (!a) return;
+          if (!a._gdjs_connected_to_audioctx && ctx.createMediaElementSource) {
+            const src = ctx.createMediaElementSource(a); const gain = ctx.createGain(); gain.gain.value = 1.0; src.connect(gain); gain.connect(ctx.destination);
+            a._gdjs_connected_to_audioctx = true; a._gdjs_gain_node = gain;
+          } else if (a._gdjs_gain_node) { a._gdjs_gain_node.gain.value = 1.0; }
+        } catch(e){}
+      });
+    } catch(e){}
+  }
+
+  // --- download util (supports abort via controller.signal) ---
+  async function fetchAsBlob(url, signal){
+    const resp = await fetch(url, { signal });
+    if (!resp.ok) throw new Error(`Fetch ${url} failed ${resp.status}`);
+    return await resp.blob();
+  }
+  async function fetchAsText(url, signal){
+    const resp = await fetch(url, { signal });
+    if (!resp.ok) throw new Error(`Fetch ${url} failed ${resp.status}`);
+    return await resp.text();
+  }
+
+  // --- main: download+prepare a folder (like your previous downloadSongFolder) ---
+  async function downloadAndPrepareFolder(folderPath, outerController){
+    // outerController: AbortController used to cancel all fetches
+    const ctrl = outerController;
+    try {
+      // stop previous audios (but do NOT revoke blobs yet if you want caching) - do full revoke so we start clean
+      stopAndCleanupAll(true);
+
+      // set selectedTrackKey (already set externally) and SongName
+      try { setVarString("SongName", basenameNoExt(folderPath.split("/").pop()||folderPath)); } catch(e){}
+      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath); } catch(e){}
+      try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(folderPath.split("/").pop()||folderPath)); } catch(e){}
+
+      // get manifest or fallback to GitHub listing
+      const manifest = await loadManifestPreferLocal();
+      let files = null;
+      if (manifest && manifest.hasOwnProperty(folderPath)) {
+        const entry = manifest[folderPath];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+          files = entry.map(e => ({ name: e.name, url: e.url || e.raw_url || null, type: e.type || "file" }));
+        } else {
+          files = [];
+        }
+      } else {
+        // fallback to GitHub API listing
+        try {
+          const api = await ghListApi(folderPath);
+          files = (api || []).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`), type: i.type }));
+        } catch(e){
+          files = [];
+        }
+      }
+
+      if (!Array.isArray(files) || files.length === 0) {
+        // nothing to do
+        return { ok:false, reason: "empty" };
+      }
+
+      window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || { audios:{}, rawFiles:{} };
+      const dest = window.gdjsCustomAudio[folderPath];
+
+      // iterate files: fetch JSONs and audios
+      let nextChannelIndex = 0;
+      const unlockQueue = [];
+      for (const f of files){
+        if (ctrl.signal.aborted) throw new Error("aborted");
+        const fname = f.name || "file";
+        const url = f.url || f.download_url || null;
+        if (!url) continue;
+
+        if (isJsonFile(fname)) {
+          try {
+            const txt = await fetchAsText(url, ctrl.signal);
+            dest.rawFiles[fname] = txt;
+            const lname = fname.toLowerCase();
+            const ggvars = runtimeScene.getGame().getVariables();
+            if (/metadata|meta/.test(lname)) ggvars.get("metadatajson").setString(txt);
+            else if (/(bf|chartbf|chart_bf)/.test(lname)) ggvars.get("BfChartJsonLoader").setString(txt);
+            else if (/(dad|opp|opponent)/.test(lname)) ggvars.get("OppChartJsonLoader").setString(txt);
+            else {
+              // heuristic: if JSON looks like chart (has notes), try assign
+              try {
+                const parsed = JSON.parse(txt);
+                if (parsed && parsed.notes) {
+                  if (!ggvars.get("BfChartJsonLoader").getAsString()) ggvars.get("BfChartJsonLoader").setString(txt);
+                  else if (!ggvars.get("OppChartJsonLoader").getAsString()) ggvars.get("OppChartJsonLoader").setString(txt);
+                  else if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
+                } else {
+                  if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
+                }
+              } catch(e){
+                if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
+              }
+            }
+          } catch(e){
+            // ignore single-file errors
+          }
+        } else if (isAudioFile(fname)) {
+          try {
+            const blob = await fetchAsBlob(url, ctrl.signal);
+            const blobUrl = URL.createObjectURL(blob);
+            const audioEl = new Audio(blobUrl);
+            audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
+            dest.audios[fname] = { blobUrl, audioEl };
+            window.gdjsChannels[nextChannelIndex] = audioEl;
+            nextChannelIndex++;
+            // priming
+            try {
+              const p = audioEl.play();
+              if (p && typeof p.then === "function") {
+                p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; }catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: fname}); });
+              } else { try{ audioEl.pause(); audioEl.currentTime = 0; }catch(e){} }
+            } catch(e){ unlockQueue.push({audioEl, name: fname}); }
+          } catch(e){
+            // fetch error for this audio -> skip
+          }
+        } else {
+          // ignore other files
+        }
+        // small break to keep UI responsive
+        await sleep(0);
+      } // end for files
+
+      // pointerdown unlock for primed elements if needed
+      if (unlockQueue.length > 0) {
+        const unlock = async ()=> { for (const it of unlockQueue) { try{ await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; }catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        window.addEventListener('pointerdown', unlock, { once:true });
+      }
+
+      // ensure channel 0 ended watcher and audio context
+      attachEndedWatcherToChannel0();
+      await ensureAudioContext();
+      setVarNumber("jsmusicfinish", 0);
+
+      return { ok:true };
+    } catch(err){
+      // aborted or failed: ensure we cleaned up if aborted
+      if (err && String(err).toLowerCase().includes("aborted")) {
+        // aborted - cleanup was probably already done by new invocation
+      }
+      return { ok:false, reason: err && err.message ? err.message : String(err) };
+    }
+  }
+
+  // --- watcher loop: detect changes to selectedTrackKey and trigger download ---
+  let lastSelected = getVarString("selectedTrackKey") || "";
+  let currentDownloadController = null;
+  let currentDownloadId = 0;
+
+  // start initial possible load (if variable already set)
+  async function startIfNeededOnStartup(){
+    const sel = getVarString("selectedTrackKey") || "";
+    if (sel && sel.trim()) {
+      // start a download job (fire-and-forget)
+      currentDownloadId++;
+      const myId = currentDownloadId;
+      if (currentDownloadController) { try{ currentDownloadController.abort(); }catch(e){} }
+      currentDownloadController = new AbortController();
+      downloadAndPrepareFolder(sel, currentDownloadController).then(res=>{
+        // if another download started in the meantime, ignore
+        if (myId !== currentDownloadId) return;
+        // done or failed
+      }).catch(()=>{});
+      lastSelected = sel;
+    }
+  }
+  startIfNeededOnStartup();
+
+  // polling loop (uses RAF for responsiveness)
+  (function pollLoop(){
+    try {
+      const cur = getVarString("selectedTrackKey") || "";
+      if (cur !== lastSelected) {
+        // new selection detected
+        lastSelected = cur;
+        // cancel previous download if exists
+        try { if (currentDownloadController) currentDownloadController.abort(); } catch(e){}
+        currentDownloadId++;
+        const myId = currentDownloadId;
+        currentDownloadController = new AbortController();
+
+        // quick sanity: if empty selection, just stop and cleanup
+        if (!cur || !cur.trim()) {
+          stopAndCleanupAll(true);
+        } else {
+          // start the download task (don't await here)
+          (async ()=>{
+            // mark jsmusicfinish reset
+            setVarNumber("jsmusicfinish", 0);
+            // ensure SongName set early
+            try { setVarString("SongName", basenameNoExt((cur.split("/").pop()||cur))); } catch(e){}
+            await downloadAndPrepareFolder(cur, currentDownloadController);
+            // after download: if this was still the latest job, set jsmusicfinish 0 and leave
+            if (myId === currentDownloadId) {
+              // done. nothing else to do here (channels already prepared)
+            }
+          })().catch(()=>{});
+        }
+      }
+    } catch(e){}
+    requestAnimationFrame(pollLoop);
+  })();
+
+  // raf loop to update jsmusicoffset & Pause logic (keeps previous behavior)
+  (function rafLoop(){
+    try {
+      const ch0 = window.gdjsChannels && window.gdjsChannels[0];
+      if (ch0) { const cur = ch0.currentTime || 0; setVarNumber("jsmusicoffset", cur); }
+      const pauseVal = Number(getVarNumber("Pause") || 0);
+      if (pauseVal) {
+        Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (a && !a.paused && !a.ended) a.pause(); } catch(e){} });
+      } else {
+        Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (!a) return; if (a.paused && !a.ended) { a.play().then(()=>{}).catch(()=>{}); } } catch(e){} });
+      }
+    } catch(e){}
+    requestAnimationFrame(rafLoop);
+  })();
+
+  // unlock on first gesture (priming)
+  window.addEventListener("pointerdown", async function unlockOnce(){
+    try { if (window._gdjs_audio_ctx && window._gdjs_audio_ctx.state === "suspended") await window._gdjs_audio_ctx.resume(); } catch(e){}
+    Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (!a) return; if (a.paused && !a.ended) { a.play().then(()=>{}).catch(()=>{}); } } catch(e){} });
+    window.removeEventListener("pointerdown", unlockOnce);
+  }, { once:true, passive:true });
+
+})(runtimeScene);
+
+};
 gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
+
+{
+
+
+gdjs.PlayonlineCode.userFunc0xef4650(runtimeScene);
+
+}
+
+
+};gdjs.PlayonlineCode.eventsList1 = function(runtimeScene) {
 
 {
 
@@ -162,7 +542,185 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.PlayonlineCode.eventsList1 = function(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x167db30 = function GDJSInlineCode(runtimeScene) {
+"use strict";
+// SCRIPT: atualiza variável de cena "AllLoaded" conforme estado de downloads (rodar every frame)
+(function(runtimeScene){
+  try {
+    const sceneVars = runtimeScene.getVariables();
+    function ensureSceneVarNumber(name, def=0){ try { if (!sceneVars.has(name)) sceneVars.get(name).setNumber(def); } catch(e){} }
+    function setSceneVarNumber(name, n){ try { sceneVars.get(name).setNumber(Number(n) || 0); } catch(e){} }
+
+    ensureSceneVarNumber("AllLoaded", 0);
+
+    // game var helper
+    const gg = runtimeScene.getGame().getVariables();
+    function getGameVarString(name){ try { return gg.get(name).getAsString(); } catch(e){ return ""; } }
+
+    const selected = (getGameVarString("selectedTrackKey") || "").trim();
+    // default: não carregado
+    let allLoaded = false;
+
+    if (!selected) {
+      allLoaded = false;
+    } else {
+      const storage = window.gdjsCustomAudio && window.gdjsCustomAudio[selected];
+      if (!storage) {
+        allLoaded = false;
+      } else {
+        // check JSONs presence (if manifest provided JSONs originally you'll have rawFiles)
+        const rawFiles = storage.rawFiles || {};
+        const rawCount = Object.keys(rawFiles).length;
+
+        // check audios presence + readiness
+        const audios = storage.audios || {};
+        const audioNames = Object.keys(audios);
+        let audiosOk = true;
+        if (audioNames.length === 0) {
+          audiosOk = true; // no audios to wait for
+        } else {
+          for (let i=0;i<audioNames.length;i++){
+            const name = audioNames[i];
+            const info = audios[name] || {};
+            const el = info.audioEl || (window.gdjsChannels && window.gdjsChannels[i]) || null;
+            if (!el) { audiosOk = false; break; }
+            // readyState >= 3 (HAVE_FUTURE_DATA) or 4 (HAVE_ENOUGH_DATA) considered "loaded enough"
+            try {
+              const rs = Number(el.readyState || 0);
+              if (isNaN(rs) || rs < 3) { audiosOk = false; break; }
+            } catch(e){ audiosOk = false; break; }
+          }
+        }
+
+        // decide jsonsOk: if there were JSONs expected (manifest may indicate), prefer rawCount>0
+        // fallback: if there are audios but no rawFiles, consider jsonsOk = true
+        let jsonsOk = true;
+        // Heuristic: if manifest entry exists and had JSONs, rawFiles should contain them.
+        // We'll treat jsonsOk = rawCount>0 OR audioNames.length>0
+        if (rawCount > 0) jsonsOk = true;
+        else if (audioNames.length > 0) jsonsOk = true;
+        else jsonsOk = rawCount > 0; // conservative
+
+        allLoaded = audiosOk && jsonsOk;
+      }
+    }
+
+    // if download UI is visible and not allLoaded, force 0 (you asked that while UI exists during download set var 0)
+    const uiVisible = !!(document && document.getElementById && document.getElementById("gdjs-mod-list-ui-final"));
+    if (uiVisible && !allLoaded) {
+      setSceneVarNumber("AllLoaded", 0);
+    } else {
+      setSceneVarNumber("AllLoaded", allLoaded ? 1 : 0);
+    }
+
+  } catch(err){
+    // em caso de erro, garanta variável 0
+    try { runtimeScene.getVariables().get("AllLoaded").setNumber(0); } catch(e){}
+  }
+})(runtimeScene);
+
+
+};
+gdjs.PlayonlineCode.eventsList2 = function(runtimeScene) {
+
+{
+
+
+gdjs.PlayonlineCode.userFunc0x167db30(runtimeScene);
+
+}
+
+
+};gdjs.PlayonlineCode.userFunc0x1a231a0 = function GDJSInlineCode(runtimeScene) {
+"use strict";
+// SCRIPT: atualiza variável de cena "AllLoaded" conforme estado de downloads (rodar every frame)
+(function(runtimeScene){
+  try {
+    const sceneVars = runtimeScene.getVariables();
+    function ensureSceneVarNumber(name, def=0){ try { if (!sceneVars.has(name)) sceneVars.get(name).setNumber(def); } catch(e){} }
+    function setSceneVarNumber(name, n){ try { sceneVars.get(name).setNumber(Number(n) || 0); } catch(e){} }
+
+    ensureSceneVarNumber("AllLoaded2", 0);
+
+    // game var helper
+    const gg = runtimeScene.getGame().getVariables();
+    function getGameVarString(name){ try { return gg.get(name).getAsString(); } catch(e){ return ""; } }
+
+    const selected = (getGameVarString("selectedTrackKey") || "").trim();
+    // default: não carregado
+    let allLoaded = false;
+
+    if (!selected) {
+      allLoaded = false;
+    } else {
+      const storage = window.gdjsCustomAudio && window.gdjsCustomAudio[selected];
+      if (!storage) {
+        allLoaded = false;
+      } else {
+        // check JSONs presence (if manifest provided JSONs originally you'll have rawFiles)
+        const rawFiles = storage.rawFiles || {};
+        const rawCount = Object.keys(rawFiles).length;
+
+        // check audios presence + readiness
+        const audios = storage.audios || {};
+        const audioNames = Object.keys(audios);
+        let audiosOk = true;
+        if (audioNames.length === 0) {
+          audiosOk = true; // no audios to wait for
+        } else {
+          for (let i=0;i<audioNames.length;i++){
+            const name = audioNames[i];
+            const info = audios[name] || {};
+            const el = info.audioEl || (window.gdjsChannels && window.gdjsChannels[i]) || null;
+            if (!el) { audiosOk = false; break; }
+            // readyState >= 3 (HAVE_FUTURE_DATA) or 4 (HAVE_ENOUGH_DATA) considered "loaded enough"
+            try {
+              const rs = Number(el.readyState || 0);
+              if (isNaN(rs) || rs < 3) { audiosOk = false; break; }
+            } catch(e){ audiosOk = false; break; }
+          }
+        }
+
+        // decide jsonsOk: if there were JSONs expected (manifest may indicate), prefer rawCount>0
+        // fallback: if there are audios but no rawFiles, consider jsonsOk = true
+        let jsonsOk = true;
+        // Heuristic: if manifest entry exists and had JSONs, rawFiles should contain them.
+        // We'll treat jsonsOk = rawCount>0 OR audioNames.length>0
+        if (rawCount > 0) jsonsOk = true;
+        else if (audioNames.length > 0) jsonsOk = true;
+        else jsonsOk = rawCount > 0; // conservative
+
+        allLoaded = audiosOk && jsonsOk;
+      }
+    }
+
+    // if download UI is visible and not allLoaded, force 0 (you asked that while UI exists during download set var 0)
+    const uiVisible = !!(document && document.getElementById && document.getElementById("gdjs-mod-list-ui-final"));
+    if (uiVisible && !allLoaded) {
+      setSceneVarNumber("AllLoaded2", 0);
+    } else {
+      setSceneVarNumber("AllLoaded2", allLoaded ? 1 : 0);
+    }
+
+  } catch(err){
+    // em caso de erro, garanta variável 0
+    try { runtimeScene.getVariables().get("AllLoaded2").setNumber(0); } catch(e){}
+  }
+})(runtimeScene);
+
+
+};
+gdjs.PlayonlineCode.eventsList3 = function(runtimeScene) {
+
+{
+
+
+gdjs.PlayonlineCode.userFunc0x1a231a0(runtimeScene);
+
+}
+
+
+};gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 
 {
 
@@ -201,7 +759,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xd9e980 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0xf330e8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — manifest-aware (local variable OR project resource OR CDN OR GitHub)
 // Usa na ordem: global var 'manifestjson' -> project resource 'manifest.json' -> jsDelivr manifest -> GitHub API fallback.
@@ -634,41 +1192,20 @@ let isConditionTrue_0 = false;
 })();
 
 };
-gdjs.PlayonlineCode.eventsList2 = function(runtimeScene) {
+gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0xd9e980(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xf330e8(runtimeScene);
 
 }
 
 
 };gdjs.PlayonlineCode.mapOfEmptyGDStartObjects = Hashtable.newFrom({"Start": []});
+gdjs.PlayonlineCode.mapOfEmptyGDStartObjects = Hashtable.newFrom({"Start": []});
 gdjs.PlayonlineCode.mapOfGDgdjs_9546PlayonlineCode_9546GDStartObjects1Objects = Hashtable.newFrom({"Start": gdjs.PlayonlineCode.GDStartObjects1});
-gdjs.PlayonlineCode.eventsList3 = function(runtimeScene) {
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.evtTools.object.getSceneInstancesCount(runtimeScene, gdjs.PlayonlineCode.mapOfEmptyGDStartObjects) == 0;
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
-}
-if (isConditionTrue_0) {
-gdjs.PlayonlineCode.GDStartObjects1.length = 0;
-
-{gdjs.evtTools.object.createObjectOnScene(runtimeScene, gdjs.PlayonlineCode.mapOfGDgdjs_9546PlayonlineCode_9546GDStartObjects1Objects, 3058, 651, "");
-}
-}
-
-}
-
-
-};gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
+gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 
 {
 
@@ -711,6 +1248,9 @@ if (isConditionTrue_0) {
 }
 {gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "Play");
 }
+
+{ //Subevents
+gdjs.PlayonlineCode.eventsList0(runtimeScene);} //End of subevents
 }
 
 }
@@ -732,13 +1272,43 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32778132);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32874804);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayonlineCode.eventsList0(runtimeScene);} //End of subevents
+gdjs.PlayonlineCode.eventsList1(runtimeScene);} //End of subevents
+}
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
+if (isConditionTrue_0) {
+
+{ //Subevents
+gdjs.PlayonlineCode.eventsList2(runtimeScene);} //End of subevents
+}
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+isConditionTrue_0 = !(gdjs.multiplayer.isCurrentPlayerHost());
+if (isConditionTrue_0) {
+
+{ //Subevents
+gdjs.PlayonlineCode.eventsList3(runtimeScene);} //End of subevents
 }
 
 }
@@ -752,7 +1322,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isLobbyGameRunning();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32780428);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32877748);
 }
 }
 if (isConditionTrue_0) {
@@ -768,7 +1338,7 @@ gdjs.copyArray(runtimeScene.getObjects("Player2text"), gdjs.PlayonlineCode.GDPla
 }
 
 { //Subevents
-gdjs.PlayonlineCode.eventsList1(runtimeScene);} //End of subevents
+gdjs.PlayonlineCode.eventsList4(runtimeScene);} //End of subevents
 }
 
 }
@@ -790,13 +1360,13 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32778508);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32881836);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayonlineCode.eventsList2(runtimeScene);} //End of subevents
+gdjs.PlayonlineCode.eventsList5(runtimeScene);} //End of subevents
 }
 
 }
@@ -807,12 +1377,68 @@ gdjs.PlayonlineCode.eventsList2(runtimeScene);} //End of subevents
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(4).getAsString() != "");
+{isConditionTrue_0 = (runtimeScene.getScene().getVariables().getFromIndex(0).getAsNumber() == 0);
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(4).getAsString() != "0");
+{isConditionTrue_0 = (runtimeScene.getScene().getVariables().getFromIndex(1).getAsNumber() == 0);
 }
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+isConditionTrue_0 = gdjs.evtTools.object.getSceneInstancesCount(runtimeScene, gdjs.PlayonlineCode.mapOfEmptyGDStartObjects) == 1;
+}
+}
+}
+if (isConditionTrue_0) {
+gdjs.copyArray(runtimeScene.getObjects("Start"), gdjs.PlayonlineCode.GDStartObjects1);
+{for(var i = 0, len = gdjs.PlayonlineCode.GDStartObjects1.length ;i < len;++i) {
+    gdjs.PlayonlineCode.GDStartObjects1[i].deleteFromScene(runtimeScene);
+}
+}
+}
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+{isConditionTrue_0 = (runtimeScene.getScene().getVariables().getFromIndex(0).getAsNumber() == 1);
+}
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = (runtimeScene.getScene().getVariables().getFromIndex(1).getAsNumber() == 1);
+}
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+isConditionTrue_0 = gdjs.evtTools.object.getSceneInstancesCount(runtimeScene, gdjs.PlayonlineCode.mapOfEmptyGDStartObjects) == 0;
+}
+}
+}
+if (isConditionTrue_0) {
+gdjs.PlayonlineCode.GDStartObjects1.length = 0;
+
+{gdjs.evtTools.object.createObjectOnScene(runtimeScene, gdjs.PlayonlineCode.mapOfGDgdjs_9546PlayonlineCode_9546GDStartObjects1Objects, 3058, 651, "");
+}
+}
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(4).getAsString() != "Song Selected: " + runtimeScene.getGame().getVariables().getFromIndex(4).getAsString());
 }
 if (isConditionTrue_0) {
 gdjs.copyArray(runtimeScene.getObjects("songselectedtext"), gdjs.PlayonlineCode.GDsongselectedtextObjects1);
@@ -820,9 +1446,6 @@ gdjs.copyArray(runtimeScene.getObjects("songselectedtext"), gdjs.PlayonlineCode.
     gdjs.PlayonlineCode.GDsongselectedtextObjects1[i].getBehavior("Text").setText("Song Selected: " + runtimeScene.getGame().getVariables().getFromIndex(4).getAsString());
 }
 }
-
-{ //Subevents
-gdjs.PlayonlineCode.eventsList3(runtimeScene);} //End of subevents
 }
 
 }
@@ -1003,7 +1626,7 @@ gdjs.PlayonlineCode.GDLongNoteOppObjects1.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects2.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects3.length = 0;
 
-gdjs.PlayonlineCode.eventsList4(runtimeScene);
+gdjs.PlayonlineCode.eventsList6(runtimeScene);
 gdjs.PlayonlineCode.GDJoinObjects1.length = 0;
 gdjs.PlayonlineCode.GDJoinObjects2.length = 0;
 gdjs.PlayonlineCode.GDJoinObjects3.length = 0;
