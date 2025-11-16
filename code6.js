@@ -132,11 +132,14 @@ gdjs.PlayonlineCode.GDLongNoteOppObjects2= [];
 gdjs.PlayonlineCode.GDLongNoteOppObjects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x16a5c50 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// WATCHER: sempre que selectedTrackKey mudar, para o que estiver e baixa a nova track+chart
+// WATCHER (download-only) — observa selectedTrackKey, pára o que estiver tocando, baixa a nova track+chart
+// Compatível com: selected = "mod/song"  OR selected = "mod/song/difficulty"
+// Procuras de áudio: difficulty -> song -> mod (pai)
+// Mostra modal não-fechável durante o download. Define cena.AllLoaded = 0 enquanto baixa, 1 ao terminar.
+// IMPORTANT: este watcher NÃO inicia reprodução automática — apenas baixa e prepara os audios em memória.
 (async function(runtimeScene){
-  // --- Helpers e configurações ---
   const GITHUB_OWNER = "LucyYuih";
   const GITHUB_REPO = "gdev-custom-charts";
   const GITHUB_BRANCH = "main";
@@ -147,13 +150,25 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
   function isJsonFile(name){ return /\.json$/i.test(name); }
   function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
 
-  // game var helpers
+  // --- game vars helpers ---
   const gg = runtimeScene.getGame().getVariables();
   function getVarString(name){ try { return gg.get(name).getAsString(); } catch(e){ return ""; } }
   function setVarString(name, v){ try { gg.get(name).setString(String(v)); } catch(e){} }
   function ensureVarString(name, def=""){ try { if(!gg.has(name)) gg.get(name).setString(def); } catch(e){} }
   function ensureVarNumber(name, def=0){ try { if(!gg.has(name)) gg.get(name).setNumber(def); } catch(e){} }
+  function getVarNumber(name){ try { return gg.get(name).getAsNumber(); } catch(e){ return 0; } }
   function setVarNumber(name, n){ try { gg.get(name).setNumber(Number(n) || 0); } catch(e){} }
+
+  // scene var helper for AllLoaded
+  function ensureSceneNumber(name, def = 0){
+    try {
+      const sv = runtimeScene.getVariables();
+      if (!sv.has(name)) sv.get(name).setNumber(def);
+    } catch(e){}
+  }
+  function setSceneNumber(name, n){
+    try { runtimeScene.getVariables().get(name).setNumber(Number(n) || 0); } catch(e){}
+  }
 
   ensureVarString("selectedTrackKey","");
   ensureVarString("BfChartJsonLoader","");
@@ -164,11 +179,13 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
   ensureVarNumber("jsmusicfinish",0);
   ensureVarNumber("Pause",0);
 
+  ensureSceneNumber("AllLoaded", 1); // initially 1 (nothing downloading)
+
   window.gdjsCustomAudio = window.gdjsCustomAudio || {};
   window.gdjsChannels = window.gdjsChannels || {};
   window._gdjs_manifest = window._gdjs_manifest || undefined;
 
-  // --- util: stop + cleanup (revoga blob URLs e limpa referências) ---
+  // --- stop + cleanup (revoga blobs e pausa elementos) ---
   function stopAndCleanupAll(revokeBlobUrls = true){
     try {
       if (window.gdjsChannels) {
@@ -196,7 +213,6 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
                 if (info && info.blobUrl && revokeBlobUrls) try{ URL.revokeObjectURL(info.blobUrl); }catch(e){}
               } catch(e){}
             });
-            // remove entry
             try{ delete window.gdjsCustomAudio[folder]; } catch(e){}
           } catch(e){}
         });
@@ -221,7 +237,6 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
         }
       }
     } catch(e){}
-    // fallback common paths
     const tries = ["manifest.json","resources/manifest.json","res/manifest.json","./manifest.json"];
     for (const p of tries) {
       try { const r = await fetch(p, {cache:"no-cache"}); if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
@@ -239,7 +254,7 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
     window._gdjs_manifest = null; return null;
   }
 
-  // --- GitHub listing fallback (respects token in localStorage or game var GitHubToken) ---
+  // --- GitHub listing fallback ---
   async function ghListApi(path="") {
     const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(path)}?ref=${GITHUB_BRANCH}`;
     let token = "";
@@ -252,7 +267,61 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
     return json.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
   }
 
-  // --- attach ended watcher to channel 0 ---
+  // --- audio search with fallback: tries difficultyPath -> songFolder -> modFolder (parent) ---
+  async function findAudioFilesWithFallback(rootFolder, difficultyPath) {
+    const manifest = await loadManifestPreferLocal();
+    async function audioListFromManifestPath(p) {
+      try {
+        if (!manifest) return [];
+        if (!manifest.hasOwnProperty(p)) return [];
+        const entry = manifest[p];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+          return entry.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
+        }
+      } catch(e){}
+      return [];
+    }
+    async function audioListFromGithubPath(p) {
+      try {
+        const api = await (async ()=> { try { return await ghListApi(p); } catch(e) { return []; } })();
+        return (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+      } catch(e){}
+      return [];
+    }
+
+    // 1) difficultyPath
+    try {
+      let list = await audioListFromManifestPath(difficultyPath);
+      if (list && list.length>0) return list;
+      list = await audioListFromGithubPath(difficultyPath);
+      if (list && list.length>0) return list;
+    } catch(e){}
+
+    // 2) rootFolder (song folder)
+    try {
+      let list = await audioListFromManifestPath(rootFolder);
+      if (list && list.length>0) return list;
+      list = await audioListFromGithubPath(rootFolder);
+      if (list && list.length>0) return list;
+    } catch(e){}
+
+    // 3) modFolder (parent of song)
+    try {
+      const parts = (rootFolder || "").split("/").filter(Boolean);
+      if (parts.length >= 2) {
+        const modFolder = parts.slice(0, parts.length - 1).join("/");
+        if (modFolder) {
+          let list = await audioListFromManifestPath(modFolder);
+          if (list && list.length>0) return list;
+          list = await audioListFromGithubPath(modFolder);
+          if (list && list.length>0) return list;
+        }
+      }
+    } catch(e){}
+    return [];
+  }
+
+  // --- attach ended watcher to channel 0 & audio context ---
   function attachEndedWatcherToChannel0(){
     const ch0 = window.gdjsChannels && window.gdjsChannels[0];
     if (!ch0) return;
@@ -262,8 +331,6 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
     ch0.addEventListener('ended', handler);
     ch0._gdjs_ended_handler = handler;
   }
-
-  // --- ensure audio context & connect elements (best-effort) ---
   async function ensureAudioContext(){
     try {
       if (!window._gdjs_audio_ctx) window._gdjs_audio_ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -282,7 +349,7 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
     } catch(e){}
   }
 
-  // --- download util (supports abort via controller.signal) ---
+  // --- fetch utils with AbortController support ---
   async function fetchAsBlob(url, signal){
     const resp = await fetch(url, { signal });
     if (!resp.ok) throw new Error(`Fetch ${url} failed ${resp.status}`);
@@ -294,181 +361,255 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
     return await resp.text();
   }
 
-  // --- main: download+prepare a folder (like your previous downloadSongFolder) ---
-  async function downloadAndPrepareFolder(folderPath, outerController){
-    // outerController: AbortController used to cancel all fetches
-    const ctrl = outerController;
+  // --- UI: modal overlay while downloading (no close button) ---
+  const OVERLAY_ID = "gdjs-download-overlay";
+  function showDownloadOverlay(message){
     try {
-      // stop previous audios (but do NOT revoke blobs yet if you want caching) - do full revoke so we start clean
+      let ov = document.getElementById(OVERLAY_ID);
+      if (ov) {
+        const msgEl = ov.querySelector(".gdjs-download-msg");
+        if (msgEl) msgEl.textContent = message || "Baixando...";
+        return;
+      }
+      ov = document.createElement("div");
+      ov.id = OVERLAY_ID;
+      Object.assign(ov.style, {
+        position: "fixed", left: "0", top: "0", right: "0", bottom: "0",
+        zIndex: 2000000, background: "rgba(0,0,0,0.6)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        pointerEvents: "auto"
+      });
+      const box = document.createElement("div");
+      Object.assign(box.style, { width: "360px", padding: "16px", borderRadius: "10px", background: "#0b0b0b", color: "#eee", textAlign: "center", boxShadow: "0 12px 40px rgba(0,0,0,0.6)" });
+      box.innerHTML = `<div style="font-weight:700;margin-bottom:10px">Baixando...</div>
+                       <div class="gdjs-download-msg" style="margin-bottom:12px">` + (message || "Aguarde — baixando recursos") + `</div>
+                       <div style="font-size:13px;opacity:0.85">Esta janela fecha automaticamente quando o download terminar.</div>
+                       <div style="margin-top:12px"><div class="gdjs-spinner" style="width:36px;height:36px;border-radius:50%;border:4px solid rgba(255,255,255,0.08);border-top-color:rgba(255,255,255,0.5);margin:10px auto;animation:gdjs-spin 1s linear infinite"></div></div>`;
+      const style = document.createElement("style");
+      style.textContent = `@keyframes gdjs-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`;
+      document.head.appendChild(style);
+      ov.appendChild(box);
+      document.body.appendChild(ov);
+    } catch(e){}
+  }
+  function hideDownloadOverlay(){
+    try {
+      const ov = document.getElementById(OVERLAY_ID);
+      if (ov) ov.remove();
+    } catch(e){}
+  }
+
+  // --- main downloader adapted: supports (rootFolder, difficultyName) or plain folderPath ---
+  async function downloadAndPrepareFolderFlexible(folderPathOrRoot, outerController, opts){
+    const ctrl = outerController;
+    const difficultyName = opts && opts.difficultyName ? opts.difficultyName : null;
+
+    try {
+      // clean previous caches but DO NOT revoke blobURLs of the new downloads until replaced
       stopAndCleanupAll(true);
 
-      // set selectedTrackKey (already set externally) and SongName
-      try { setVarString("SongName", basenameNoExt(folderPath.split("/").pop()||folderPath)); } catch(e){}
-      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath); } catch(e){}
-      try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(folderPath.split("/").pop()||folderPath)); } catch(e){}
+      // set selected and SongName (game var)
+      const rootFolder = (() => {
+        if (difficultyName) return folderPathOrRoot;
+        const parts = (folderPathOrRoot || "").split("/").filter(Boolean);
+        if (parts.length >= 3) return parts.slice(0, parts.length - 1).join("/");
+        return folderPathOrRoot;
+      })();
 
-      // get manifest or fallback to GitHub listing
+      let inferredDifficulty = difficultyName;
+      if (!inferredDifficulty && (folderPathOrRoot || "").split("/").filter(Boolean).length >= 3) {
+        const parts = (folderPathOrRoot || "").split("/").filter(Boolean);
+        inferredDifficulty = parts.slice(-1)[0];
+      }
+
+      try { setVarString("SongName", basenameNoExt((rootFolder || "").split("/").pop()||"")); } catch(e){}
+      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPathOrRoot); } catch(e){}
+
+      // mark AllLoaded = 0
+      setSceneNumber("AllLoaded", 0);
+
+      showDownloadOverlay("Preparando download...");
+
       const manifest = await loadManifestPreferLocal();
-      let files = null;
-      if (manifest && manifest.hasOwnProperty(folderPath)) {
-        const entry = manifest[folderPath];
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-          files = entry.map(e => ({ name: e.name, url: e.url || e.raw_url || null, type: e.type || "file" }));
-        } else {
-          files = [];
-        }
+
+      // determine audio list
+      let audioFiles = [];
+      if (inferredDifficulty) {
+        const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
+        audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
       } else {
-        // fallback to GitHub API listing
-        try {
-          const api = await ghListApi(folderPath);
-          files = (api || []).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`), type: i.type }));
-        } catch(e){
-          files = [];
+        const mp = (manifest && manifest.hasOwnProperty(folderPathOrRoot)) ? manifest[folderPathOrRoot] : null;
+        if (mp && Array.isArray(mp) && mp.length>0 && typeof mp[0] === "object") {
+          audioFiles = mp.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
+        } else {
+          try {
+            const api = await (async ()=> { try { return await ghListApi(folderPathOrRoot); } catch(e) { return []; } })();
+            audioFiles = (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+          } catch(e){}
         }
       }
 
-      if (!Array.isArray(files) || files.length === 0) {
-        // nothing to do
-        return { ok:false, reason: "empty" };
+      // determine charts map
+      const allJsonsMap = {};
+      if (inferredDifficulty) {
+        const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
+        if (manifest && manifest.hasOwnProperty(difficultyPath)) {
+          const entry = manifest[difficultyPath];
+          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+            entry.filter(e=> isJsonFile(e.name)).forEach(e=> allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: difficultyPath });
+          }
+        } else {
+          try {
+            const api = await (async ()=> { try { return await ghListApi(difficultyPath); } catch(e){ return []; } })();
+            (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i => allJsonsMap[i.name] = { name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`), origin: difficultyPath });
+          } catch(e){}
+        }
+      }
+      // include jsons from rootFolder as fallback
+      try {
+        if (manifest && manifest.hasOwnProperty(rootFolder)) {
+          const entry = manifest[rootFolder];
+          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+            entry.filter(e=> isJsonFile(e.name)).forEach(e=> { if (!allJsonsMap[e.name]) allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: rootFolder }; });
+          }
+        } else {
+          const api = await (async ()=> { try { return await ghListApi(rootFolder); } catch(e){ return []; } })();
+          (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i=> { if (!allJsonsMap[i.name]) allJsonsMap[i.name] = { name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`), origin: rootFolder }; });
+        }
+      } catch(e){}
+
+      // prepare storage
+      window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
+      const dest = window.gdjsCustomAudio[rootFolder];
+
+      // --- fetch audios (download only — DO NOT play) ---
+      let nextChannelIndex = 0;
+      for (const f of (audioFiles || [])) {
+        if (ctrl.signal.aborted) throw new Error("aborted");
+        try {
+          showDownloadOverlay(`Baixando áudio: ${f.name} ...`);
+          const blob = await fetchAsBlob(f.url, ctrl.signal);
+          const blobUrl = URL.createObjectURL(blob);
+
+          // create audio element but DO NOT call play()
+          const audioEl = new Audio();
+          audioEl.preload = "auto";
+          audioEl.crossOrigin = "anonymous";
+          audioEl.loop = false;
+
+          // set src via blobUrl and ensure paused/currentTime = 0
+          try { audioEl.src = blobUrl; } catch(e){}
+          try { audioEl.pause(); } catch(e){}
+          try { audioEl.currentTime = 0; } catch(e){}
+
+          // store references (mimic Script A structure)
+          dest.audios[f.name] = { blobUrl, audioEl };
+          window.gdjsChannels[nextChannelIndex] = audioEl;
+          nextChannelIndex++;
+          setVarString("SongName", setVarString || "" ); // noop guard - keep variable available
+        } catch(e){
+          // skip individual audio errors
+        }
+        await sleep(0);
       }
 
-      window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || { audios:{}, rawFiles:{} };
-      const dest = window.gdjsCustomAudio[folderPath];
-
-      // iterate files: fetch JSONs and audios
-      let nextChannelIndex = 0;
-      const unlockQueue = [];
-      for (const f of files){
+      // --- fetch charts / jsons ---
+      const ggvars = runtimeScene.getGame().getVariables();
+      for (const key in allJsonsMap) {
         if (ctrl.signal.aborted) throw new Error("aborted");
-        const fname = f.name || "file";
-        const url = f.url || f.download_url || null;
-        if (!url) continue;
-
-        if (isJsonFile(fname)) {
-          try {
-            const txt = await fetchAsText(url, ctrl.signal);
-            dest.rawFiles[fname] = txt;
-            const lname = fname.toLowerCase();
-            const ggvars = runtimeScene.getGame().getVariables();
-            if (/metadata|meta/.test(lname)) ggvars.get("metadatajson").setString(txt);
-            else if (/(bf|chartbf|chart_bf)/.test(lname)) ggvars.get("BfChartJsonLoader").setString(txt);
-            else if (/(dad|opp|opponent)/.test(lname)) ggvars.get("OppChartJsonLoader").setString(txt);
-            else {
-              // heuristic: if JSON looks like chart (has notes), try assign
-              try {
-                const parsed = JSON.parse(txt);
-                if (parsed && parsed.notes) {
-                  if (!ggvars.get("BfChartJsonLoader").getAsString()) ggvars.get("BfChartJsonLoader").setString(txt);
-                  else if (!ggvars.get("OppChartJsonLoader").getAsString()) ggvars.get("OppChartJsonLoader").setString(txt);
-                  else if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
-                } else {
-                  if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
-                }
-              } catch(e){
+        try {
+          const j = allJsonsMap[key];
+          showDownloadOverlay(`Baixando chart: ${j.name} ...`);
+          const txt = await fetchAsText(j.url, ctrl.signal);
+          const storeKey = (j.origin && j.origin !== rootFolder ? (j.origin.split("/").pop() + "/" + j.name) : j.name);
+          dest.rawFiles[storeKey] = txt;
+          const lname = j.name.toLowerCase();
+          if (/metadata|meta/.test(lname)) ggvars.get("metadatajson").setString(txt);
+          else if (/(bf|chartbf|chart_bf)/.test(lname)) ggvars.get("BfChartJsonLoader").setString(txt);
+          else if (/(dad|opp|opponent)/.test(lname)) ggvars.get("OppChartJsonLoader").setString(txt);
+          else {
+            try {
+              const parsed = JSON.parse(txt);
+              if (parsed && parsed.notes) {
+                if (!ggvars.get("BfChartJsonLoader").getAsString()) ggvars.get("BfChartJsonLoader").setString(txt);
+                else if (!ggvars.get("OppChartJsonLoader").getAsString()) ggvars.get("OppChartJsonLoader").setString(txt);
+                else if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
+              } else {
                 if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
               }
+            } catch(e){
+              if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
             }
-          } catch(e){
-            // ignore single-file errors
           }
-        } else if (isAudioFile(fname)) {
-          try {
-            const blob = await fetchAsBlob(url, ctrl.signal);
-            const blobUrl = URL.createObjectURL(blob);
-            const audioEl = new Audio(blobUrl);
-            audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
-            dest.audios[fname] = { blobUrl, audioEl };
-            window.gdjsChannels[nextChannelIndex] = audioEl;
-            nextChannelIndex++;
-            // priming
-            try {
-              const p = audioEl.play();
-              if (p && typeof p.then === "function") {
-                p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; }catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: fname}); });
-              } else { try{ audioEl.pause(); audioEl.currentTime = 0; }catch(e){} }
-            } catch(e){ unlockQueue.push({audioEl, name: fname}); }
-          } catch(e){
-            // fetch error for this audio -> skip
-          }
-        } else {
-          // ignore other files
+        } catch(e){
+          // ignore single-json errors
         }
-        // small break to keep UI responsive
         await sleep(0);
-      } // end for files
-
-      // pointerdown unlock for primed elements if needed
-      if (unlockQueue.length > 0) {
-        const unlock = async ()=> { for (const it of unlockQueue) { try{ await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; }catch(e){} } window.removeEventListener('pointerdown', unlock); };
-        window.addEventListener('pointerdown', unlock, { once:true });
       }
 
-      // ensure channel 0 ended watcher and audio context
+      // finalize: connect to audio context (no playback), attach ended watcher (harmless)
       attachEndedWatcherToChannel0();
       await ensureAudioContext();
       setVarNumber("jsmusicfinish", 0);
 
+      // success: set AllLoaded = 1 and hide overlay
+      setSceneNumber("AllLoaded", 1);
+      hideDownloadOverlay();
+
       return { ok:true };
     } catch(err){
-      // aborted or failed: ensure we cleaned up if aborted
-      if (err && String(err).toLowerCase().includes("aborted")) {
-        // aborted - cleanup was probably already done by new invocation
-      }
+      // aborted or failed
+      try { stopAndCleanupAll(true); } catch(e){}
+      setSceneNumber("AllLoaded", 0);
+      hideDownloadOverlay();
       return { ok:false, reason: err && err.message ? err.message : String(err) };
     }
   }
 
-  // --- watcher loop: detect changes to selectedTrackKey and trigger download ---
+  // --- watcher loop (selectedTrackKey) ---
   let lastSelected = getVarString("selectedTrackKey") || "";
   let currentDownloadController = null;
   let currentDownloadId = 0;
 
-  // start initial possible load (if variable already set)
+  // initial if already set
   async function startIfNeededOnStartup(){
     const sel = getVarString("selectedTrackKey") || "";
     if (sel && sel.trim()) {
-      // start a download job (fire-and-forget)
       currentDownloadId++;
       const myId = currentDownloadId;
       if (currentDownloadController) { try{ currentDownloadController.abort(); }catch(e){} }
       currentDownloadController = new AbortController();
-      downloadAndPrepareFolder(sel, currentDownloadController).then(res=>{
-        // if another download started in the meantime, ignore
+      const parts = sel.split("/").filter(Boolean);
+      downloadAndPrepareFolderFlexible(sel, currentDownloadController, {}).then(res=>{
         if (myId !== currentDownloadId) return;
-        // done or failed
       }).catch(()=>{});
       lastSelected = sel;
     }
   }
   startIfNeededOnStartup();
 
-  // polling loop (uses RAF for responsiveness)
+  // RAF poll
   (function pollLoop(){
     try {
       const cur = getVarString("selectedTrackKey") || "";
       if (cur !== lastSelected) {
-        // new selection detected
         lastSelected = cur;
-        // cancel previous download if exists
         try { if (currentDownloadController) currentDownloadController.abort(); } catch(e){}
         currentDownloadId++;
         const myId = currentDownloadId;
         currentDownloadController = new AbortController();
 
-        // quick sanity: if empty selection, just stop and cleanup
         if (!cur || !cur.trim()) {
           stopAndCleanupAll(true);
+          setSceneNumber("AllLoaded", 1);
         } else {
-          // start the download task (don't await here)
           (async ()=>{
-            // mark jsmusicfinish reset
+            setSceneNumber("AllLoaded", 0);
             setVarNumber("jsmusicfinish", 0);
-            // ensure SongName set early
             try { setVarString("SongName", basenameNoExt((cur.split("/").pop()||cur))); } catch(e){}
-            await downloadAndPrepareFolder(cur, currentDownloadController);
-            // after download: if this was still the latest job, set jsmusicfinish 0 and leave
+            await downloadAndPrepareFolderFlexible(cur, currentDownloadController, {});
             if (myId === currentDownloadId) {
-              // done. nothing else to do here (channels already prepared)
+              // finished for the current selection
             }
           })().catch(()=>{});
         }
@@ -477,7 +618,7 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
     requestAnimationFrame(pollLoop);
   })();
 
-  // raf loop to update jsmusicoffset & Pause logic (keeps previous behavior)
+  // raf loop: update jsmusicoffset & respect Pause (but do NOT auto-play)
   (function rafLoop(){
     try {
       const ch0 = window.gdjsChannels && window.gdjsChannels[0];
@@ -486,18 +627,13 @@ gdjs.PlayonlineCode.userFunc0xef4650 = function GDJSInlineCode(runtimeScene) {
       if (pauseVal) {
         Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (a && !a.paused && !a.ended) a.pause(); } catch(e){} });
       } else {
-        Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (!a) return; if (a.paused && !a.ended) { a.play().then(()=>{}).catch(()=>{}); } } catch(e){} });
+        // do NOT call play() here. leave elements paused and ready in memory.
       }
     } catch(e){}
     requestAnimationFrame(rafLoop);
   })();
 
-  // unlock on first gesture (priming)
-  window.addEventListener("pointerdown", async function unlockOnce(){
-    try { if (window._gdjs_audio_ctx && window._gdjs_audio_ctx.state === "suspended") await window._gdjs_audio_ctx.resume(); } catch(e){}
-    Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (!a) return; if (a.paused && !a.ended) { a.play().then(()=>{}).catch(()=>{}); } } catch(e){} });
-    window.removeEventListener("pointerdown", unlockOnce);
-  }, { once:true, passive:true });
+  // removed pointerdown priming/unlock so downloads never trigger sound
 
 })(runtimeScene);
 
@@ -507,12 +643,29 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xef4650(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x16a5c50(runtimeScene);
 
 }
 
 
 };gdjs.PlayonlineCode.eventsList1 = function(runtimeScene) {
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+isConditionTrue_0 = !(gdjs.multiplayer.isCurrentPlayerHost());
+if (isConditionTrue_0) {
+
+{ //Subevents
+gdjs.PlayonlineCode.eventsList0(runtimeScene);} //End of subevents
+}
+
+}
+
+
+};gdjs.PlayonlineCode.eventsList2 = function(runtimeScene) {
 
 {
 
@@ -542,185 +695,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x167db30 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-// SCRIPT: atualiza variável de cena "AllLoaded" conforme estado de downloads (rodar every frame)
-(function(runtimeScene){
-  try {
-    const sceneVars = runtimeScene.getVariables();
-    function ensureSceneVarNumber(name, def=0){ try { if (!sceneVars.has(name)) sceneVars.get(name).setNumber(def); } catch(e){} }
-    function setSceneVarNumber(name, n){ try { sceneVars.get(name).setNumber(Number(n) || 0); } catch(e){} }
-
-    ensureSceneVarNumber("AllLoaded", 0);
-
-    // game var helper
-    const gg = runtimeScene.getGame().getVariables();
-    function getGameVarString(name){ try { return gg.get(name).getAsString(); } catch(e){ return ""; } }
-
-    const selected = (getGameVarString("selectedTrackKey") || "").trim();
-    // default: não carregado
-    let allLoaded = false;
-
-    if (!selected) {
-      allLoaded = false;
-    } else {
-      const storage = window.gdjsCustomAudio && window.gdjsCustomAudio[selected];
-      if (!storage) {
-        allLoaded = false;
-      } else {
-        // check JSONs presence (if manifest provided JSONs originally you'll have rawFiles)
-        const rawFiles = storage.rawFiles || {};
-        const rawCount = Object.keys(rawFiles).length;
-
-        // check audios presence + readiness
-        const audios = storage.audios || {};
-        const audioNames = Object.keys(audios);
-        let audiosOk = true;
-        if (audioNames.length === 0) {
-          audiosOk = true; // no audios to wait for
-        } else {
-          for (let i=0;i<audioNames.length;i++){
-            const name = audioNames[i];
-            const info = audios[name] || {};
-            const el = info.audioEl || (window.gdjsChannels && window.gdjsChannels[i]) || null;
-            if (!el) { audiosOk = false; break; }
-            // readyState >= 3 (HAVE_FUTURE_DATA) or 4 (HAVE_ENOUGH_DATA) considered "loaded enough"
-            try {
-              const rs = Number(el.readyState || 0);
-              if (isNaN(rs) || rs < 3) { audiosOk = false; break; }
-            } catch(e){ audiosOk = false; break; }
-          }
-        }
-
-        // decide jsonsOk: if there were JSONs expected (manifest may indicate), prefer rawCount>0
-        // fallback: if there are audios but no rawFiles, consider jsonsOk = true
-        let jsonsOk = true;
-        // Heuristic: if manifest entry exists and had JSONs, rawFiles should contain them.
-        // We'll treat jsonsOk = rawCount>0 OR audioNames.length>0
-        if (rawCount > 0) jsonsOk = true;
-        else if (audioNames.length > 0) jsonsOk = true;
-        else jsonsOk = rawCount > 0; // conservative
-
-        allLoaded = audiosOk && jsonsOk;
-      }
-    }
-
-    // if download UI is visible and not allLoaded, force 0 (you asked that while UI exists during download set var 0)
-    const uiVisible = !!(document && document.getElementById && document.getElementById("gdjs-mod-list-ui-final"));
-    if (uiVisible && !allLoaded) {
-      setSceneVarNumber("AllLoaded", 0);
-    } else {
-      setSceneVarNumber("AllLoaded", allLoaded ? 1 : 0);
-    }
-
-  } catch(err){
-    // em caso de erro, garanta variável 0
-    try { runtimeScene.getVariables().get("AllLoaded").setNumber(0); } catch(e){}
-  }
-})(runtimeScene);
-
-
-};
-gdjs.PlayonlineCode.eventsList2 = function(runtimeScene) {
-
-{
-
-
-gdjs.PlayonlineCode.userFunc0x167db30(runtimeScene);
-
-}
-
-
-};gdjs.PlayonlineCode.userFunc0x1a231a0 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-// SCRIPT: atualiza variável de cena "AllLoaded" conforme estado de downloads (rodar every frame)
-(function(runtimeScene){
-  try {
-    const sceneVars = runtimeScene.getVariables();
-    function ensureSceneVarNumber(name, def=0){ try { if (!sceneVars.has(name)) sceneVars.get(name).setNumber(def); } catch(e){} }
-    function setSceneVarNumber(name, n){ try { sceneVars.get(name).setNumber(Number(n) || 0); } catch(e){} }
-
-    ensureSceneVarNumber("AllLoaded2", 0);
-
-    // game var helper
-    const gg = runtimeScene.getGame().getVariables();
-    function getGameVarString(name){ try { return gg.get(name).getAsString(); } catch(e){ return ""; } }
-
-    const selected = (getGameVarString("selectedTrackKey") || "").trim();
-    // default: não carregado
-    let allLoaded = false;
-
-    if (!selected) {
-      allLoaded = false;
-    } else {
-      const storage = window.gdjsCustomAudio && window.gdjsCustomAudio[selected];
-      if (!storage) {
-        allLoaded = false;
-      } else {
-        // check JSONs presence (if manifest provided JSONs originally you'll have rawFiles)
-        const rawFiles = storage.rawFiles || {};
-        const rawCount = Object.keys(rawFiles).length;
-
-        // check audios presence + readiness
-        const audios = storage.audios || {};
-        const audioNames = Object.keys(audios);
-        let audiosOk = true;
-        if (audioNames.length === 0) {
-          audiosOk = true; // no audios to wait for
-        } else {
-          for (let i=0;i<audioNames.length;i++){
-            const name = audioNames[i];
-            const info = audios[name] || {};
-            const el = info.audioEl || (window.gdjsChannels && window.gdjsChannels[i]) || null;
-            if (!el) { audiosOk = false; break; }
-            // readyState >= 3 (HAVE_FUTURE_DATA) or 4 (HAVE_ENOUGH_DATA) considered "loaded enough"
-            try {
-              const rs = Number(el.readyState || 0);
-              if (isNaN(rs) || rs < 3) { audiosOk = false; break; }
-            } catch(e){ audiosOk = false; break; }
-          }
-        }
-
-        // decide jsonsOk: if there were JSONs expected (manifest may indicate), prefer rawCount>0
-        // fallback: if there are audios but no rawFiles, consider jsonsOk = true
-        let jsonsOk = true;
-        // Heuristic: if manifest entry exists and had JSONs, rawFiles should contain them.
-        // We'll treat jsonsOk = rawCount>0 OR audioNames.length>0
-        if (rawCount > 0) jsonsOk = true;
-        else if (audioNames.length > 0) jsonsOk = true;
-        else jsonsOk = rawCount > 0; // conservative
-
-        allLoaded = audiosOk && jsonsOk;
-      }
-    }
-
-    // if download UI is visible and not allLoaded, force 0 (you asked that while UI exists during download set var 0)
-    const uiVisible = !!(document && document.getElementById && document.getElementById("gdjs-mod-list-ui-final"));
-    if (uiVisible && !allLoaded) {
-      setSceneVarNumber("AllLoaded2", 0);
-    } else {
-      setSceneVarNumber("AllLoaded2", allLoaded ? 1 : 0);
-    }
-
-  } catch(err){
-    // em caso de erro, garanta variável 0
-    try { runtimeScene.getVariables().get("AllLoaded2").setNumber(0); } catch(e){}
-  }
-})(runtimeScene);
-
-
-};
-gdjs.PlayonlineCode.eventsList3 = function(runtimeScene) {
-
-{
-
-
-gdjs.PlayonlineCode.userFunc0x1a231a0(runtimeScene);
-
-}
-
-
-};gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
+};gdjs.PlayonlineCode.eventsList3 = function(runtimeScene) {
 
 {
 
@@ -746,11 +721,11 @@ let isConditionTrue_0 = false;
 {
 {gdjs.evtTools.camera.setCameraX(runtimeScene, gdjs.evtTools.camera.getCameraX(runtimeScene, "", 0) + (2220), "", 0);
 }
-{runtimeScene.getGame().getVariables().getFromIndex(55).getChild(2).setString("NoBotplay");
+{runtimeScene.getGame().getVariables().getFromIndex(56).getChild(2).setString("NoBotplay");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "Botplay", "NoBotplay");
 }
-{runtimeScene.getGame().getVariables().getFromIndex(55).getChild(3).setString("NoMissesChallenge");
+{runtimeScene.getGame().getVariables().getFromIndex(56).getChild(3).setString("NoMissesChallenge");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "MissChallenge", "NoMissChallenge");
 }
@@ -759,10 +734,9 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xf330e8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1a86ac8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT A — manifest-aware (local variable OR project resource OR CDN OR GitHub)
-// Usa na ordem: global var 'manifestjson' -> project resource 'manifest.json' -> jsDelivr manifest -> GitHub API fallback.
+// SCRIPT A — compatibilidade: procura áudio na difficulty -> song folder -> mod folder (fallback)
 (function () {
   const GITHUB_OWNER = "LucyYuih";
   const GITHUB_REPO = "gdev-custom-charts";
@@ -770,19 +744,18 @@ let isConditionTrue_0 = false;
   const MANIFEST_CDN_URL = `https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/manifest.json`;
 
   if (document.getElementById("gdjs-mod-list-ui-final")) return;
+  window._gdjs_manifest = window._gdjs_manifest || undefined;
 
-  // small helpers
   function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
   function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
   function isJsonFile(name){ return /\.json$/i.test(name); }
   function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
 
-  // ===== new: stop & cleanup util =====
+  // stop + cleanup util
   function stopAndCleanupPrevious(options){
     options = options || {};
     const revokeBlobUrls = options.revokeBlobUrls === true;
     try {
-      // pause and reset all channels
       if (window.gdjsChannels) {
         Object.keys(window.gdjsChannels).forEach(k=>{
           try {
@@ -791,13 +764,11 @@ let isConditionTrue_0 = false;
             try { a.pause(); } catch(e){}
             try { a.currentTime = 0; } catch(e){}
             if (a._gdjs_ended_handler) { try { a.removeEventListener('ended', a._gdjs_ended_handler); } catch(e){} a._gdjs_ended_handler = null; }
-            // try revoke src if blob:
             try { if (revokeBlobUrls && a.src && a.src.startsWith('blob:')) URL.revokeObjectURL(a.src); } catch(e){}
           } catch(e){}
         });
       }
 
-      // revoke and delete stored blobUrls in gdjsCustomAudio
       if (window.gdjsCustomAudio) {
         Object.keys(window.gdjsCustomAudio).forEach(folder=>{
           try {
@@ -811,18 +782,16 @@ let isConditionTrue_0 = false;
                 }
               } catch(e){}
             });
-            // remove the entry entirely
             try { delete window.gdjsCustomAudio[folder]; } catch(e){}
           } catch(e){}
         });
       }
 
-      // finally clear the channels map
       window.gdjsChannels = {};
     } catch(e){}
   }
 
-  // ---------- Manifest loaders (tries multiple strategies) ----------
+  // ---------- manifest & github helpers ----------
   async function tryManifestFromGameVar() {
     try {
       if (typeof runtimeScene !== "undefined" && runtimeScene.getGame) {
@@ -830,7 +799,7 @@ let isConditionTrue_0 = false;
         if (gg.has("manifestjson")) {
           const s = gg.get("manifestjson").getAsString();
           if (s && s.trim()) {
-            try { return JSON.parse(s); } catch(e) { console.warn("manifestjson invalid JSON"); return null; }
+            try { return JSON.parse(s); } catch(e) { return null; }
           }
         }
       }
@@ -854,31 +823,15 @@ let isConditionTrue_0 = false;
       }
     } catch(e){}
 
-    try {
-      let candidateUrls = [
-        "manifest.json",
-        "resources/manifest.json",
-        "res/manifest.json",
-        "./manifest.json"
-      ];
-      for (const u of candidateUrls) {
-        try {
-          const r = await fetch(u, {cache:"no-cache"});
-          if (r.ok) {
-            try { return await r.json(); } catch(e){}
-          }
-        } catch(e){}
-      }
-    } catch(e){}
+    const tries = ["manifest.json","resources/manifest.json","res/manifest.json","./manifest.json"];
+    for (const p of tries) {
+      try { const r = await fetch(p, {cache:"no-cache"}); if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
+    }
     return null;
   }
 
   async function tryManifestFromCDN() {
-    try {
-      const r = await fetch(MANIFEST_CDN_URL, {cache:"no-cache"});
-      if (r.ok) return await r.json();
-    } catch(e){}
-    return null;
+    try { const r = await fetch(MANIFEST_CDN_URL, {cache:"no-cache"}); if (r.ok) return await r.json(); } catch(e){} return null;
   }
 
   async function tryManifestFromGithubApi(path = "") {
@@ -897,25 +850,87 @@ let isConditionTrue_0 = false;
       if (r.status === 403) throw new Error("GitHub API: 403");
       throw new Error(`GitHub API: ${r.status}`);
     }
-    const json = await r.json();
-    return json;
+    return await r.json();
   }
 
-  // unified manifest loader tries the strategies in order and caches result
   let _manifest_cache = undefined;
   async function loadManifestPreferLocal() {
     if (typeof _manifest_cache !== "undefined") return _manifest_cache;
-    const fromVar = await tryManifestFromGameVar();
-    if (fromVar) { _manifest_cache = fromVar; return _manifest_cache; }
-    const fromRes = await tryManifestFromProjectResource();
-    if (fromRes) { _manifest_cache = fromRes; return _manifest_cache; }
-    const fromCdn = await tryManifestFromCDN();
-    if (fromCdn) { _manifest_cache = fromCdn; return _manifest_cache; }
-    _manifest_cache = null;
-    return null;
+    const a = await tryManifestFromGameVar(); if (a) { _manifest_cache = a; window._gdjs_manifest = _manifest_cache; return a; }
+    const b = await tryManifestFromProjectResource(); if (b) { _manifest_cache = b; window._gdjs_manifest = _manifest_cache; return b; }
+    const c = await tryManifestFromCDN(); if (c) { _manifest_cache = c; window._gdjs_manifest = _manifest_cache; return c; }
+    _manifest_cache = null; window._gdjs_manifest = null; return null;
   }
 
-  // ---------- UI (keeps previous behavior, token removed) ----------
+  async function ghListForFolder(path="") {
+    try {
+      const api = await tryManifestFromGithubApi(path);
+      return (api || []).map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
+    } catch(e){ throw e; }
+  }
+
+  // ---------- novo: procura de arquivos de áudio com fallback ----------
+  // tenta na difficultyPath -> songFolder (rootFolder) -> modFolder (pai de songFolder)
+  async function findAudioFilesWithFallback(rootFolder, difficultyPath) {
+    // rootFolder example: "modName/songName"
+    // difficultyPath example: "modName/songName/hard"
+    const manifest = await loadManifestPreferLocal();
+
+    async function audioListFromManifestPath(p) {
+      try {
+        if (!manifest) return [];
+        if (!manifest.hasOwnProperty(p)) return [];
+        const entry = manifest[p];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+          return entry.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
+        }
+      } catch(e){}
+      return [];
+    }
+
+    async function audioListFromGithubPath(p) {
+      try {
+        const api = await tryManifestFromGithubApi(p);
+        return (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+      } catch(e){}
+      return [];
+    }
+
+    // 1) try difficultyPath
+    try {
+      let list = await audioListFromManifestPath(difficultyPath);
+      if (list && list.length>0) return list;
+      list = await audioListFromGithubPath(difficultyPath);
+      if (list && list.length>0) return list;
+    } catch(e){}
+
+    // 2) try rootFolder (song folder)
+    try {
+      let list = await audioListFromManifestPath(rootFolder);
+      if (list && list.length>0) return list;
+      list = await audioListFromGithubPath(rootFolder);
+      if (list && list.length>0) return list;
+    } catch(e){}
+
+    // 3) try modFolder (parent folder of rootFolder)
+    try {
+      const parts = (rootFolder || "").split("/").filter(Boolean);
+      if (parts.length >= 2) {
+        const modFolder = parts.slice(0, parts.length - 1).join("/");
+        if (modFolder) {
+          let list = await audioListFromManifestPath(modFolder);
+          if (list && list.length>0) return list;
+          list = await audioListFromGithubPath(modFolder);
+          if (list && list.length>0) return list;
+        }
+      }
+    } catch(e){}
+
+    // nothing found
+    return [];
+  }
+
+  // ---------- UI (mesma estrutura, sem mudar comportamento visual) ----------
   const container = document.createElement("div");
   container.id = "gdjs-mod-list-ui-final";
   Object.assign(container.style, {
@@ -942,6 +957,7 @@ let isConditionTrue_0 = false;
   footer.innerHTML = `<div id="gdjs-final-status" style="font-size:13px;opacity:0.9;height:18px"></div><div style="display:flex;gap:8px;align-items:center"><div style="font-size:13px">Último baixado:</div><div id="gdjs-final-last" style="flex:1;text-align:right;font-size:13px;opacity:0.85"></div></div><div style="display:flex;gap:8px;align-items:center"><div style="font-size:13px">Progresso:</div><div id="gdjs-final-progress" style="flex:1;text-align:right;font-size:13px;opacity:0.85"></div></div>`;
   container.appendChild(header); container.appendChild(listWrapper); container.appendChild(footer);
   document.body.appendChild(container);
+
   const btnBack = document.getElementById("gdjs-final-back"), btnRefresh = document.getElementById("gdjs-final-refresh"), btnClose = document.getElementById("gdjs-final-close"), searchInput = document.getElementById("gdjs-final-search");
   const statusEl = document.getElementById("gdjs-final-status"), lastEl = document.getElementById("gdjs-final-last"), progressEl = document.getElementById("gdjs-final-progress");
 
@@ -949,7 +965,7 @@ let isConditionTrue_0 = false;
   function setLast(s){ lastEl.textContent = s || ""; }
   function setProg(s){ progressEl.textContent = s || ""; }
 
-  // state for listing
+  // state
   let currentPath = "";
   let currentItems = [];
   const pathHistory = [];
@@ -957,7 +973,6 @@ let isConditionTrue_0 = false;
   let elementMapForPath = {};
   let backgroundCheckerAbort = null;
 
-  // render
   function renderList(items) {
     listWrapper.innerHTML = "";
     elementMapForPath = {};
@@ -969,11 +984,10 @@ let isConditionTrue_0 = false;
       const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px";
       const placeholderBtn = document.createElement("button"); placeholderBtn.textContent = "Checando..."; placeholderBtn.disabled = true; placeholderBtn.style.padding = "6px"; placeholderBtn.style.borderRadius = "6px";
       right.appendChild(placeholderBtn); row.appendChild(left); row.appendChild(right); listWrapper.appendChild(row);
-      elementMapForPath[item.path] = { rightContainer: right, placeholderBtn };
+      elementMapForPath[item.path] = { rightContainer: right, placeholderBtn, name: item.name };
     }
   }
 
-  // background check (small pool)
   function startBackgroundCheck(items) {
     if (backgroundCheckerAbort && typeof backgroundCheckerAbort.abort === "function") { try{ backgroundCheckerAbort.abort(); }catch(e){} }
     const controller = { aborted:false, abort(){ this.aborted=true; } }; backgroundCheckerAbort = controller;
@@ -1010,27 +1024,78 @@ let isConditionTrue_0 = false;
     for (let i=0;i<concurrency;i++) worker();
   }
 
+  async function fetchSubdirs(folderPath) {
+    try {
+      const manifest = await loadManifestPreferLocal();
+      if (manifest && manifest.hasOwnProperty(folderPath)) {
+        const entry = manifest[folderPath];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "string") return entry.slice();
+      }
+    } catch(e){}
+    try {
+      const api = await ghListForFolder(folderPath);
+      const dirs = (api || []).filter(i=> i.type === "dir").map(i=> i.name);
+      return dirs;
+    } catch(e){}
+    return [];
+  }
+
+  // modal: only list difficulties (no raiz, no baixar todas)
+  function showDifficultyChooser(rootFolder, subdirs) {
+    const overlay = document.createElement("div");
+    Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 1000000, display: "flex", alignItems: "center", justifyContent: "center" });
+    const box = document.createElement("div");
+    Object.assign(box.style, { width: "420px", maxHeight: "70vh", overflowY: "auto", background: "#0f0f10", borderRadius: "8px", padding: "12px", boxShadow: "0 12px 40px rgba(0,0,0,0.6)", color: "#eee" });
+    box.innerHTML = `<div style="font-weight:700;margin-bottom:8px">Escolha uma difficulty para:</div><div style="margin-bottom:8px;color:#bbb">${rootFolder}</div>`;
+    const list = document.createElement("div"); list.style.display = "flex"; list.style.flexDirection = "column"; list.style.gap = "6px";
+    for (const d of subdirs) {
+      const b = document.createElement("button");
+      b.textContent = d;
+      b.style.padding="8px"; b.style.borderRadius="6px";
+      b.onclick = ()=> { overlay.remove(); downloadDifficultyKeepAudioRoot(rootFolder, d); };
+      list.appendChild(b);
+    }
+    const cancel = document.createElement("button"); cancel.textContent = "Cancelar"; cancel.style.marginTop="10px"; cancel.style.padding="8px"; cancel.style.borderRadius="6px";
+    cancel.onclick = ()=> overlay.remove();
+    box.appendChild(list); box.appendChild(cancel);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  }
+
+  // update per-item buttons:
   function updateButtonsForDecisionFromCache(path, hasSubdirs) {
     const el = elementMapForPath[path];
     if (!el) return;
     const right = el.rightContainer; right.innerHTML = "";
+    const itemName = el.name || path.split("/").pop();
+
     if (hasSubdirs) {
-      const openBtn = document.createElement("button"); openBtn.textContent = "Abrir"; openBtn.style.padding="6px"; openBtn.style.borderRadius="6px"; openBtn.onclick = ()=> openFolder(path);
-      right.appendChild(openBtn);
+      if (!currentPath || currentPath === "") {
+        // root listing: item is a mod folder
+        const openBtn = document.createElement("button"); openBtn.textContent = "Abrir"; openBtn.style.padding="6px"; openBtn.style.borderRadius="6px"; openBtn.onclick = ()=> openFolder(path);
+        right.appendChild(openBtn);
+      } else {
+        // inside mod: item is a song with difficulties -> show only select difficulty
+        const pickBtn = document.createElement("button"); pickBtn.textContent = "Selecionar difficulty"; pickBtn.style.padding="6px"; pickBtn.style.borderRadius="6px";
+        pickBtn.onclick = async ()=>{
+          try {
+            setStatus("Carregando difficulties de " + itemName + "...");
+            const subdirs = await fetchSubdirs(path);
+            if (!subdirs || subdirs.length === 0) { setStatus("Nenhuma difficulty encontrada."); return; }
+            showDifficultyChooser(path, subdirs);
+            setStatus("");
+          } catch(e){ setStatus("Erro listando difficulties."); }
+        };
+        right.appendChild(pickBtn);
+      }
     } else {
+      // leaf song (no subdirs) -> selectable and downloadable directly
       const dlBtn = document.createElement("button"); dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px"; dlBtn.onclick = ()=> downloadSongFolder(path);
       right.appendChild(dlBtn);
     }
   }
 
-  async function ghListForFolder(path="") {
-    try {
-      const apiList = await tryManifestFromGithubApi(path);
-      return apiList.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
-    } catch(e){ throw e; }
-  }
-
-  // load folder (only directories)
+  // load folder (directories)
   async function loadFolder(path="") {
     try {
       setStatus("Carregando pasta...");
@@ -1041,12 +1106,14 @@ let isConditionTrue_0 = false;
           const entry = manifest[path];
           if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "string") {
             return entry.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
-          } else {
-            return [];
           }
         }
-        const api = await ghListForFolder(path);
-        return (api || []).filter(it => it.type === "dir").map(it => ({ name: it.name, path: it.path, type: "dir" }));
+        try {
+          const api = await ghListForFolder(path);
+          return (api || []).filter(it => it.type === "dir").map(it => ({ name: it.name, path: it.path, type: "dir" }));
+        } catch(e){
+          return [];
+        }
       })();
       currentItems = items || [];
       currentPath = path || "";
@@ -1063,19 +1130,257 @@ let isConditionTrue_0 = false;
   async function openFolder(path) { if (currentPath !== path) pathHistory.push(currentPath); await loadFolder(path); }
 
   btnBack.onclick = async ()=> { if (pathHistory.length === 0) { await loadFolder(""); return; } const prev = pathHistory.pop(); await loadFolder(prev || ""); };
-  btnRefresh.onclick = async ()=> { setStatus("Atualizando..."); try { const items = currentItems||[]; for (const it of items) delete hasSubdirsCache[it.path]; } catch(e){} _manifest_cache = undefined; await loadFolder(currentPath||""); };
+  btnRefresh.onclick = async ()=> {
+    try { setStatus("Atualizando..."); } catch(e){}
+    try { const items = currentItems||[]; for (const it of items) delete hasSubdirsCache[it.path]; } catch(e){}
+    try { _manifest_cache = undefined; } catch(e){}
+    try { window._gdjs_manifest = undefined; delete window._gdjs_manifest; } catch(e){}
+    try { await sleep(30); } catch(e){}
+    await loadFolder(currentPath||"");
+  };
   btnClose.onclick = ()=> container.remove();
   searchInput.addEventListener("input", ()=> { const q = searchInput.value.trim().toLowerCase(); if (!q) { renderList(currentItems); setStatus((currentPath||"Mods")+` — ${currentItems.length} pastas`); setTimeout(()=> startBackgroundCheck(currentItems), 10); return; } const filtered = currentItems.filter(it => it.name.toLowerCase().includes(q)); renderList(filtered); setStatus(`Resultado: ${filtered.length} / ${currentItems.length}`); setTimeout(()=> startBackgroundCheck(filtered), 10); });
 
-  // downloader: prefers manifest file URLs when present, else builds cdn url, else GitHub API
+  // downloader helpers
   window.gdjsCustomAudio = window.gdjsCustomAudio || {};
   window.gdjsChannels = window.gdjsChannels || {};
 
-  async function downloadSongFolder(folderPath) {
-    // disable close until finished
+  // download JSONs for chosen difficulty, audios with fallback
+  async function downloadDifficultyKeepAudioRoot(rootFolder, difficultyName) {
+    const difficultyPath = (rootFolder? rootFolder + "/" + difficultyName : difficultyName);
     try { btnClose.disabled = true; } catch(e){}
     try {
-      // stop/cleanup previous before doing anything (revoke previous blobs)
+      stopAndCleanupPrevious({ revokeBlobUrls: true });
+
+      // mark selected track
+      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
+      try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
+
+      setStatus("Listando arquivos (procura áudios: difficulty -> song -> mod)...");
+      // usa fallback novo
+      const audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
+
+      // charts: from difficultyPath
+      let chartFiles = [];
+      const manifest = await loadManifestPreferLocal();
+      if (manifest && manifest.hasOwnProperty(difficultyPath)) {
+        const entry = manifest[difficultyPath];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+          chartFiles = entry.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url || e.raw_url || null }) );
+        }
+      } else {
+        try {
+          const api = await ghListForFolder(difficultyPath);
+          chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+        } catch(e){}
+      }
+
+      // also include any jsons that might exist in rootFolder (fallback)
+      let rootJsons = [];
+      if (manifest && manifest.hasOwnProperty(rootFolder)) {
+        const entry = manifest[rootFolder];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+          rootJsons = entry.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url || e.raw_url || null }) );
+        }
+      } else {
+        try {
+          const api = await ghListForFolder(rootFolder);
+          rootJsons = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+        } catch(e){}
+      }
+
+      // merge jsons, difficulty ones override root ones
+      const allJsonsMap = {};
+      rootJsons.forEach(j => { allJsonsMap[j.name] = j; });
+      chartFiles.forEach(j => { allJsonsMap[j.name] = j; });
+
+      // prepare storage under rootFolder key
+      window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
+      const dest = window.gdjsCustomAudio[rootFolder];
+
+      // download audios (from whichever source the fallback returned)
+      let nextChannelIndex = 0;
+      const unlockQueue = [];
+      for (const f of (audioFiles || [])) {
+        try {
+          setStatus("Baixando áudio: " + f.name + "...");
+          const resp = await fetch(f.url);
+          if (!resp.ok) continue;
+          const blob = await resp.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const audioEl = new Audio(blobUrl);
+          audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
+          dest.audios[f.name] = { blobUrl, audioEl };
+          window.gdjsChannels[nextChannelIndex] = audioEl;
+          nextChannelIndex++;
+          try {
+            const p = audioEl.play();
+            if (p && typeof p.then === "function") {
+              p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: f.name}); });
+            } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
+          } catch(e){ unlockQueue.push({audioEl, name: f.name}); }
+          setLast(f.name);
+        } catch(e){}
+        await sleep(0);
+      }
+
+      // download jsons (from difficulty primarily)
+      for (const name in allJsonsMap) {
+        try {
+          const j = allJsonsMap[name];
+          setStatus("Baixando chart: " + name + "...");
+          const r = await fetch(j.url);
+          if (!r.ok) continue;
+          const txt = await r.text();
+          // store under key indicating difficulty origin
+          const key = difficultyName + "/" + name;
+          dest.rawFiles[key] = txt;
+          const lname = name.toLowerCase();
+          const gg = runtimeScene.getGame().getVariables();
+          if (/metadata|meta/.test(lname)) gg.get("metadatajson").setString(txt);
+          else if (/(bf|chartbf|chart_bf)/.test(lname)) gg.get("BfChartJsonLoader").setString(txt);
+          else if (/(dad|opp|opponent)/.test(lname)) gg.get("OppChartJsonLoader").setString(txt);
+          else {
+            try {
+              const parsed = JSON.parse(txt);
+              if (parsed && parsed.notes) {
+                if (!gg.get("BfChartJsonLoader").getAsString()) gg.get("BfChartJsonLoader").setString(txt);
+                else if (!gg.get("OppChartJsonLoader").getAsString()) gg.get("OppChartJsonLoader").setString(txt);
+                else if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+              } else {
+                if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+              }
+            } catch(e){
+              if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+            }
+          }
+          setLast(name);
+        } catch(e){}
+        await sleep(0);
+      }
+
+      // unlock on gesture if needed
+      if (unlockQueue.length > 0) {
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        window.addEventListener('pointerdown', unlock, { once: true });
+      }
+
+      setStatus('Download concluído para "' + rootFolder + '" (difficulty: ' + difficultyName + ').'); setProg("");
+    } catch(e){
+      setStatus("Erro ao baixar: " + (e && e.message ? e.message : e)); setProg("");
+    } finally {
+      try { btnClose.disabled = false; } catch(e){}
+    }
+  }
+
+  // download all difficulties (áudios também usando fallback)
+  async function downloadAllDifficulties(rootFolder, subdirs) {
+    try { btnClose.disabled = true; } catch(e){}
+    try {
+      stopAndCleanupPrevious({ revokeBlobUrls: true });
+      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
+      try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
+
+      setStatus("Procurando áudios (difficulty -> song -> mod)...");
+      // Try to find audios via fallback. We can pass the first difficulty path as a hint, but fallback will try root and mod as well.
+      const hintDifficulty = (subdirs && subdirs.length>0) ? (rootFolder + "/" + subdirs[0]) : rootFolder;
+      const audioFiles = await findAudioFilesWithFallback(rootFolder, hintDifficulty);
+
+      window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
+      const dest = window.gdjsCustomAudio[rootFolder];
+      let nextChannelIndex = 0;
+      const unlockQueue = [];
+      for (const f of (audioFiles || [])) {
+        try {
+          setStatus("Baixando áudio: " + f.name + "...");
+          const resp = await fetch(f.url);
+          if (!resp.ok) continue;
+          const blob = await resp.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const audioEl = new Audio(blobUrl);
+          audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
+          dest.audios[f.name] = { blobUrl, audioEl };
+          window.gdjsChannels[nextChannelIndex] = audioEl;
+          nextChannelIndex++;
+          try {
+            const p = audioEl.play();
+            if (p && typeof p.then === "function") {
+              p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: f.name}); });
+            } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
+          } catch(e){ unlockQueue.push({audioEl, name: f.name}); }
+          setLast(f.name);
+        } catch(e){}
+        await sleep(0);
+      }
+
+      // then download all jsons from each subdir
+      const manifest = await loadManifestPreferLocal();
+      for (const d of subdirs) {
+        try {
+          setStatus("Baixando charts: " + d + " ...");
+          let chartFiles = [];
+          const difficultyPath = (rootFolder? rootFolder + "/" + d : d);
+          if (manifest && manifest.hasOwnProperty(difficultyPath)) {
+            const entry = manifest[difficultyPath];
+            if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+              chartFiles = entry.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url || e.raw_url || null }) );
+            }
+          } else {
+            try {
+              const api = await ghListForFolder(difficultyPath);
+              chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+            } catch(e){}
+          }
+          for (const j of chartFiles) {
+            try {
+              const r = await fetch(j.url);
+              if (!r.ok) continue;
+              const txt = await r.text();
+              const key = d + "/" + j.name;
+              dest.rawFiles[key] = txt;
+              const lname = j.name.toLowerCase();
+              const gg = runtimeScene.getGame().getVariables();
+              if (/metadata|meta/.test(lname)) gg.get("metadatajson").setString(txt);
+              else if (/(bf|chartbf|chart_bf)/.test(lname)) gg.get("BfChartJsonLoader").setString(txt);
+              else if (/(dad|opp|opponent)/.test(lname)) gg.get("OppChartJsonLoader").setString(txt);
+              else {
+                try {
+                  const parsed = JSON.parse(txt);
+                  if (parsed && parsed.notes) {
+                    if (!gg.get("BfChartJsonLoader").getAsString()) gg.get("BfChartJsonLoader").setString(txt);
+                    else if (!gg.get("OppChartJsonLoader").getAsString()) gg.get("OppChartJsonLoader").setString(txt);
+                    else if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+                  } else {
+                    if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+                  }
+                } catch(e){
+                  if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+                }
+              }
+              setLast(j.name);
+            } catch(e){}
+            await sleep(0);
+          }
+        } catch(e){}
+      }
+
+      if (unlockQueue.length > 0) {
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        window.addEventListener('pointerdown', unlock, { once: true });
+      }
+
+      setStatus('Download concluído para "' + rootFolder + '" (todas difficulties).'); setProg("");
+    } catch(e){
+      setStatus("Erro ao baixar: " + (e && e.message ? e.message : e)); setProg("");
+    } finally {
+      try { btnClose.disabled = false; } catch(e){}
+    }
+  }
+
+  // standard leaf download (sem mudanças)
+  async function downloadSongFolder(folderPath) {
+    try { btnClose.disabled = true; } catch(e){}
+    try {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
 
       setStatus("Listando arquivos em " + folderPath + "...");
@@ -1085,14 +1390,17 @@ let isConditionTrue_0 = false;
         const entry = manifest[folderPath];
         if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
           files = entry.map(e => ({ name: e.name, url: e.url || e.raw_url || null, type: e.type || "file" }));
-        } else if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "string") {
-          files = [];
         } else {
           files = [];
         }
       } else {
-        const apiList = await ghListForFolder(folderPath);
-        files = (apiList || []).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`), type: i.type }));
+        try {
+          const apiList = await ghListForFolder(folderPath);
+          files = (apiList || []).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`), type: i.type }));
+          files = files.filter(x => x.type !== "dir");
+        } catch(e){
+          files = [];
+        }
       }
 
       if (!Array.isArray(files) || files.length === 0) { setStatus("Pasta vazia."); return; }
@@ -1100,7 +1408,6 @@ let isConditionTrue_0 = false;
       window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || {audios:{}, rawFiles:{}};
       const dest = window.gdjsCustomAudio[folderPath];
 
-      // set selectedTrackKey and SongName
       try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath); } catch(e){}
       try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(folderPath.split("/").pop()||folderPath)); } catch(e){}
 
@@ -1165,12 +1472,9 @@ let isConditionTrue_0 = false;
             try { const gg = runtimeScene.getGame().getVariables(); if (!gg.get("SongName").getAsString()) gg.get("SongName").setString(basenameNoExt(fname)); } catch(e){}
             setLast(fname);
           } catch(e){}
-        } else {
-          // ignore other files
         }
-
         await sleep(0);
-      } // end files loop
+      }
 
       if (unlockQueue.length > 0) {
         const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
@@ -1181,7 +1485,6 @@ let isConditionTrue_0 = false;
     } catch(e){
       setStatus("Erro ao baixar pasta: " + (e && e.message ? e.message : e)); setProg("");
     } finally {
-      // re-enable close button
       try { btnClose.disabled = false; } catch(e){}
     }
   }
@@ -1192,20 +1495,17 @@ let isConditionTrue_0 = false;
 })();
 
 };
-gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
+gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0xf330e8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1a86ac8(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.mapOfEmptyGDStartObjects = Hashtable.newFrom({"Start": []});
-gdjs.PlayonlineCode.mapOfEmptyGDStartObjects = Hashtable.newFrom({"Start": []});
-gdjs.PlayonlineCode.mapOfGDgdjs_9546PlayonlineCode_9546GDStartObjects1Objects = Hashtable.newFrom({"Start": gdjs.PlayonlineCode.GDStartObjects1});
-gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
+};gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 
 {
 
@@ -1214,8 +1514,6 @@ let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.evtTools.runtimeScene.sceneJustBegins(runtimeScene);
 if (isConditionTrue_0) {
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(20));
-}
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(21));
 }
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(22));
@@ -1230,27 +1528,31 @@ if (isConditionTrue_0) {
 }
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(27));
 }
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(18));
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(28));
 }
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(52));
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(19));
 }
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(50));
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(53));
 }
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(81).getChild("BestScore"));
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(51));
 }
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(81).getChild("SongsBestScore"));
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(82).getChild("BestScore"));
 }
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(81).getChild("Points"));
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(82).getChild("SongsBestScore"));
 }
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(81).getChild("PointsMessage"));
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(82).getChild("Points"));
 }
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(81).getChild("Pfcs"));
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(82).getChild("PointsMessage"));
+}
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(82).getChild("Pfcs"));
 }
 {gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "Play");
 }
+{runtimeScene.getGame().getVariables().getFromIndex(5).setNumber(1);
+}
 
 { //Subevents
-gdjs.PlayonlineCode.eventsList0(runtimeScene);} //End of subevents
+gdjs.PlayonlineCode.eventsList1(runtimeScene);} //End of subevents
 }
 
 }
@@ -1272,24 +1574,9 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32874804);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33151068);
 }
 }
-if (isConditionTrue_0) {
-
-{ //Subevents
-gdjs.PlayonlineCode.eventsList1(runtimeScene);} //End of subevents
-}
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 
 { //Subevents
@@ -1304,8 +1591,27 @@ gdjs.PlayonlineCode.eventsList2(runtimeScene);} //End of subevents
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-isConditionTrue_0 = !(gdjs.multiplayer.isCurrentPlayerHost());
+isConditionTrue_0 = gdjs.multiplayer.isLobbyGameRunning();
 if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33155276);
+}
+}
+}
+if (isConditionTrue_0) {
+gdjs.copyArray(runtimeScene.getObjects("Player1text"), gdjs.PlayonlineCode.GDPlayer1textObjects1);
+gdjs.copyArray(runtimeScene.getObjects("Player2text"), gdjs.PlayonlineCode.GDPlayer2textObjects1);
+{for(var i = 0, len = gdjs.PlayonlineCode.GDPlayer1textObjects1.length ;i < len;++i) {
+    gdjs.PlayonlineCode.GDPlayer1textObjects1[i].getBehavior("Text").setText(gdjs.multiplayer.getPlayerUsername(1) + gdjs.evtTools.string.newLine() + "v");
+}
+}
+{for(var i = 0, len = gdjs.PlayonlineCode.GDPlayer2textObjects1.length ;i < len;++i) {
+    gdjs.PlayonlineCode.GDPlayer2textObjects1[i].getBehavior("Text").setText(gdjs.multiplayer.getPlayerUsername(2) + gdjs.evtTools.string.newLine() + "v");
+}
+}
 
 { //Subevents
 gdjs.PlayonlineCode.eventsList3(runtimeScene);} //End of subevents
@@ -1322,23 +1628,11 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isLobbyGameRunning();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32877748);
-}
+isConditionTrue_0 = !(gdjs.multiplayer.isPlayerConnected(2));
 }
 if (isConditionTrue_0) {
-gdjs.copyArray(runtimeScene.getObjects("Player1text"), gdjs.PlayonlineCode.GDPlayer1textObjects1);
-gdjs.copyArray(runtimeScene.getObjects("Player2text"), gdjs.PlayonlineCode.GDPlayer2textObjects1);
-{for(var i = 0, len = gdjs.PlayonlineCode.GDPlayer1textObjects1.length ;i < len;++i) {
-    gdjs.PlayonlineCode.GDPlayer1textObjects1[i].getBehavior("Text").setText(gdjs.multiplayer.getPlayerUsername(1) + gdjs.evtTools.string.newLine() + "v");
+{gdjs.multiplayer.endLobbyGame();
 }
-}
-{for(var i = 0, len = gdjs.PlayonlineCode.GDPlayer2textObjects1.length ;i < len;++i) {
-    gdjs.PlayonlineCode.GDPlayer2textObjects1[i].getBehavior("Text").setText(gdjs.multiplayer.getPlayerUsername(2) + gdjs.evtTools.string.newLine() + "v");
-}
-}
-
-{ //Subevents
-gdjs.PlayonlineCode.eventsList4(runtimeScene);} //End of subevents
 }
 
 }
@@ -1360,13 +1654,13 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32881836);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33164852);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayonlineCode.eventsList5(runtimeScene);} //End of subevents
+gdjs.PlayonlineCode.eventsList4(runtimeScene);} //End of subevents
 }
 
 }
@@ -1375,30 +1669,13 @@ gdjs.PlayonlineCode.eventsList5(runtimeScene);} //End of subevents
 {
 
 
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getScene().getVariables().getFromIndex(0).getAsNumber() == 0);
+
 }
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getScene().getVariables().getFromIndex(1).getAsNumber() == 0);
-}
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.evtTools.object.getSceneInstancesCount(runtimeScene, gdjs.PlayonlineCode.mapOfEmptyGDStartObjects) == 1;
-}
-}
-}
-if (isConditionTrue_0) {
-gdjs.copyArray(runtimeScene.getObjects("Start"), gdjs.PlayonlineCode.GDStartObjects1);
-{for(var i = 0, len = gdjs.PlayonlineCode.GDStartObjects1.length ;i < len;++i) {
-    gdjs.PlayonlineCode.GDStartObjects1[i].deleteFromScene(runtimeScene);
-}
-}
-}
+
+
+{
+
+
 
 }
 
@@ -1407,46 +1684,20 @@ gdjs.copyArray(runtimeScene.getObjects("Start"), gdjs.PlayonlineCode.GDStartObje
 
 
 let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getScene().getVariables().getFromIndex(0).getAsNumber() == 1);
-}
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getScene().getVariables().getFromIndex(1).getAsNumber() == 1);
-}
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.evtTools.object.getSceneInstancesCount(runtimeScene, gdjs.PlayonlineCode.mapOfEmptyGDStartObjects) == 0;
-}
-}
-}
-if (isConditionTrue_0) {
-gdjs.PlayonlineCode.GDStartObjects1.length = 0;
-
-{gdjs.evtTools.object.createObjectOnScene(runtimeScene, gdjs.PlayonlineCode.mapOfGDgdjs_9546PlayonlineCode_9546GDStartObjects1Objects, 3058, 651, "");
-}
-}
-
-}
-
-
 {
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(4).getAsString() != "Song Selected: " + runtimeScene.getGame().getVariables().getFromIndex(4).getAsString());
-}
-if (isConditionTrue_0) {
 gdjs.copyArray(runtimeScene.getObjects("songselectedtext"), gdjs.PlayonlineCode.GDsongselectedtextObjects1);
 {for(var i = 0, len = gdjs.PlayonlineCode.GDsongselectedtextObjects1.length ;i < len;++i) {
     gdjs.PlayonlineCode.GDsongselectedtextObjects1[i].getBehavior("Text").setText("Song Selected: " + runtimeScene.getGame().getVariables().getFromIndex(4).getAsString());
 }
 }
 }
+
+}
+
+
+{
+
+
 
 }
 
@@ -1465,6 +1716,11 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDStartObjects1.length;i<l;++i) {
     }
 }
 gdjs.PlayonlineCode.GDStartObjects1.length = k;
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(4).getAsString() != "None");
+}
+}
 if (isConditionTrue_0) {
 {gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, "Play", false);
 }
@@ -1626,7 +1882,7 @@ gdjs.PlayonlineCode.GDLongNoteOppObjects1.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects2.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects3.length = 0;
 
-gdjs.PlayonlineCode.eventsList6(runtimeScene);
+gdjs.PlayonlineCode.eventsList5(runtimeScene);
 gdjs.PlayonlineCode.GDJoinObjects1.length = 0;
 gdjs.PlayonlineCode.GDJoinObjects2.length = 0;
 gdjs.PlayonlineCode.GDJoinObjects3.length = 0;

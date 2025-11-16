@@ -324,24 +324,6 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0xf2fe30 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-// Pausa canais + suspende AudioContext (opcional)
-(function(runtimeScene){
-  try {
-    if (window.gdjsChannels) {
-      Object.keys(window.gdjsChannels).forEach(k => {
-        try { const a = window.gdjsChannels[k]; if (a && typeof a.pause === "function") a.pause(); } catch(e){}
-      });
-    }
-    if (window._gdjs_audio_ctx && typeof window._gdjs_audio_ctx.suspend === "function") {
-      try { window._gdjs_audio_ctx.suspend().catch(()=>{}); } catch(e){}
-    }
-  } catch(e){}
-})(runtimeScene);
-
-
-};
 gdjs.InicioCode.eventsList1 = function(runtimeScene) {
 
 };gdjs.InicioCode.eventsList2 = function(runtimeScene) {
@@ -366,7 +348,6 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0xf2fe30(runtimeScene);
 
 }
 
@@ -427,10 +408,9 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1925bf8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x18cd038 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT A — manifest-aware (local variable OR project resource OR CDN OR GitHub)
-// Usa na ordem: global var 'manifestjson' -> project resource 'manifest.json' -> jsDelivr manifest -> GitHub API fallback.
+// SCRIPT A — compatibilidade: procura áudio na difficulty -> song folder -> mod folder (fallback)
 (function () {
   const GITHUB_OWNER = "LucyYuih";
   const GITHUB_REPO = "gdev-custom-charts";
@@ -438,19 +418,18 @@ if (true) {
   const MANIFEST_CDN_URL = `https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/manifest.json`;
 
   if (document.getElementById("gdjs-mod-list-ui-final")) return;
+  window._gdjs_manifest = window._gdjs_manifest || undefined;
 
-  // small helpers
   function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
   function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
   function isJsonFile(name){ return /\.json$/i.test(name); }
   function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
 
-  // ===== new: stop & cleanup util =====
+  // stop + cleanup util
   function stopAndCleanupPrevious(options){
     options = options || {};
     const revokeBlobUrls = options.revokeBlobUrls === true;
     try {
-      // pause and reset all channels
       if (window.gdjsChannels) {
         Object.keys(window.gdjsChannels).forEach(k=>{
           try {
@@ -459,13 +438,11 @@ if (true) {
             try { a.pause(); } catch(e){}
             try { a.currentTime = 0; } catch(e){}
             if (a._gdjs_ended_handler) { try { a.removeEventListener('ended', a._gdjs_ended_handler); } catch(e){} a._gdjs_ended_handler = null; }
-            // try revoke src if blob:
             try { if (revokeBlobUrls && a.src && a.src.startsWith('blob:')) URL.revokeObjectURL(a.src); } catch(e){}
           } catch(e){}
         });
       }
 
-      // revoke and delete stored blobUrls in gdjsCustomAudio
       if (window.gdjsCustomAudio) {
         Object.keys(window.gdjsCustomAudio).forEach(folder=>{
           try {
@@ -479,18 +456,16 @@ if (true) {
                 }
               } catch(e){}
             });
-            // remove the entry entirely
             try { delete window.gdjsCustomAudio[folder]; } catch(e){}
           } catch(e){}
         });
       }
 
-      // finally clear the channels map
       window.gdjsChannels = {};
     } catch(e){}
   }
 
-  // ---------- Manifest loaders (tries multiple strategies) ----------
+  // ---------- manifest & github helpers ----------
   async function tryManifestFromGameVar() {
     try {
       if (typeof runtimeScene !== "undefined" && runtimeScene.getGame) {
@@ -498,7 +473,7 @@ if (true) {
         if (gg.has("manifestjson")) {
           const s = gg.get("manifestjson").getAsString();
           if (s && s.trim()) {
-            try { return JSON.parse(s); } catch(e) { console.warn("manifestjson invalid JSON"); return null; }
+            try { return JSON.parse(s); } catch(e) { return null; }
           }
         }
       }
@@ -522,31 +497,15 @@ if (true) {
       }
     } catch(e){}
 
-    try {
-      let candidateUrls = [
-        "manifest.json",
-        "resources/manifest.json",
-        "res/manifest.json",
-        "./manifest.json"
-      ];
-      for (const u of candidateUrls) {
-        try {
-          const r = await fetch(u, {cache:"no-cache"});
-          if (r.ok) {
-            try { return await r.json(); } catch(e){}
-          }
-        } catch(e){}
-      }
-    } catch(e){}
+    const tries = ["manifest.json","resources/manifest.json","res/manifest.json","./manifest.json"];
+    for (const p of tries) {
+      try { const r = await fetch(p, {cache:"no-cache"}); if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
+    }
     return null;
   }
 
   async function tryManifestFromCDN() {
-    try {
-      const r = await fetch(MANIFEST_CDN_URL, {cache:"no-cache"});
-      if (r.ok) return await r.json();
-    } catch(e){}
-    return null;
+    try { const r = await fetch(MANIFEST_CDN_URL, {cache:"no-cache"}); if (r.ok) return await r.json(); } catch(e){} return null;
   }
 
   async function tryManifestFromGithubApi(path = "") {
@@ -565,25 +524,87 @@ if (true) {
       if (r.status === 403) throw new Error("GitHub API: 403");
       throw new Error(`GitHub API: ${r.status}`);
     }
-    const json = await r.json();
-    return json;
+    return await r.json();
   }
 
-  // unified manifest loader tries the strategies in order and caches result
   let _manifest_cache = undefined;
   async function loadManifestPreferLocal() {
     if (typeof _manifest_cache !== "undefined") return _manifest_cache;
-    const fromVar = await tryManifestFromGameVar();
-    if (fromVar) { _manifest_cache = fromVar; return _manifest_cache; }
-    const fromRes = await tryManifestFromProjectResource();
-    if (fromRes) { _manifest_cache = fromRes; return _manifest_cache; }
-    const fromCdn = await tryManifestFromCDN();
-    if (fromCdn) { _manifest_cache = fromCdn; return _manifest_cache; }
-    _manifest_cache = null;
-    return null;
+    const a = await tryManifestFromGameVar(); if (a) { _manifest_cache = a; window._gdjs_manifest = _manifest_cache; return a; }
+    const b = await tryManifestFromProjectResource(); if (b) { _manifest_cache = b; window._gdjs_manifest = _manifest_cache; return b; }
+    const c = await tryManifestFromCDN(); if (c) { _manifest_cache = c; window._gdjs_manifest = _manifest_cache; return c; }
+    _manifest_cache = null; window._gdjs_manifest = null; return null;
   }
 
-  // ---------- UI (keeps previous behavior, token removed) ----------
+  async function ghListForFolder(path="") {
+    try {
+      const api = await tryManifestFromGithubApi(path);
+      return (api || []).map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
+    } catch(e){ throw e; }
+  }
+
+  // ---------- novo: procura de arquivos de áudio com fallback ----------
+  // tenta na difficultyPath -> songFolder (rootFolder) -> modFolder (pai de songFolder)
+  async function findAudioFilesWithFallback(rootFolder, difficultyPath) {
+    // rootFolder example: "modName/songName"
+    // difficultyPath example: "modName/songName/hard"
+    const manifest = await loadManifestPreferLocal();
+
+    async function audioListFromManifestPath(p) {
+      try {
+        if (!manifest) return [];
+        if (!manifest.hasOwnProperty(p)) return [];
+        const entry = manifest[p];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+          return entry.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
+        }
+      } catch(e){}
+      return [];
+    }
+
+    async function audioListFromGithubPath(p) {
+      try {
+        const api = await tryManifestFromGithubApi(p);
+        return (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+      } catch(e){}
+      return [];
+    }
+
+    // 1) try difficultyPath
+    try {
+      let list = await audioListFromManifestPath(difficultyPath);
+      if (list && list.length>0) return list;
+      list = await audioListFromGithubPath(difficultyPath);
+      if (list && list.length>0) return list;
+    } catch(e){}
+
+    // 2) try rootFolder (song folder)
+    try {
+      let list = await audioListFromManifestPath(rootFolder);
+      if (list && list.length>0) return list;
+      list = await audioListFromGithubPath(rootFolder);
+      if (list && list.length>0) return list;
+    } catch(e){}
+
+    // 3) try modFolder (parent folder of rootFolder)
+    try {
+      const parts = (rootFolder || "").split("/").filter(Boolean);
+      if (parts.length >= 2) {
+        const modFolder = parts.slice(0, parts.length - 1).join("/");
+        if (modFolder) {
+          let list = await audioListFromManifestPath(modFolder);
+          if (list && list.length>0) return list;
+          list = await audioListFromGithubPath(modFolder);
+          if (list && list.length>0) return list;
+        }
+      }
+    } catch(e){}
+
+    // nothing found
+    return [];
+  }
+
+  // ---------- UI (mesma estrutura, sem mudar comportamento visual) ----------
   const container = document.createElement("div");
   container.id = "gdjs-mod-list-ui-final";
   Object.assign(container.style, {
@@ -610,6 +631,7 @@ if (true) {
   footer.innerHTML = `<div id="gdjs-final-status" style="font-size:13px;opacity:0.9;height:18px"></div><div style="display:flex;gap:8px;align-items:center"><div style="font-size:13px">Último baixado:</div><div id="gdjs-final-last" style="flex:1;text-align:right;font-size:13px;opacity:0.85"></div></div><div style="display:flex;gap:8px;align-items:center"><div style="font-size:13px">Progresso:</div><div id="gdjs-final-progress" style="flex:1;text-align:right;font-size:13px;opacity:0.85"></div></div>`;
   container.appendChild(header); container.appendChild(listWrapper); container.appendChild(footer);
   document.body.appendChild(container);
+
   const btnBack = document.getElementById("gdjs-final-back"), btnRefresh = document.getElementById("gdjs-final-refresh"), btnClose = document.getElementById("gdjs-final-close"), searchInput = document.getElementById("gdjs-final-search");
   const statusEl = document.getElementById("gdjs-final-status"), lastEl = document.getElementById("gdjs-final-last"), progressEl = document.getElementById("gdjs-final-progress");
 
@@ -617,7 +639,7 @@ if (true) {
   function setLast(s){ lastEl.textContent = s || ""; }
   function setProg(s){ progressEl.textContent = s || ""; }
 
-  // state for listing
+  // state
   let currentPath = "";
   let currentItems = [];
   const pathHistory = [];
@@ -625,7 +647,6 @@ if (true) {
   let elementMapForPath = {};
   let backgroundCheckerAbort = null;
 
-  // render
   function renderList(items) {
     listWrapper.innerHTML = "";
     elementMapForPath = {};
@@ -637,11 +658,10 @@ if (true) {
       const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px";
       const placeholderBtn = document.createElement("button"); placeholderBtn.textContent = "Checando..."; placeholderBtn.disabled = true; placeholderBtn.style.padding = "6px"; placeholderBtn.style.borderRadius = "6px";
       right.appendChild(placeholderBtn); row.appendChild(left); row.appendChild(right); listWrapper.appendChild(row);
-      elementMapForPath[item.path] = { rightContainer: right, placeholderBtn };
+      elementMapForPath[item.path] = { rightContainer: right, placeholderBtn, name: item.name };
     }
   }
 
-  // background check (small pool)
   function startBackgroundCheck(items) {
     if (backgroundCheckerAbort && typeof backgroundCheckerAbort.abort === "function") { try{ backgroundCheckerAbort.abort(); }catch(e){} }
     const controller = { aborted:false, abort(){ this.aborted=true; } }; backgroundCheckerAbort = controller;
@@ -678,27 +698,78 @@ if (true) {
     for (let i=0;i<concurrency;i++) worker();
   }
 
+  async function fetchSubdirs(folderPath) {
+    try {
+      const manifest = await loadManifestPreferLocal();
+      if (manifest && manifest.hasOwnProperty(folderPath)) {
+        const entry = manifest[folderPath];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "string") return entry.slice();
+      }
+    } catch(e){}
+    try {
+      const api = await ghListForFolder(folderPath);
+      const dirs = (api || []).filter(i=> i.type === "dir").map(i=> i.name);
+      return dirs;
+    } catch(e){}
+    return [];
+  }
+
+  // modal: only list difficulties (no raiz, no baixar todas)
+  function showDifficultyChooser(rootFolder, subdirs) {
+    const overlay = document.createElement("div");
+    Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 1000000, display: "flex", alignItems: "center", justifyContent: "center" });
+    const box = document.createElement("div");
+    Object.assign(box.style, { width: "420px", maxHeight: "70vh", overflowY: "auto", background: "#0f0f10", borderRadius: "8px", padding: "12px", boxShadow: "0 12px 40px rgba(0,0,0,0.6)", color: "#eee" });
+    box.innerHTML = `<div style="font-weight:700;margin-bottom:8px">Escolha uma difficulty para:</div><div style="margin-bottom:8px;color:#bbb">${rootFolder}</div>`;
+    const list = document.createElement("div"); list.style.display = "flex"; list.style.flexDirection = "column"; list.style.gap = "6px";
+    for (const d of subdirs) {
+      const b = document.createElement("button");
+      b.textContent = d;
+      b.style.padding="8px"; b.style.borderRadius="6px";
+      b.onclick = ()=> { overlay.remove(); downloadDifficultyKeepAudioRoot(rootFolder, d); };
+      list.appendChild(b);
+    }
+    const cancel = document.createElement("button"); cancel.textContent = "Cancelar"; cancel.style.marginTop="10px"; cancel.style.padding="8px"; cancel.style.borderRadius="6px";
+    cancel.onclick = ()=> overlay.remove();
+    box.appendChild(list); box.appendChild(cancel);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  }
+
+  // update per-item buttons:
   function updateButtonsForDecisionFromCache(path, hasSubdirs) {
     const el = elementMapForPath[path];
     if (!el) return;
     const right = el.rightContainer; right.innerHTML = "";
+    const itemName = el.name || path.split("/").pop();
+
     if (hasSubdirs) {
-      const openBtn = document.createElement("button"); openBtn.textContent = "Abrir"; openBtn.style.padding="6px"; openBtn.style.borderRadius="6px"; openBtn.onclick = ()=> openFolder(path);
-      right.appendChild(openBtn);
+      if (!currentPath || currentPath === "") {
+        // root listing: item is a mod folder
+        const openBtn = document.createElement("button"); openBtn.textContent = "Abrir"; openBtn.style.padding="6px"; openBtn.style.borderRadius="6px"; openBtn.onclick = ()=> openFolder(path);
+        right.appendChild(openBtn);
+      } else {
+        // inside mod: item is a song with difficulties -> show only select difficulty
+        const pickBtn = document.createElement("button"); pickBtn.textContent = "Selecionar difficulty"; pickBtn.style.padding="6px"; pickBtn.style.borderRadius="6px";
+        pickBtn.onclick = async ()=>{
+          try {
+            setStatus("Carregando difficulties de " + itemName + "...");
+            const subdirs = await fetchSubdirs(path);
+            if (!subdirs || subdirs.length === 0) { setStatus("Nenhuma difficulty encontrada."); return; }
+            showDifficultyChooser(path, subdirs);
+            setStatus("");
+          } catch(e){ setStatus("Erro listando difficulties."); }
+        };
+        right.appendChild(pickBtn);
+      }
     } else {
+      // leaf song (no subdirs) -> selectable and downloadable directly
       const dlBtn = document.createElement("button"); dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px"; dlBtn.onclick = ()=> downloadSongFolder(path);
       right.appendChild(dlBtn);
     }
   }
 
-  async function ghListForFolder(path="") {
-    try {
-      const apiList = await tryManifestFromGithubApi(path);
-      return apiList.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
-    } catch(e){ throw e; }
-  }
-
-  // load folder (only directories)
+  // load folder (directories)
   async function loadFolder(path="") {
     try {
       setStatus("Carregando pasta...");
@@ -709,12 +780,14 @@ if (true) {
           const entry = manifest[path];
           if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "string") {
             return entry.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
-          } else {
-            return [];
           }
         }
-        const api = await ghListForFolder(path);
-        return (api || []).filter(it => it.type === "dir").map(it => ({ name: it.name, path: it.path, type: "dir" }));
+        try {
+          const api = await ghListForFolder(path);
+          return (api || []).filter(it => it.type === "dir").map(it => ({ name: it.name, path: it.path, type: "dir" }));
+        } catch(e){
+          return [];
+        }
       })();
       currentItems = items || [];
       currentPath = path || "";
@@ -731,19 +804,257 @@ if (true) {
   async function openFolder(path) { if (currentPath !== path) pathHistory.push(currentPath); await loadFolder(path); }
 
   btnBack.onclick = async ()=> { if (pathHistory.length === 0) { await loadFolder(""); return; } const prev = pathHistory.pop(); await loadFolder(prev || ""); };
-  btnRefresh.onclick = async ()=> { setStatus("Atualizando..."); try { const items = currentItems||[]; for (const it of items) delete hasSubdirsCache[it.path]; } catch(e){} _manifest_cache = undefined; await loadFolder(currentPath||""); };
+  btnRefresh.onclick = async ()=> {
+    try { setStatus("Atualizando..."); } catch(e){}
+    try { const items = currentItems||[]; for (const it of items) delete hasSubdirsCache[it.path]; } catch(e){}
+    try { _manifest_cache = undefined; } catch(e){}
+    try { window._gdjs_manifest = undefined; delete window._gdjs_manifest; } catch(e){}
+    try { await sleep(30); } catch(e){}
+    await loadFolder(currentPath||"");
+  };
   btnClose.onclick = ()=> container.remove();
   searchInput.addEventListener("input", ()=> { const q = searchInput.value.trim().toLowerCase(); if (!q) { renderList(currentItems); setStatus((currentPath||"Mods")+` — ${currentItems.length} pastas`); setTimeout(()=> startBackgroundCheck(currentItems), 10); return; } const filtered = currentItems.filter(it => it.name.toLowerCase().includes(q)); renderList(filtered); setStatus(`Resultado: ${filtered.length} / ${currentItems.length}`); setTimeout(()=> startBackgroundCheck(filtered), 10); });
 
-  // downloader: prefers manifest file URLs when present, else builds cdn url, else GitHub API
+  // downloader helpers
   window.gdjsCustomAudio = window.gdjsCustomAudio || {};
   window.gdjsChannels = window.gdjsChannels || {};
 
-  async function downloadSongFolder(folderPath) {
-    // disable close until finished
+  // download JSONs for chosen difficulty, audios with fallback
+  async function downloadDifficultyKeepAudioRoot(rootFolder, difficultyName) {
+    const difficultyPath = (rootFolder? rootFolder + "/" + difficultyName : difficultyName);
     try { btnClose.disabled = true; } catch(e){}
     try {
-      // stop/cleanup previous before doing anything (revoke previous blobs)
+      stopAndCleanupPrevious({ revokeBlobUrls: true });
+
+      // mark selected track
+      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
+      try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
+
+      setStatus("Listando arquivos (procura áudios: difficulty -> song -> mod)...");
+      // usa fallback novo
+      const audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
+
+      // charts: from difficultyPath
+      let chartFiles = [];
+      const manifest = await loadManifestPreferLocal();
+      if (manifest && manifest.hasOwnProperty(difficultyPath)) {
+        const entry = manifest[difficultyPath];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+          chartFiles = entry.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url || e.raw_url || null }) );
+        }
+      } else {
+        try {
+          const api = await ghListForFolder(difficultyPath);
+          chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+        } catch(e){}
+      }
+
+      // also include any jsons that might exist in rootFolder (fallback)
+      let rootJsons = [];
+      if (manifest && manifest.hasOwnProperty(rootFolder)) {
+        const entry = manifest[rootFolder];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+          rootJsons = entry.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url || e.raw_url || null }) );
+        }
+      } else {
+        try {
+          const api = await ghListForFolder(rootFolder);
+          rootJsons = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+        } catch(e){}
+      }
+
+      // merge jsons, difficulty ones override root ones
+      const allJsonsMap = {};
+      rootJsons.forEach(j => { allJsonsMap[j.name] = j; });
+      chartFiles.forEach(j => { allJsonsMap[j.name] = j; });
+
+      // prepare storage under rootFolder key
+      window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
+      const dest = window.gdjsCustomAudio[rootFolder];
+
+      // download audios (from whichever source the fallback returned)
+      let nextChannelIndex = 0;
+      const unlockQueue = [];
+      for (const f of (audioFiles || [])) {
+        try {
+          setStatus("Baixando áudio: " + f.name + "...");
+          const resp = await fetch(f.url);
+          if (!resp.ok) continue;
+          const blob = await resp.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const audioEl = new Audio(blobUrl);
+          audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
+          dest.audios[f.name] = { blobUrl, audioEl };
+          window.gdjsChannels[nextChannelIndex] = audioEl;
+          nextChannelIndex++;
+          try {
+            const p = audioEl.play();
+            if (p && typeof p.then === "function") {
+              p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: f.name}); });
+            } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
+          } catch(e){ unlockQueue.push({audioEl, name: f.name}); }
+          setLast(f.name);
+        } catch(e){}
+        await sleep(0);
+      }
+
+      // download jsons (from difficulty primarily)
+      for (const name in allJsonsMap) {
+        try {
+          const j = allJsonsMap[name];
+          setStatus("Baixando chart: " + name + "...");
+          const r = await fetch(j.url);
+          if (!r.ok) continue;
+          const txt = await r.text();
+          // store under key indicating difficulty origin
+          const key = difficultyName + "/" + name;
+          dest.rawFiles[key] = txt;
+          const lname = name.toLowerCase();
+          const gg = runtimeScene.getGame().getVariables();
+          if (/metadata|meta/.test(lname)) gg.get("metadatajson").setString(txt);
+          else if (/(bf|chartbf|chart_bf)/.test(lname)) gg.get("BfChartJsonLoader").setString(txt);
+          else if (/(dad|opp|opponent)/.test(lname)) gg.get("OppChartJsonLoader").setString(txt);
+          else {
+            try {
+              const parsed = JSON.parse(txt);
+              if (parsed && parsed.notes) {
+                if (!gg.get("BfChartJsonLoader").getAsString()) gg.get("BfChartJsonLoader").setString(txt);
+                else if (!gg.get("OppChartJsonLoader").getAsString()) gg.get("OppChartJsonLoader").setString(txt);
+                else if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+              } else {
+                if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+              }
+            } catch(e){
+              if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+            }
+          }
+          setLast(name);
+        } catch(e){}
+        await sleep(0);
+      }
+
+      // unlock on gesture if needed
+      if (unlockQueue.length > 0) {
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        window.addEventListener('pointerdown', unlock, { once: true });
+      }
+
+      setStatus('Download concluído para "' + rootFolder + '" (difficulty: ' + difficultyName + ').'); setProg("");
+    } catch(e){
+      setStatus("Erro ao baixar: " + (e && e.message ? e.message : e)); setProg("");
+    } finally {
+      try { btnClose.disabled = false; } catch(e){}
+    }
+  }
+
+  // download all difficulties (áudios também usando fallback)
+  async function downloadAllDifficulties(rootFolder, subdirs) {
+    try { btnClose.disabled = true; } catch(e){}
+    try {
+      stopAndCleanupPrevious({ revokeBlobUrls: true });
+      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
+      try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
+
+      setStatus("Procurando áudios (difficulty -> song -> mod)...");
+      // Try to find audios via fallback. We can pass the first difficulty path as a hint, but fallback will try root and mod as well.
+      const hintDifficulty = (subdirs && subdirs.length>0) ? (rootFolder + "/" + subdirs[0]) : rootFolder;
+      const audioFiles = await findAudioFilesWithFallback(rootFolder, hintDifficulty);
+
+      window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
+      const dest = window.gdjsCustomAudio[rootFolder];
+      let nextChannelIndex = 0;
+      const unlockQueue = [];
+      for (const f of (audioFiles || [])) {
+        try {
+          setStatus("Baixando áudio: " + f.name + "...");
+          const resp = await fetch(f.url);
+          if (!resp.ok) continue;
+          const blob = await resp.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const audioEl = new Audio(blobUrl);
+          audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
+          dest.audios[f.name] = { blobUrl, audioEl };
+          window.gdjsChannels[nextChannelIndex] = audioEl;
+          nextChannelIndex++;
+          try {
+            const p = audioEl.play();
+            if (p && typeof p.then === "function") {
+              p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: f.name}); });
+            } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
+          } catch(e){ unlockQueue.push({audioEl, name: f.name}); }
+          setLast(f.name);
+        } catch(e){}
+        await sleep(0);
+      }
+
+      // then download all jsons from each subdir
+      const manifest = await loadManifestPreferLocal();
+      for (const d of subdirs) {
+        try {
+          setStatus("Baixando charts: " + d + " ...");
+          let chartFiles = [];
+          const difficultyPath = (rootFolder? rootFolder + "/" + d : d);
+          if (manifest && manifest.hasOwnProperty(difficultyPath)) {
+            const entry = manifest[difficultyPath];
+            if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+              chartFiles = entry.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url || e.raw_url || null }) );
+            }
+          } else {
+            try {
+              const api = await ghListForFolder(difficultyPath);
+              chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`) }));
+            } catch(e){}
+          }
+          for (const j of chartFiles) {
+            try {
+              const r = await fetch(j.url);
+              if (!r.ok) continue;
+              const txt = await r.text();
+              const key = d + "/" + j.name;
+              dest.rawFiles[key] = txt;
+              const lname = j.name.toLowerCase();
+              const gg = runtimeScene.getGame().getVariables();
+              if (/metadata|meta/.test(lname)) gg.get("metadatajson").setString(txt);
+              else if (/(bf|chartbf|chart_bf)/.test(lname)) gg.get("BfChartJsonLoader").setString(txt);
+              else if (/(dad|opp|opponent)/.test(lname)) gg.get("OppChartJsonLoader").setString(txt);
+              else {
+                try {
+                  const parsed = JSON.parse(txt);
+                  if (parsed && parsed.notes) {
+                    if (!gg.get("BfChartJsonLoader").getAsString()) gg.get("BfChartJsonLoader").setString(txt);
+                    else if (!gg.get("OppChartJsonLoader").getAsString()) gg.get("OppChartJsonLoader").setString(txt);
+                    else if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+                  } else {
+                    if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+                  }
+                } catch(e){
+                  if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
+                }
+              }
+              setLast(j.name);
+            } catch(e){}
+            await sleep(0);
+          }
+        } catch(e){}
+      }
+
+      if (unlockQueue.length > 0) {
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        window.addEventListener('pointerdown', unlock, { once: true });
+      }
+
+      setStatus('Download concluído para "' + rootFolder + '" (todas difficulties).'); setProg("");
+    } catch(e){
+      setStatus("Erro ao baixar: " + (e && e.message ? e.message : e)); setProg("");
+    } finally {
+      try { btnClose.disabled = false; } catch(e){}
+    }
+  }
+
+  // standard leaf download (sem mudanças)
+  async function downloadSongFolder(folderPath) {
+    try { btnClose.disabled = true; } catch(e){}
+    try {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
 
       setStatus("Listando arquivos em " + folderPath + "...");
@@ -753,14 +1064,17 @@ if (true) {
         const entry = manifest[folderPath];
         if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
           files = entry.map(e => ({ name: e.name, url: e.url || e.raw_url || null, type: e.type || "file" }));
-        } else if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "string") {
-          files = [];
         } else {
           files = [];
         }
       } else {
-        const apiList = await ghListForFolder(folderPath);
-        files = (apiList || []).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`), type: i.type }));
+        try {
+          const apiList = await ghListForFolder(folderPath);
+          files = (apiList || []).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}`), type: i.type }));
+          files = files.filter(x => x.type !== "dir");
+        } catch(e){
+          files = [];
+        }
       }
 
       if (!Array.isArray(files) || files.length === 0) { setStatus("Pasta vazia."); return; }
@@ -768,7 +1082,6 @@ if (true) {
       window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || {audios:{}, rawFiles:{}};
       const dest = window.gdjsCustomAudio[folderPath];
 
-      // set selectedTrackKey and SongName
       try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath); } catch(e){}
       try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(folderPath.split("/").pop()||folderPath)); } catch(e){}
 
@@ -833,12 +1146,9 @@ if (true) {
             try { const gg = runtimeScene.getGame().getVariables(); if (!gg.get("SongName").getAsString()) gg.get("SongName").setString(basenameNoExt(fname)); } catch(e){}
             setLast(fname);
           } catch(e){}
-        } else {
-          // ignore other files
         }
-
         await sleep(0);
-      } // end files loop
+      }
 
       if (unlockQueue.length > 0) {
         const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
@@ -849,7 +1159,6 @@ if (true) {
     } catch(e){
       setStatus("Erro ao baixar pasta: " + (e && e.message ? e.message : e)); setProg("");
     } finally {
-      // re-enable close button
       try { btnClose.disabled = false; } catch(e){}
     }
   }
@@ -865,7 +1174,7 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1925bf8(runtimeScene);
+gdjs.InicioCode.userFunc0x18cd038(runtimeScene);
 
 }
 
@@ -878,7 +1187,7 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(61).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(59)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(60)));
 }
 if (isConditionTrue_0) {
 {runtimeScene.getScene().getVariables().getFromIndex(6).setBoolean(true);
@@ -893,21 +1202,21 @@ if (isConditionTrue_0) {
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(61).getAsNumber() >= gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(59)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getAsNumber() >= gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(60)));
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(61).setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(62).setNumber(0);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback32116244 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback32403828 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
-{gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(60), null);
+{gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(61), null);
 }
-{gdjs.evtsExt__ArrayTools__GlobalSplitString.func(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(60).getAsString(), "/", runtimeScene.getGame().getVariables().getFromIndex(59), null);
+{gdjs.evtsExt__ArrayTools__GlobalSplitString.func(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(61).getAsString(), "/", runtimeScene.getGame().getVariables().getFromIndex(60), null);
 }
 {runtimeScene.getScene().getVariables().getFromIndex(6).setBoolean(true);
 }
@@ -917,7 +1226,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(32116244, gdjs.InicioCode.asyncCallback32116244);
+gdjs.InicioCode.idToCallbackMap.set(32403828, gdjs.InicioCode.asyncCallback32403828);
 gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 
 {
@@ -927,7 +1236,7 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback32116244(runtimeScene, asyncObjectsList)), 32116244, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback32403828(runtimeScene, asyncObjectsList)), 32403828, asyncObjectsList);
 }
 }
 
@@ -956,7 +1265,7 @@ if (true) {
     gdjs.InicioCode.GDbegfontObjects3[i].deleteFromScene(runtimeScene);
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(61).setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(62).setNumber(0);
 }
 }
 }
@@ -1092,14 +1401,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback32155876 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback32431684 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
 gdjs.InicioCode.eventsList13(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(32155876, gdjs.InicioCode.asyncCallback32155876);
+gdjs.InicioCode.idToCallbackMap.set(32431684, gdjs.InicioCode.asyncCallback32431684);
 gdjs.InicioCode.eventsList14 = function(runtimeScene) {
 
 {
@@ -1109,20 +1418,20 @@ gdjs.InicioCode.eventsList14 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback32155876(runtimeScene, asyncObjectsList)), 32155876, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback32431684(runtimeScene, asyncObjectsList)), 32431684, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback32206804 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback32441060 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(32206804, gdjs.InicioCode.asyncCallback32206804);
+gdjs.InicioCode.idToCallbackMap.set(32441060, gdjs.InicioCode.asyncCallback32441060);
 gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 
 {
@@ -1132,14 +1441,14 @@ gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback32206804(runtimeScene, asyncObjectsList)), 32206804, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback32441060(runtimeScene, asyncObjectsList)), 32441060, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback32212076 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback32446604 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 
@@ -1149,7 +1458,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPoin
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(32212076, gdjs.InicioCode.asyncCallback32212076);
+gdjs.InicioCode.idToCallbackMap.set(32446604, gdjs.InicioCode.asyncCallback32446604);
 gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 
 {
@@ -1160,7 +1469,7 @@ gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback32212076(runtimeScene, asyncObjectsList)), 32212076, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback32446604(runtimeScene, asyncObjectsList)), 32446604, asyncObjectsList);
 }
 }
 
@@ -1174,20 +1483,20 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), 
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(81).getChild("PointsMessage").getAsNumber() > 0);
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(82).getChild("PointsMessage").getAsNumber() > 0);
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32210204);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32444084);
 }
 }
 if (isConditionTrue_0) {
 gdjs.copyArray(runtimeScene.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 {for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Text").setText("+" + runtimeScene.getGame().getVariables().getFromIndex(81).getChild("PointsMessage").getAsString() + " points");
+    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Text").setText("+" + runtimeScene.getGame().getVariables().getFromIndex(82).getChild("PointsMessage").getAsString() + " points");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(81).getChild("PointsMessage").setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(82).getChild("PointsMessage").setNumber(0);
 }
 {for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
     gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Tween").addObjectOpacityTween2("OpaInPT", 255, "easeInQuad", 0.5, false);
@@ -1214,7 +1523,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32211804);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32446684);
 }
 }
 if (isConditionTrue_0) {
@@ -1234,7 +1543,7 @@ gdjs.copyArray(runtimeScene.getObjects("Hard"), gdjs.InicioCode.GDHardObjects2);
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(43).getAsString() == "Hard");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(44).getAsString() == "Hard");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1265,7 +1574,7 @@ if (isConditionTrue_0) {
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(43).getAsString() == "Erect");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(44).getAsString() == "Erect");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1288,7 +1597,7 @@ gdjs.copyArray(runtimeScene.getObjects("Hard"), gdjs.InicioCode.GDHardObjects2);
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(43).getAsString() == "Pico");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(44).getAsString() == "Pico");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1332,12 +1641,12 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects2.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects2.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32227004);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32447804);
 }
 }
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(43).setString("Hard");
+{runtimeScene.getGame().getVariables().getFromIndex(44).setString("Hard");
 }
 }
 
@@ -1353,12 +1662,12 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 /* Unknown object - skipped. */if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32228004);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32418820);
 }
 }
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(43).setString("Erect");
+{runtimeScene.getGame().getVariables().getFromIndex(44).setString("Erect");
 }
 }
 
@@ -1374,12 +1683,12 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 /* Unknown object - skipped. */if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32229004);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32416668);
 }
 }
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(43).setString("Pico");
+{runtimeScene.getGame().getVariables().getFromIndex(44).setString("Pico");
 }
 }
 
@@ -1416,9 +1725,11 @@ gdjs.InicioCode.GDbegfontObjects1.length = 0;
     gdjs.InicioCode.GDbegfontObjects1[i].getBehavior("Text").setText("no");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(73).setBoolean(false);
+{runtimeScene.getGame().getVariables().getFromIndex(74).setBoolean(false);
 }
 {gdjs.evtTools.sound.setGlobalVolume(runtimeScene, 100);
+}
+{runtimeScene.getGame().getVariables().getFromIndex(5).setNumber(1);
 }
 
 { //Subevents
@@ -1444,7 +1755,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32115324);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32366364);
 }
 }
 if (isConditionTrue_0) {
@@ -1465,11 +1776,11 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(61).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(59)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(60)));
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getAsNumber() == runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(63).getAsNumber() == runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
 }
 }
 }
@@ -1481,20 +1792,20 @@ gdjs.InicioCode.GDbegfontObjects1.length = 0;
 {gdjs.evtTools.object.createObjectOnScene(runtimeScene, gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects, 20, runtimeScene.getScene().getVariables().getFromIndex(7).getAsNumber(), "");
 }
 {for(var i = 0, len = gdjs.InicioCode.GDbegfontObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(0)).setString(runtimeScene.getGame().getVariables().getFromIndex(59).getChild(runtimeScene.getGame().getVariables().getFromIndex(61).getAsNumber()).getAsString());
+    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(0)).setString(runtimeScene.getGame().getVariables().getFromIndex(60).getChild(runtimeScene.getGame().getVariables().getFromIndex(62).getAsNumber()).getAsString());
 }
 }
 {for(var i = 0, len = gdjs.InicioCode.GDbegfontObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(1)).setString(runtimeScene.getGame().getVariables().getFromIndex(59).getChild(runtimeScene.getGame().getVariables().getFromIndex(61).getAsNumber() + 1).getAsString());
+    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(1)).setString(runtimeScene.getGame().getVariables().getFromIndex(60).getChild(runtimeScene.getGame().getVariables().getFromIndex(62).getAsNumber() + 1).getAsString());
 }
 }
 {for(var i = 0, len = gdjs.InicioCode.GDbegfontObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(2)).setString(runtimeScene.getGame().getVariables().getFromIndex(59).getChild(runtimeScene.getGame().getVariables().getFromIndex(61).getAsNumber() + 2).getAsString());
+    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(2)).setString(runtimeScene.getGame().getVariables().getFromIndex(60).getChild(runtimeScene.getGame().getVariables().getFromIndex(62).getAsNumber() + 2).getAsString());
 }
 }
 {runtimeScene.getScene().getVariables().getFromIndex(7).add(180);
 }
-{runtimeScene.getGame().getVariables().getFromIndex(61).add(3);
+{runtimeScene.getGame().getVariables().getFromIndex(62).add(3);
 }
 
 { //Subevents
@@ -1509,11 +1820,11 @@ gdjs.InicioCode.eventsList4(runtimeScene);} //End of subevents
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getAsNumber() == 0);
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(63).getAsNumber() == 0);
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32116868);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32403620);
 }
 }
 if (isConditionTrue_0) {
@@ -1530,10 +1841,10 @@ gdjs.InicioCode.eventsList5(runtimeScene);} //End of subevents
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getAsNumber() != runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(63).getAsNumber() != runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(62).setNumber(runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+{runtimeScene.getGame().getVariables().getFromIndex(63).setNumber(runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
 }
 {runtimeScene.getScene().getVariables().getFromIndex(7).setNumber(200);
 }
@@ -1721,15 +2032,15 @@ gdjs.copyArray(runtimeScene.getObjects("SwipeText"), gdjs.InicioCode.GDSwipeText
     gdjs.InicioCode.GDSwipeTextObjects1[i].getBehavior("Opacity").setOpacity(100);
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(44).getChild(0).setString("BF");
+{runtimeScene.getGame().getVariables().getFromIndex(45).getChild(0).setString("BF");
 }
-{runtimeScene.getGame().getVariables().getFromIndex(44).getChild(1).setString("Dad");
-}
-{gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(40));
+{runtimeScene.getGame().getVariables().getFromIndex(45).getChild(1).setString("Dad");
 }
 {gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(41));
 }
-{gdjs.evtTools.storage.readNumberFromJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(50));
+{gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(42));
+}
+{gdjs.evtTools.storage.readNumberFromJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(51));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDPauseButtonObjects1.length ;i < len;++i) {
     gdjs.InicioCode.GDPauseButtonObjects1[i].getBehavior("Opacity").setOpacity(155);
@@ -1825,7 +2136,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32164524);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32429972);
 }
 }
 }
@@ -1887,7 +2198,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32205444);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32437420);
 }
 }
 if (isConditionTrue_0) {
@@ -1896,32 +2207,32 @@ gdjs.copyArray(runtimeScene.getObjects("DownKeybind"), gdjs.InicioCode.GDDownKey
 gdjs.copyArray(runtimeScene.getObjects("LeftKeybind"), gdjs.InicioCode.GDLeftKeybindObjects1);
 gdjs.copyArray(runtimeScene.getObjects("RightKeybind"), gdjs.InicioCode.GDRightKeybindObjects1);
 gdjs.copyArray(runtimeScene.getObjects("UpKeybind"), gdjs.InicioCode.GDUpKeybindObjects1);
-{gdjs.evtTools.storage.readStringFromJSONFile("Left", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(20));
+{gdjs.evtTools.storage.readStringFromJSONFile("Left", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(21));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDLeftKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDLeftKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(20).getAsString());
+    gdjs.InicioCode.GDLeftKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(21).getAsString());
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Down", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(22));
+{gdjs.evtTools.storage.readStringFromJSONFile("Down", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(23));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDDownKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDDownKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(22).getAsString());
+    gdjs.InicioCode.GDDownKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(23).getAsString());
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Up", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(24));
+{gdjs.evtTools.storage.readStringFromJSONFile("Up", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(25));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDUpKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDUpKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(24).getAsString());
+    gdjs.InicioCode.GDUpKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(25).getAsString());
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Right", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(26));
+{gdjs.evtTools.storage.readStringFromJSONFile("Right", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(27));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDRightKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDRightKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(26).getAsString());
+    gdjs.InicioCode.GDRightKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(27).getAsString());
 }
 }
 {for(var i = 0, len = gdjs.InicioCode.GDChartDelayInputObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDChartDelayInputObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(28).getAsString());
+    gdjs.InicioCode.GDChartDelayInputObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(29).getAsString());
 }
 }
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(false);
@@ -1958,7 +2269,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32209140);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32442436);
 }
 }
 if (isConditionTrue_0) {
@@ -2035,7 +2346,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32230380);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(32454852);
 }
 }
 if (isConditionTrue_0) {
