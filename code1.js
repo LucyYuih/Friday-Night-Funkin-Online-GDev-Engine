@@ -408,7 +408,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x18cd038 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1b19968 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — compatibilidade: procura áudio na difficulty -> song folder -> mod folder (fallback)
 (function () {
@@ -1174,7 +1174,7 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x18cd038(runtimeScene);
+gdjs.InicioCode.userFunc0x1b19968(runtimeScene);
 
 }
 
@@ -1730,6 +1730,8 @@ gdjs.InicioCode.GDbegfontObjects1.length = 0;
 {gdjs.evtTools.sound.setGlobalVolume(runtimeScene, 100);
 }
 {runtimeScene.getGame().getVariables().getFromIndex(5).setNumber(1);
+}
+{gdjs.multiplayer.endLobbyGame();
 }
 
 { //Subevents

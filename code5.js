@@ -17573,7 +17573,7 @@ gdjs.PlayCode.eventsList216(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1772430 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x18c9c18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -17763,7 +17763,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1772430(runtimeScene);
+gdjs.PlayCode.userFunc0x18c9c18(runtimeScene);
 
 }
 
@@ -17845,8 +17845,6 @@ gdjs.PlayCode.eventsList221(runtimeScene, asyncObjectsList);} //End of subevents
 
 let isConditionTrue_0 = false;
 {
-{gdjs.multiplayer.endLobbyGame();
-}
 {gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, "Inicio", true);
 }
 }
@@ -17942,7 +17940,7 @@ gdjs.PlayCode.eventsList224(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x177dad0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x178af88 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18132,7 +18130,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x177dad0(runtimeScene);
+gdjs.PlayCode.userFunc0x178af88(runtimeScene);
 
 }
 
@@ -18214,8 +18212,6 @@ gdjs.PlayCode.eventsList229(runtimeScene, asyncObjectsList);} //End of subevents
 
 let isConditionTrue_0 = false;
 {
-{gdjs.multiplayer.endLobbyGame();
-}
 {gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, "Inicio", true);
 }
 }
@@ -22599,7 +22595,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0xd6a1a0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xdff370 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader que tenta: global var 'manifestjson' -> project resource -> CDN -> GitHub API
 (async function(runtimeScene){
@@ -22871,7 +22867,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0xd6a1a0(runtimeScene);
+gdjs.PlayCode.userFunc0xdff370(runtimeScene);
 
 }
 

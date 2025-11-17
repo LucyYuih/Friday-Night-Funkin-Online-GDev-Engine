@@ -132,7 +132,7 @@ gdjs.PlayonlineCode.GDLongNoteOppObjects2= [];
 gdjs.PlayonlineCode.GDLongNoteOppObjects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x16a5c50 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x26f74b0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — observa selectedTrackKey, pára o que estiver tocando, baixa a nova track+chart
 // Compatível com: selected = "mod/song"  OR selected = "mod/song/difficulty"
@@ -643,7 +643,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x16a5c50(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x26f74b0(runtimeScene);
 
 }
 
@@ -657,6 +657,11 @@ let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 isConditionTrue_0 = !(gdjs.multiplayer.isCurrentPlayerHost());
 if (isConditionTrue_0) {
+gdjs.copyArray(runtimeScene.getObjects("Start"), gdjs.PlayonlineCode.GDStartObjects1);
+{for(var i = 0, len = gdjs.PlayonlineCode.GDStartObjects1.length ;i < len;++i) {
+    gdjs.PlayonlineCode.GDStartObjects1[i].deleteFromScene(runtimeScene);
+}
+}
 
 { //Subevents
 gdjs.PlayonlineCode.eventsList0(runtimeScene);} //End of subevents
@@ -734,7 +739,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x1a86ac8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1708490 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — compatibilidade: procura áudio na difficulty -> song folder -> mod folder (fallback)
 (function () {
@@ -1500,12 +1505,13 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1a86ac8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1708490(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
+};gdjs.PlayonlineCode.mapOfGDgdjs_9546PlayonlineCode_9546GDStartObjects1Objects = Hashtable.newFrom({"Start": gdjs.PlayonlineCode.GDStartObjects1});
+gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 
 {
 
@@ -1676,6 +1682,20 @@ gdjs.PlayonlineCode.eventsList4(runtimeScene);} //End of subevents
 {
 
 
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33165572);
+}
+}
+if (isConditionTrue_0) {
+gdjs.PlayonlineCode.GDStartObjects1.length = 0;
+
+{gdjs.evtTools.object.createObjectOnScene(runtimeScene, gdjs.PlayonlineCode.mapOfGDgdjs_9546PlayonlineCode_9546GDStartObjects1Objects, 3058, 651, "");
+}
+}
 
 }
 
