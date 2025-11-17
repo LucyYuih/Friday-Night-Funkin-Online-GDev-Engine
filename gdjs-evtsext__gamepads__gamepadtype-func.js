@@ -9,7 +9,7 @@ gdjs.evtsExt__Gamepads__GamepadType = {};
 gdjs.evtsExt__Gamepads__GamepadType.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__Gamepads__GamepadType.userFunc0x205edb8 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__Gamepads__GamepadType.userFunc0x11f8c40 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 /** @type {Gamepad[]} */
 const gamepads = navigator.getGamepads ? navigator.getGamepads() : (navigator.webkitGetGamepads ? navigator.webkitGetGamepads() : []);
@@ -35,7 +35,7 @@ gdjs.evtsExt__Gamepads__GamepadType.eventsList0 = function(runtimeScene, eventsF
 {
 
 
-gdjs.evtsExt__Gamepads__GamepadType.userFunc0x205edb8(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__Gamepads__GamepadType.userFunc0x11f8c40(runtimeScene, eventsFunctionContext);
 
 }
 
