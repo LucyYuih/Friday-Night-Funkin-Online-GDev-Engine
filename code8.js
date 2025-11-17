@@ -117,7 +117,7 @@ for (var i = 0, k = 0, l = gdjs.All_32songs_32Death_32SceneCode.GDNoObjects1.len
 gdjs.All_32songs_32Death_32SceneCode.GDNoObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33247796);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33187556);
 }
 }
 if (isConditionTrue_0) {
@@ -146,7 +146,7 @@ for (var i = 0, k = 0, l = gdjs.All_32songs_32Death_32SceneCode.GDYesObjects1.le
 gdjs.All_32songs_32Death_32SceneCode.GDYesObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33249052);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33188812);
 }
 }
 if (isConditionTrue_0) {

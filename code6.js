@@ -132,7 +132,7 @@ gdjs.PlayonlineCode.GDLongNoteOppObjects2= [];
 gdjs.PlayonlineCode.GDLongNoteOppObjects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x26f74b0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x1a0f5d0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — observa selectedTrackKey, pára o que estiver tocando, baixa a nova track+chart
 // Compatível com: selected = "mod/song"  OR selected = "mod/song/difficulty"
@@ -643,7 +643,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x26f74b0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1a0f5d0(runtimeScene);
 
 }
 
@@ -739,7 +739,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x1708490 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0xaa9e18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — compatibilidade: procura áudio na difficulty -> song folder -> mod folder (fallback)
 (function () {
@@ -1505,7 +1505,7 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1708490(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xaa9e18(runtimeScene);
 
 }
 
@@ -1580,7 +1580,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33151068);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33093380);
 }
 }
 if (isConditionTrue_0) {
@@ -1603,7 +1603,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33155276);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33090524);
 }
 }
 }
@@ -1660,7 +1660,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33164852);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33103156);
 }
 }
 if (isConditionTrue_0) {
@@ -1687,7 +1687,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33165572);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33097980);
 }
 }
 if (isConditionTrue_0) {
