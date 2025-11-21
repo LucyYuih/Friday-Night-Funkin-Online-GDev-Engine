@@ -17545,7 +17545,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xe034f8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2592680 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -17735,7 +17735,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xe034f8(runtimeScene);
+gdjs.PlayCode.userFunc0x2592680(runtimeScene);
 
 }
 
@@ -17912,7 +17912,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xdcf4b8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2591f20 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18102,7 +18102,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xdcf4b8(runtimeScene);
+gdjs.PlayCode.userFunc0x2591f20(runtimeScene);
 
 }
 
@@ -22376,7 +22376,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x18cf7c0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x17b0710 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22395,25 +22395,31 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x18cebf0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0xacbfb8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// Script otimizado: atualiza texto só quando valor muda, ram em linha nova.
-// Colar em "No início da cena" (GDevelop 5). Usa objeto de texto chamado "fps".
-
+// Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
+// Formato: 
+// fps: 60
+// ram_total: 123 MB
 (function(runtimeScene){
   "use strict";
 
-  const OBJ_NAME = "fps";          // nome do objeto de texto na cena
-  const UPDATE_MS = 500;          // intervalo mínimo para recalcular/atualizar (ms)
+  const OBJ_NAME = "fps";           // objeto de texto (1º encontrado)
+  const UPDATE_MS = 800;           // intervalo para reavaliar (ms)
+  const MB = 1024 * 1024;
+  const CHANGE_THRESHOLD_MB = 1;   // atualiza texto só se diferença >= 1MB
 
+  // caches locais
   let fpsObj = null;
-  let lastUpdate = performance.now();
-  let frames = 0;
   let lastFps = -1;
-  let lastRam = null;
-  let lastString = "";
+  let frames = 0;
+  let lastUpdateTime = performance.now();
 
-  // tenta localizar o objeto fps (pega o primeiro)
+  // cache de tamanhos para blobUrls / data urls
+  const blobSizeCache = new Map(); // key: url -> size (bytes)
+  let lastShownTotalMB = -1;
+
+  // pega o primeiro objeto texto chamado OBJ_NAME
   function findFpsObj() {
     try {
       const arr = runtimeScene.getObjects(OBJ_NAME);
@@ -22422,60 +22428,202 @@ gdjs.PlayCode.userFunc0x18cebf0 = function GDJSInlineCode(runtimeScene) {
     return null;
   }
 
-  // lê RAM em MB se suportado
-  function readRamMB() {
+  // ler heap JS se disponível
+  function readUsedJsHeap() {
     try {
       if (performance && performance.memory && performance.memory.usedJSHeapSize) {
-        return Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+        return performance.memory.usedJSHeapSize; // bytes
       }
     } catch(e){}
-    return null; // N/A
+    return null;
   }
 
-  // atualiza o texto apenas se mudou
-  function applyTextIfChanged(fpsVal, ramVal) {
-    const ramStr = (ramVal === null || typeof ramVal === "undefined") ? "N/A" : (ramVal + " MB");
-    const newStr = "fps: " + fpsVal + "\n" + "ram: " + ramStr;
-    if (newStr !== lastString) {
-      lastString = newStr;
-      try {
-        if (!fpsObj) fpsObj = findFpsObj();
-        if (fpsObj) fpsObj.setString(newStr);
-      } catch(e){}
+  // estima memória ocupada por todos canvas na página (width * height * 4)
+  function estimateCanvasMemory() {
+    try {
+      const canvases = Array.from(document.getElementsByTagName("canvas"));
+      let sum = 0;
+      for (const c of canvases) {
+        try {
+          const w = c.width || (c.clientWidth || 0);
+          const h = c.height || (c.clientHeight || 0);
+          if (w > 0 && h > 0) sum += w * h * 4; // 4 bytes por pixel (RGBA)
+        } catch(e){}
+      }
+      return sum;
+    } catch(e){ return 0; }
+  }
+
+  // tenta obter tamanho de blobUrl ou data: url (retorna null se não conseguir rapidamente)
+  async function fetchBlobSizeIfNeeded(url) {
+    if (!url) return 0;
+    if (blobSizeCache.has(url)) return blobSizeCache.get(url);
+    try {
+      // Apenas tentar para blob: e data: e same-origin URLs (fetch local blob é rápido)
+      if (url.startsWith("blob:") || url.startsWith("data:") || new URL(url, location.href).origin === location.origin) {
+        // Faz fetch da url (para blob: isso retorna o blob local)
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          blobSizeCache.set(url, 0);
+          return 0;
+        }
+        const b = await resp.blob();
+        const s = b.size || 0;
+        blobSizeCache.set(url, s);
+        return s;
+      }
+    } catch(e){
+      // se falhar, grava 0 pra não ficar tentando toda hora
+      blobSizeCache.set(url, 0);
+      return 0;
     }
+    // se for cross-origin e não temos acesso, não contamos
+    blobSizeCache.set(url, 0);
+    return 0;
   }
 
-  // loop principal via rAF (baixo overhead)
-  function loop(now) {
+  // soma sizes de blobs presentes em window.gdjsCustomAudio (áudios) — chama fetchBlobSizeIfNeeded só quando necessário
+  async function sumGdjsCustomAudioBlobs() {
+    try {
+      if (!window.gdjsCustomAudio) return 0;
+      const keys = Object.keys(window.gdjsCustomAudio);
+      let total = 0;
+      const tasks = [];
+      for (const k of keys) {
+        try {
+          const folder = window.gdjsCustomAudio[k] || {};
+          const audios = folder.audios || {};
+          for (const name of Object.keys(audios)) {
+            try {
+              const info = audios[name] || {};
+              // se tiver blobSize explícito, usar direto
+              if (info.blobSize && typeof info.blobSize === "number") {
+                total += info.blobSize;
+              } else if (info.blobUrl && typeof info.blobUrl === "string") {
+                // adiar fetch para batches
+                tasks.push(fetchBlobSizeIfNeeded(info.blobUrl).then(s => { total += s; }).catch(()=>{}));
+              } else if (info.url && typeof info.url === "string") {
+                // remote url: às vezes podemos HEAD ou fetch, mas evitamos (pode ser caro / cross-origin)
+                // ignoramos por padrão (poderia ser opcional)
+              }
+            } catch(e){}
+          }
+          // rawFiles são textos (JSONs) — estimativa: bytes ~ length of string
+          const raws = folder.rawFiles || {};
+          for (const rname of Object.keys(raws)) {
+            try {
+              const txt = raws[rname];
+              if (typeof txt === "string") total += (new TextEncoder().encode(txt)).length;
+            } catch(e){}
+          }
+        } catch(e){}
+      }
+      // aguarda tasks
+      if (tasks.length > 0) await Promise.all(tasks);
+      return total;
+    } catch(e){ return 0; }
+  }
+
+  // soma tamanhos de imagens <img> com src blob/data (opcional)
+  async function sumImageBlobSizes() {
+    try {
+      const imgs = Array.from(document.images || []);
+      let total = 0;
+      const tasks = [];
+      for (const im of imgs) {
+        try {
+          const s = im.src || "";
+          if (s && (s.startsWith("blob:") || s.startsWith("data:"))) {
+            tasks.push(fetchBlobSizeIfNeeded(s).then(sz => { total += sz; }).catch(()=>{}));
+          }
+        } catch(e){}
+      }
+      if (tasks.length > 0) await Promise.all(tasks);
+      return total;
+    } catch(e){ return 0; }
+  }
+
+  // calcula estimativa total (em bytes)
+  async function computeTotalRamEstimateBytes() {
+    let total = 0;
+    // 1) JS heap se disponível
+    const heap = readUsedJsHeap();
+    if (heap && typeof heap === "number") total += heap;
+
+    // 2) blobs de áudio + jsons (window.gdjsCustomAudio)
+    const audioBlobs = await sumGdjsCustomAudioBlobs();
+    total += audioBlobs;
+
+    // 3) imagens blobs/data
+    const imgBlobs = await sumImageBlobSizes();
+    total += imgBlobs;
+
+    // 4) canvas estimate (textures / framebuffers)
+    const canv = estimateCanvasMemory();
+    total += canv;
+
+    // 5) fallback: se nada disponível, tentar usar heapTotal se exposto (performance.memory.totalJSHeapSize)
+    try {
+      if ((!heap || heap === 0) && performance && performance.memory && performance.memory.totalJSHeapSize) {
+        total = performance.memory.totalJSHeapSize;
+      }
+    } catch(e){}
+
+    return total;
+  }
+
+  // atualiza objeto texto se mudou
+  async function updateIfChanged() {
+    try {
+      // calcula fps aproximado (já em frames desde lastUpdateTime)
+      const now = performance.now();
+      const dt = now - lastUpdateTime;
+      let fpsVal = 0;
+      if (dt > 0) fpsVal = Math.round((frames / dt) * 1000);
+      // reset contadores de frames pra próximo ciclo
+      frames = 0;
+      lastUpdateTime = now;
+
+      // calcula estimativa total (pode efetuar fetchs locais p/ blob:)
+      const totalBytes = await computeTotalRamEstimateBytes();
+      const totalMB = Math.round(totalBytes / MB);
+
+      // atualiza texto só se diferença significativa em MB
+      if (Math.abs(totalMB - lastShownTotalMB) >= CHANGE_THRESHOLD_MB || fpsVal !== lastFps) {
+        lastShownTotalMB = totalMB;
+        lastFps = fpsVal;
+        try {
+          if (!fpsObj) fpsObj = findFpsObj();
+          if (fpsObj) {
+            const ramLine = "ram_total: " + totalMB + " MB";
+            const text = "fps: " + fpsVal + "\n" + ramLine;
+            fpsObj.setString(text);
+          }
+        } catch(e){}
+      }
+    } catch(e){}
+  }
+
+  // loop principal via rAF (conta frames e a cada UPDATE_MS chama updateIfChanged)
+  let lastTick = performance.now();
+  function rafLoop(now) {
     try {
       frames++;
-      const elapsed = now - lastUpdate;
+      const elapsed = now - lastTick;
       if (elapsed >= UPDATE_MS) {
-        const fpsVal = Math.round((frames / elapsed) * 1000);
-        frames = 0;
-        lastUpdate = now;
-
-        const ramVal = readRamMB();
-
-        // se mudou fps ou ram (estritamente), aplica
-        const fpsChanged = fpsVal !== lastFps;
-        const ramChanged = (ramVal !== lastRam);
-        lastFps = fpsVal;
-        lastRam = ramVal;
-
-        if (fpsChanged || ramChanged) applyTextIfChanged(fpsVal, ramVal);
+        lastTick = now;
+        updateIfChanged(); // não await aqui, é async mas ok (ele faz fetchs internos)
       }
     } catch(e){}
-    requestAnimationFrame(loop);
+    requestAnimationFrame(rafLoop);
   }
 
-  // init: tenta achar objeto e dispara loop
+  // inicialização
   fpsObj = findFpsObj();
-  // se quiser garantir que algo apareça logo (opcional), define um texto inicial:
-  try { if (fpsObj) fpsObj.setString("fps: --\nram: --"); } catch(e){}
-
-  // start loop
-  requestAnimationFrame(loop);
+  if (fpsObj) {
+    try { fpsObj.setString("fps: --\nram: -- MB"); } catch(e){}
+  }
+  requestAnimationFrame(rafLoop);
 
 })(runtimeScene);
 
@@ -22515,7 +22663,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x18cf7c0(runtimeScene);
+gdjs.PlayCode.userFunc0x17b0710(runtimeScene);
 
 }
 
@@ -22523,7 +22671,7 @@ gdjs.PlayCode.userFunc0x18cf7c0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x18cebf0(runtimeScene);
+gdjs.PlayCode.userFunc0xacbfb8(runtimeScene);
 
 }
 
@@ -22632,7 +22780,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x16d4038 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xe3e8d8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -23513,7 +23661,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x16d4038(runtimeScene);
+gdjs.PlayCode.userFunc0xe3e8d8(runtimeScene);
 
 }
 

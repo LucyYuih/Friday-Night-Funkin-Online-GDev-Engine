@@ -132,7 +132,7 @@ gdjs.PlayonlineCode.GDLongNoteOppObjects2= [];
 gdjs.PlayonlineCode.GDLongNoteOppObjects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x16e5800 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x955cb0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage
 // Base: watcher que você forneceu (mantive toda a lógica). Apenas resolvi o repositório ativo dinamicamente.
@@ -634,7 +634,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x16e5800(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x955cb0(runtimeScene);
 
 }
 
@@ -730,7 +730,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x18cebf0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0xacbfb8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — compatibilidade: procura áudio na difficulty -> song folder -> mod folder (fallback)
 (function () {
@@ -1496,7 +1496,7 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x18cebf0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xacbfb8(runtimeScene);
 
 }
 

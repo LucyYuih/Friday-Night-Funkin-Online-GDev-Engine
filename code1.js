@@ -408,7 +408,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x2701630 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xdce7d8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — UI final (ajustes: modal de difficulties sobre a UI, remove "Abrir", hover animation)
 // Base: sua versão anterior (mantive toda a lógica de download/difficulty intacta).
@@ -1447,7 +1447,7 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2701630(runtimeScene);
+gdjs.InicioCode.userFunc0xdce7d8(runtimeScene);
 
 }
 
