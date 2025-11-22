@@ -17545,7 +17545,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x19637b8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1963b78 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -17735,7 +17735,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x19637b8(runtimeScene);
+gdjs.PlayCode.userFunc0x1963b78(runtimeScene);
 
 }
 
@@ -17912,7 +17912,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1878220 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1877a48 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18102,7 +18102,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1878220(runtimeScene);
+gdjs.PlayCode.userFunc0x1877a48(runtimeScene);
 
 }
 
@@ -22380,7 +22380,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x173f038 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x129fbb0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22399,7 +22399,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x1a6ede0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x17dd698 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22664,7 +22664,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x173f038(runtimeScene);
+gdjs.PlayCode.userFunc0x129fbb0(runtimeScene);
 
 }
 
@@ -22672,7 +22672,7 @@ gdjs.PlayCode.userFunc0x173f038(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x1a6ede0(runtimeScene);
+gdjs.PlayCode.userFunc0x17dd698(runtimeScene);
 
 }
 
@@ -22920,20 +22920,33 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), 
 }
 
 
-};gdjs.PlayCode.userFunc0x17dc9d0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1705b50 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT B — loader que tenta: global var 'manifestjson' -> project resource -> CDN -> GitHub API
+// SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
+// Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
+// Use diretamente em GDevelop (runtimeScene disponível).
 (async function(runtimeScene){
-  const GITHUB_OWNER = "LucyYuih";
-  const GITHUB_REPO = "gdev-custom-charts";
-  const GITHUB_BRANCH = "main";
-  const MANIFEST_CDN_URL = `https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/manifest.json`;
+  "use strict";
 
-  function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
-  function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
-  function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
+  // ---------- CONFIGURAÇÕES ------------
+  const CONFIG = {
+    manifestTTLms: 1000 * 60 * 10,     // 10 min cache para manifest.json na memória
+    ghListTTLms: 1000 * 60 * 5,        // 5 min cache para listagens GH
+    maxParallelDownloads: 4,           // nível de concorrência de downloads
+    fetchRetries: 2,                   // número de retries (além da 1ª tentativa)
+    fetchBackoffBase: 250,             // ms base para backoff exponencial
+    useIndexedDBCache: true,           // persistir blobs/jsons no IndexedDB
+    indexedDBName: "gdjs-cache-v1",
+    indexedDBStoreFiles: "files",
+    indexedDBStoreMeta: "meta",
+    enableConsoleLogs: false           // true para logs de debug
+  };
 
-  // safe vars
+  // ---------- HELPERS GERAIS ------------
+  const log = (...args) => { if (CONFIG.enableConsoleLogs) console.log("[gdjs-loader]", ...args); };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---------- GAME VAR HELPERS (mesma API usada antes) ------------
   const gg = runtimeScene.getGame().getVariables();
   function ensureVarString(name, def=""){ if(!gg.has(name)) gg.get(name).setString(def); }
   function ensureVarNumber(name, def=0){ if(!gg.has(name)) gg.get(name).setNumber(def); }
@@ -22946,33 +22959,157 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), 
   ensureVarString("BfChartJsonLoader","");
   ensureVarString("OppChartJsonLoader","");
   ensureVarString("metadatajson","");
+  ensureVarString("SongName","");
   ensureVarNumber("jsmusicoffset",0);
   ensureVarNumber("Pause",0);
   ensureVarNumber("jsmusicfinish",0);
-  ensureVarString("SongName","");
-  // NEW: stop flag to force keep music stopped
+  ensureVarNumber("AllLoaded", 1);
   ensureVarNumber("StopJsMusic", 0);
 
-  window.gdjsCustomAudio = window.gdjsCustomAudio || {};
-  window.gdjsChannels = window.gdjsChannels || {};
-  window._gdjs_manifest = window._gdjs_manifest || undefined; // cache
+  // ---------- GLOBALS (compatibilidade com scripts existentes) ----------
+  window.gdjsCustomAudio = window.gdjsCustomAudio || {}; // estrutura: { folderPath: { audios: {name:{blobUrl,audioEl}}, rawFiles: {name:txt} } }
+  window.gdjsChannels = window.gdjsChannels || {};       // channel index -> Audio element
+  window._gdjs_manifest = window._gdjs_manifest || undefined;
+  window._gdjs_manifest_cache_ts = window._gdjs_manifest_cache_ts || 0;
 
-  // Manifest loaders (same order)
-  async function tryManifestFromGameVar() {
+  // ---------- UTILIDADES DE FETCH (retry/backoff e abort) ----------
+  async function fetchWithRetry(url, opts = {}, retries = CONFIG.fetchRetries) {
+    let attempt = 0;
+    let lastErr = null;
+    while (attempt <= retries) {
+      try {
+        const controller = opts.signal ? null : new AbortController(); // only create if user didn't pass signal
+        const fetchOpts = Object.assign({}, opts);
+        if (!fetchOpts.signal && controller) fetchOpts.signal = controller.signal;
+        const resp = await fetch(url, fetchOpts);
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        return resp;
+      } catch (err) {
+        lastErr = err;
+        if (err && err.name === "AbortError") throw err; // propagate abort immediately
+        const backoff = CONFIG.fetchBackoffBase * (2 ** attempt);
+        await sleep(backoff);
+        attempt++;
+      }
+    }
+    throw lastErr || new Error("fetch failed");
+  }
+
+  async function fetchAsBlob(url, signal) {
+    const resp = await fetchWithRetry(url, { signal });
+    return await resp.blob();
+  }
+  async function fetchAsText(url, signal) {
+    const resp = await fetchWithRetry(url, { signal });
+    return await resp.text();
+  }
+
+  // ---------- TOKEN / HEADER MEMOIZAÇÃO ----------
+  let _cachedGitHubToken = null;
+  function getGitHubTokenOnce() {
+    if (_cachedGitHubToken !== null) return _cachedGitHubToken;
+    try { _cachedGitHubToken = localStorage.getItem("gdjs_github_token") || ""; } catch(e){ _cachedGitHubToken = ""; }
     try {
-      if (runtimeScene && runtimeScene.getGame) {
-        const gvars = runtimeScene.getGame().getVariables();
-        if (gvars.has("manifestjson")) {
-          const s = gvars.get("manifestjson").getAsString();
-          if (s && s.trim()) {
-            try { return JSON.parse(s); } catch(e) { console.warn("manifestjson invalid JSON"); return null; }
-          }
-        }
+      if ((!_cachedGitHubToken || _cachedGitHubToken.trim()==="") && runtimeScene && runtimeScene.getGame) {
+        const gv = runtimeScene.getGame().getVariables();
+        if (gv.has("GitHubToken")) _cachedGitHubToken = gv.get("GitHubToken").getAsString() || "";
       }
     } catch(e){}
+    return _cachedGitHubToken;
+  }
+  function getAuthHeaders() {
+    const token = getGitHubTokenOnce();
+    return token ? { "Authorization": "token " + token } : {};
+  }
+
+  // ---------- MANIFEST & GH LIST CACHE (memória) ----------
+  // Chave baseada no repo ativo (owner/repo@branch) ou no URL custom.
+  const manifestMemoryCache = new Map(); // key -> { manifest, ts }
+  const ghListMemoryCache = new Map();   // key -> { data, ts }
+
+  function repoKeyFrom(entry) {
+    if (!entry) return "__default__";
+    if (entry.manifestUrl) return "url::" + entry.manifestUrl;
+    return `${entry.owner || ""}/${entry.repo || ""}@${entry.branch || "main"}`;
+  }
+
+  // ---------- IndexedDB (opcional) ----------
+  // simples wrapper minimal sem dependencies
+  const idb = {
+    db: null,
+    async open() {
+      if (!CONFIG.useIndexedDBCache) return null;
+      if (this.db) return this.db;
+      return new Promise((resolve, reject) => {
+        const rq = indexedDB.open(CONFIG.indexedDBName, 1);
+        rq.onupgradeneeded = function(e) {
+          const db = rq.result;
+          if (!db.objectStoreNames.contains(CONFIG.indexedDBStoreFiles)) db.createObjectStore(CONFIG.indexedDBStoreFiles);
+          if (!db.objectStoreNames.contains(CONFIG.indexedDBStoreMeta)) db.createObjectStore(CONFIG.indexedDBStoreMeta);
+        };
+        rq.onsuccess = function() {
+          idb.db = rq.result;
+          resolve(idb.db);
+        };
+        rq.onerror = function(){ reject(rq.error); };
+      });
+    },
+    async put(storeName, key, value) {
+      if (!CONFIG.useIndexedDBCache) return;
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).put(value, key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+    },
+    async get(storeName, key) {
+      if (!CONFIG.useIndexedDBCache) return null;
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, "readonly");
+        const req = tx.objectStore(storeName).get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    },
+    async del(storeName, key) {
+      if (!CONFIG.useIndexedDBCache) return;
+      const db = await this.open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, "readwrite");
+        tx.objectStore(storeName).delete(key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+  };
+
+  // ---------- REPO HELPERS (lê lista do localStorage / UI) ----------
+  function loadRepoList() {
+    try { const raw = localStorage.getItem("gdjs_repo_list_v1"); if (!raw) return []; return JSON.parse(raw); } catch(e){ return []; }
+  }
+  function getActiveRepo() {
+    try {
+      const id = localStorage.getItem("gdjs_active_repo_id_v1");
+      const list = loadRepoList();
+      let pick = list.find(r => r.id === id && r.enabled);
+      if (!pick) pick = list.find(r => r.enabled) || list[0] || { owner: "LucyYuih", repo: "gdev-custom-charts", branch: "main" };
+      return pick;
+    } catch(e){ return { owner: "LucyYuih", repo: "gdev-custom-charts", branch: "main" }; }
+  }
+  function buildManifestCdnUrl(entry) {
+    if (!entry) return null;
+    if (entry.manifestUrl) return entry.manifestUrl;
+    if (entry.owner && entry.repo) return `https://cdn.jsdelivr.net/gh/${entry.owner}/${entry.repo}@${entry.branch}/manifest.json`;
     return null;
   }
 
+  // ---------- MANIFEST LOADER (cache + fallbacks) ----------
+  async function tryManifestFromGameVar() {
+    try { if (runtimeScene && runtimeScene.getGame) { const v = runtimeScene.getGame().getVariables(); if (v.has("manifestjson")) { const s = v.get("manifestjson").getAsString(); if (s && s.trim()) { try { return JSON.parse(s); } catch(e){ return null; } } } } } catch(e){} return null;
+  }
   async function tryManifestFromProjectResource() {
     try {
       if (runtimeScene && runtimeScene.getGame && runtimeScene.getGame().getResourcesManager) {
@@ -22980,131 +23117,490 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), 
         if (rm.getResourceFullUrl) {
           try {
             const url = rm.getResourceFullUrl("manifest.json");
-            if (url) { const r = await fetch(url, {cache:"no-cache"}); if (r.ok) return await r.json(); }
+            if (url) { const r = await fetchWithRetry(url, {cache:"no-cache"}); if (r.ok) return await r.json(); }
           } catch(e){}
         }
       }
     } catch(e){}
-    // fallback try common paths
     const tries = ["manifest.json","resources/manifest.json","res/manifest.json","./manifest.json"];
     for (const p of tries) {
-      try {
-        const r = await fetch(p, {cache:"no-cache"});
-        if (r.ok) { try { return await r.json(); } catch(e){} }
-      } catch(e){}
+      try { const r = await fetchWithRetry(p, {cache:"no-cache"}); if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
     }
     return null;
   }
 
-  async function tryManifestFromCDN() {
-    try { const r = await fetch(MANIFEST_CDN_URL, {cache:"no-cache"}); if (r.ok) return await r.json(); } catch(e){} return null;
+  async function tryManifestFromCdnOf(entry) {
+    try {
+      const url = buildManifestCdnUrl(entry);
+      if (!url) return null;
+      // verificar cache em idb primeiro
+      if (CONFIG.useIndexedDBCache) {
+        try {
+          const cached = await idb.get(CONFIG.indexedDBStoreMeta, "manifest::" + repoKeyFrom(entry));
+          if (cached && cached.ts && (Date.now() - cached.ts) < CONFIG.manifestTTLms && cached.manifest) {
+            log("manifest from idb cache");
+            return cached.manifest;
+          }
+        } catch(e){ /* ignore */ }
+      }
+      const r = await fetchWithRetry(url, {cache:"no-cache"});
+      if (r.ok) {
+        const json = await r.json();
+        // store in idb
+        try { if (CONFIG.useIndexedDBCache) await idb.put(CONFIG.indexedDBStoreMeta, "manifest::" + repoKeyFrom(entry), {ts: Date.now(), manifest: json}); } catch(e){}
+        return json;
+      }
+    } catch(e){}
+    return null;
   }
 
-  // unified
-  async function loadManifest() {
-    if (typeof window._gdjs_manifest !== "undefined") return window._gdjs_manifest;
-    const a = await tryManifestFromGameVar(); if (a) { window._gdjs_manifest = a; return a; }
-    const b = await tryManifestFromProjectResource(); if (b) { window._gdjs_manifest = b; return b; }
-    const c = await tryManifestFromCDN(); if (c) { window._gdjs_manifest = c; return c; }
-    window._gdjs_manifest = null; return null;
+  async function loadManifestPreferLocalFor(entry) {
+    const rk = repoKeyFrom(entry);
+    const cached = manifestMemoryCache.get(rk);
+    if (cached && (Date.now() - cached.ts) < CONFIG.manifestTTLms) {
+      log("manifest memory cache hit", rk);
+      return cached.manifest;
+    }
+    // try order: game var -> project resource -> CDN -> null
+    const a = await tryManifestFromGameVar(); if (a) { manifestMemoryCache.set(rk, { manifest: a, ts: Date.now() }); return a; }
+    const b = await tryManifestFromProjectResource(); if (b) { manifestMemoryCache.set(rk, { manifest: b, ts: Date.now() }); return b; }
+    const c = await tryManifestFromCdnOf(entry); if (c) { manifestMemoryCache.set(rk, { manifest: c, ts: Date.now() }); return c; }
+    manifestMemoryCache.set(rk, { manifest: null, ts: Date.now() });
+    return null;
   }
 
-  // GitHub fallback listing
+  // ---------- GitHub list (API) com cache ----------
   async function ghListApi(path="") {
-    const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(path)}?ref=${GITHUB_BRANCH}`;
-    let token = "";
-    try { token = localStorage.getItem("gdjs_github_token") || ""; } catch(e){}
-    try { if ((!token || token.trim()==="") && runtimeScene && runtimeScene.getGame) { const gv = runtimeScene.getGame().getVariables(); if (gv.has("GitHubToken")) token = gv.get("GitHubToken").getAsString(); } } catch(e){}
-    const headers = token ? { "Authorization": "token " + token } : {};
-    const r = await fetch(apiUrl, { headers });
+    const active = getActiveRepo();
+    if (!active.owner || !active.repo) throw new Error("No active GH repo configured");
+    const key = repoKeyFrom(active) + "::" + path;
+    const cached = ghListMemoryCache.get(key);
+    if (cached && (Date.now() - cached.ts) < CONFIG.ghListTTLms) {
+      log("ghList cache hit", key);
+      return cached.data;
+    }
+    const apiUrl = `https://api.github.com/repos/${active.owner}/${active.repo}/contents/${encodeURIComponent(path)}?ref=${active.branch || "main"}`;
+    const headers = getAuthHeaders();
+    const r = await fetchWithRetry(apiUrl, { headers });
     if (!r.ok) throw new Error(`GitHub API: ${r.status}`);
     const json = await r.json();
-    return json.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
+    const out = json.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
+    ghListMemoryCache.set(key, { data: out, ts: Date.now() });
+    return out;
   }
 
-  // load audios for a selected track (manifest-aware)
-  async function loadAudiosForTrack(selected) {
-    if (!selected || !selected.trim()) return [];
-    window.gdjsCustomAudio[selected] = window.gdjsCustomAudio[selected] || { audios:{}, rawFiles:{} };
-    const entry = window.gdjsCustomAudio[selected];
-    // try manifest
-    const manifest = await loadManifest();
-    let files = null;
-    if (manifest && manifest.hasOwnProperty(selected)) {
-      const raw = manifest[selected];
-      if (Array.isArray(raw) && raw.length>0 && typeof raw[0] === "object") {
-        files = raw.map(e => ({ name: e.name, url: e.url }));
-      } else {
-        // no files in manifest for this leaf
-        files = [];
+  // fallback wrapper used in multiple lugares (keeps same contract)
+  async function ghListForFolderUsingEntry(entry, path="") {
+    if (!entry || (!entry.owner || !entry.repo)) throw new Error("No GitHub owner/repo specified for ghList");
+    return await ghListApi(path);
+  }
+
+  // ---------- CONCURRENCY LIMITER (simples) ----------
+  function createLimiter(concurrency = CONFIG.maxParallelDownloads) {
+    let active = 0;
+    const queue = [];
+    function next() {
+      if (active >= concurrency) return;
+      const task = queue.shift();
+      if (!task) return;
+      active++;
+      Promise.resolve().then(task.fn).then(task.resolve).catch(task.reject).finally(()=>{ active--; next(); });
+    }
+    return function limit(fn) {
+      return new Promise((resolve, reject) => {
+        queue.push({ fn, resolve, reject });
+        next();
+      });
+    };
+  }
+  const limit = createLimiter(CONFIG.maxParallelDownloads);
+
+  // ---------- AUDIO POOL e gerenciamento de blobUrls ----------
+  // Objetos:
+  //   window.gdjsCustomAudio[folder] = { audios: { name: { blobUrl, audioElId } }, rawFiles: { name: text } }
+  //   audioPool: array de elements HTMLAudioElement pré-criados
+  const audioPool = {
+    pool: [],
+    maxSize: 8,
+    nextId: 0,
+    refsByBlob: new Map(), // blobUrl -> refcount
+    createElement() {
+      const el = new Audio();
+      el.preload = "auto";
+      el.crossOrigin = "anonymous";
+      el.loop = false;
+      const id = this.nextId++;
+      el._gdjs_pool_id = id;
+      return el;
+    },
+    async init(size = 4) {
+      const needed = Math.max(2, Math.min(this.maxSize, size));
+      while (this.pool.length < needed) this.pool.push(this.createElement());
+    },
+    acquire(blobUrl) {
+      // reuse existing element if its src equals blobUrl
+      for (const el of this.pool) {
+        if (!el._gdjs_in_use) {
+          el._gdjs_in_use = true;
+          try { el.src = blobUrl; } catch(e){}
+          return el;
+        }
       }
-    } else {
-      // fallback to GitHub list
-      try { const list = await ghListApi(selected); files = list.map(i => ({ name: i.name, url: i.download_url || `https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${i.path}` })); } catch(e){ files = []; }
+      // none available: create new if under maxSize
+      if (this.pool.length < this.maxSize) {
+        const el = this.createElement();
+        el._gdjs_in_use = true;
+        try { el.src = blobUrl; } catch(e){}
+        this.pool.push(el);
+        return el;
+      }
+      // fallback: reuse first one forcibly
+      const el = this.pool[0];
+      try { el.pause(); } catch(e){}
+      try { el.src = blobUrl; } catch(e){}
+      el._gdjs_in_use = true;
+      return el;
+    },
+    release(el) {
+      if (!el) return;
+      el._gdjs_in_use = false;
+      try { el.pause(); el.currentTime = 0; } catch(e){}
+    },
+    incBlobRef(blobUrl) {
+      if (!blobUrl) return;
+      const cur = this.refsByBlob.get(blobUrl) || 0;
+      this.refsByBlob.set(blobUrl, cur + 1);
+    },
+    decBlobRef(blobUrl) {
+      if (!blobUrl) return;
+      const cur = this.refsByBlob.get(blobUrl) || 0;
+      if (cur <= 1) {
+        this.refsByBlob.delete(blobUrl);
+        // revoke URL to free memory
+        try { URL.revokeObjectURL(blobUrl); } catch(e){ }
+      } else {
+        this.refsByBlob.set(blobUrl, cur - 1);
+      }
     }
+  };
 
-    const audioFiles = (files||[]).filter(f=> isAudioFile(f.name));
-    const unlock = [];
-    let idx = 0;
-    for (const f of audioFiles) {
+  // init pool
+  audioPool.init(4);
+
+  // ---------- UTIL: basenameNoExt e isAudio/isJson ----------
+  function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
+  function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
+  function isJsonFile(name){ return /\.json$/i.test(name); }
+
+  // ---------- CARREGAMENTO DE ÁUDIOS/JSONS PARA UMA PASTA (melhorado) ----------
+  // Nota: esta função preserva a semântica original: NÃO chama play() automaticamente.
+  async function downloadAndPrepareFolderFlexible(folderPathOrRoot, outerController, opts) {
+    const ctrl = outerController;
+    const difficultyName = opts && opts.difficultyName ? opts.difficultyName : null;
+
+    try {
+      // cleanup anterior (revoke se necessário)
+      // mas não revocar os blobUrls que vamos reutilizar; apenas limpar canais
+      stopAndCleanupAll(true);
+
+      const rootFolder = (() => {
+        if (difficultyName) return folderPathOrRoot;
+        const parts = (folderPathOrRoot || "").split("/").filter(Boolean);
+        if (parts.length >= 3) return parts.slice(0, parts.length - 1).join("/");
+        return folderPathOrRoot;
+      })();
+
+      let inferredDifficulty = difficultyName;
+      if (!inferredDifficulty && (folderPathOrRoot || "").split("/").filter(Boolean).length >= 3) {
+        const parts = (folderPathOrRoot || "").split("/").filter(Boolean);
+        inferredDifficulty = parts.slice(-1)[0];
+      }
+
+      try { setVarString("SongName", basenameNoExt((rootFolder || "").split("/").pop()||"")); } catch(e){}
+      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPathOrRoot); } catch(e){}
+
+      // sinal de carregando
+      setVarNumber("AllLoaded", 0);
+
+      // prepare manifest + active repo
+      const activeRepo = getActiveRepo();
+      const manifest = await loadManifestPreferLocalFor(activeRepo);
+
+      // listagem de arquivos de áudio
+      let audioFiles = [];
+      if (inferredDifficulty) {
+        const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
+        audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
+      } else {
+        const mp = (manifest && manifest.hasOwnProperty(folderPathOrRoot)) ? manifest[folderPathOrRoot] : null;
+        if (mp && Array.isArray(mp) && mp.length>0 && typeof mp[0] === "object") {
+          audioFiles = mp.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
+        } else {
+          try {
+            const api = await (async ()=> { try { return await ghListApi(folderPathOrRoot); } catch(e) { return []; } })();
+            audioFiles = (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
+          } catch(e){}
+        }
+      }
+
+      // charts / jsons map
+      const allJsonsMap = {};
+      if (inferredDifficulty) {
+        const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
+        if (manifest && manifest.hasOwnProperty(difficultyPath)) {
+          const entry = manifest[difficultyPath];
+          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+            entry.filter(e=> isJsonFile(e.name)).forEach(e=> allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: difficultyPath });
+          }
+        } else {
+          try {
+            const api = await (async ()=> { try { return await ghListApi(difficultyPath); } catch(e){ return []; } })();
+            (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i => allJsonsMap[i.name] = { name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`), origin: difficultyPath });
+          } catch(e){}
+        }
+      }
+      // include jsons from rootFolder as fallback
       try {
-        const resp = await fetch(f.url);
-        if (!resp.ok) { idx++; await sleep(0); continue; }
-        const blob = await resp.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const audioEl = new Audio(blobUrl);
-        audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
-        entry.audios[f.name] = { blobUrl, audioEl };
-        window.gdjsChannels[idx] = audioEl;
-        // prime non-blocking
-        try {
-          const p = audioEl.play();
-          if (p && typeof p.then === "function") {
-            p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; }catch(e){} }).catch(()=>{ unlock.push({audioEl, name:f.name}); });
-          } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
-        } catch(e){ unlock.push({audioEl, name:f.name}); }
-        // SongName: only set if not already set (we'll also sync later from selectedTrackKey)
-        if (!getVarString("SongName")) setVarString("SongName", basenameNoExt(f.name));
-        idx++;
+        if (manifest && manifest.hasOwnProperty(rootFolder)) {
+          const entry = manifest[rootFolder];
+          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+            entry.filter(e=> isJsonFile(e.name)).forEach(e=> { if (!allJsonsMap[e.name]) allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: rootFolder }; });
+          }
+        } else {
+          const api = await (async ()=> { try { return await ghListApi(rootFolder); } catch(e){ return []; } })();
+          (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i=> { if (!allJsonsMap[i.name]) allJsonsMap[i.name] = { name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`), origin: rootFolder }; });
+        }
       } catch(e){}
-      await sleep(0);
+
+      // prepare storage
+      window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
+      const dest = window.gdjsCustomAudio[rootFolder];
+
+      // --------- download audios com limiter e cache idb ----------
+      let nextChannelIndex = 0;
+      const tasks = (audioFiles || []).map(f => async () => {
+        if (ctrl.signal.aborted) throw new Error("aborted");
+        try {
+          setVarString("SongName", setVarString || "" ); // noop guard to keep variable reference alive
+          // tentar recuperar de IDB se ativado
+          const cacheKeyBlob = "blob::" + folderPathOrRoot + "::" + f.name;
+          let blob = null;
+          if (CONFIG.useIndexedDBCache) {
+            try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyBlob); if (cached) blob = cached; } catch(e){ /* ignore */ }
+          }
+          if (!blob) {
+            // fetch e salvar
+            const b = await fetchAsBlob(f.url, ctrl.signal);
+            blob = b;
+            if (CONFIG.useIndexedDBCache) {
+              try { await idb.put(CONFIG.indexedDBStoreFiles, cacheKeyBlob, b); } catch(e){}
+            }
+          }
+          // create blobUrl e store
+          const blobUrl = URL.createObjectURL(blob);
+          audioPool.incBlobRef(blobUrl);
+          // create audio element from pool
+          const audioEl = audioPool.acquire(blobUrl);
+          // store dest
+          dest.audios[f.name] = { blobUrl, audioEl };
+          window.gdjsChannels[nextChannelIndex] = audioEl;
+          nextChannelIndex++;
+        } catch(e){
+          // skip error for this file
+        }
+      });
+      // run tasks com concurrency
+      await Promise.all(tasks.map(t => limit(t)));
+
+      // --------- download jsons (charts) ----------
+      const ggvars = runtimeScene.getGame().getVariables();
+      const jsonTasks = Object.keys(allJsonsMap).map(name => async () => {
+        if (ctrl.signal.aborted) throw new Error("aborted");
+        try {
+          const j = allJsonsMap[name];
+          // idb cache key
+          const cacheKeyTxt = "txt::" + folderPathOrRoot + "::" + j.name;
+          let txt = null;
+          if (CONFIG.useIndexedDBCache) {
+            try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyTxt); if (cached) txt = cached; } catch(e){}
+          }
+          if (!txt) {
+            const text = await fetchAsText(j.url, ctrl.signal);
+            txt = text;
+            if (CONFIG.useIndexedDBCache) {
+              try { await idb.put(CONFIG.indexedDBStoreFiles, cacheKeyTxt, txt); } catch(e){}
+            }
+          }
+          const storeKey = (j.origin && j.origin !== rootFolder ? (j.origin.split("/").pop() + "/" + j.name) : j.name);
+          dest.rawFiles[storeKey] = txt;
+          const lname = j.name.toLowerCase();
+          if (ggvars) {
+            if (/metadata|meta/.test(lname)) ggvars.get("metadatajson").setString(txt);
+            else if (/(bf|chartbf|chart_bf)/.test(lname)) ggvars.get("BfChartJsonLoader").setString(txt);
+            else if (/(dad|opp|opponent)/.test(lname)) ggvars.get("OppChartJsonLoader").setString(txt);
+            else {
+              try {
+                const parsed = JSON.parse(txt);
+                if (parsed && parsed.notes) {
+                  if (!ggvars.get("BfChartJsonLoader").getAsString()) ggvars.get("BfChartJsonLoader").setString(txt);
+                  else if (!ggvars.get("OppChartJsonLoader").getAsString()) ggvars.get("OppChartJsonLoader").setString(txt);
+                  else if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
+                } else {
+                  if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
+                }
+              } catch(e){
+                if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
+              }
+            }
+          }
+        } catch(e){}
+      });
+      await Promise.all(jsonTasks.map(t => limit(t)));
+
+      // finalize: connect channel 0 watcher / audio context setup (sem tocar)
+      attachEndedWatcherToChannel0();
+      await ensureAudioContext();
+      setVarNumber("jsmusicfinish", 0);
+
+      // success
+      setVarNumber("AllLoaded", 1);
+      return { ok:true };
+    } catch(err) {
+      try { stopAndCleanupAll(true); } catch(e){}
+      setVarNumber("AllLoaded", 0);
+      return { ok:false, reason: err && err.message ? err.message : String(err) };
     }
-    if (unlock.length>0) {
-      const handler = async ()=> { for (const it of unlock) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', handler); };
-      window.addEventListener('pointerdown', handler, { once: true });
-    }
-    return Object.keys(entry.audios || {});
   }
 
-  // attach ended watcher to channel 0
-  function attachEndedWatcherToChannel0() {
+  // ---------- findAudioFilesWithFallback (mantive semântica, use activeRepo) ----------
+  async function findAudioFilesWithFallback(rootFolder, difficultyPath) {
+    const activeRepo = getActiveRepo();
+    const manifest = await loadManifestPreferLocalFor(activeRepo);
+
+    async function audioListFromManifestPath(p) {
+      try {
+        if (!manifest) return [];
+        if (!manifest.hasOwnProperty(p)) return [];
+        const entry = manifest[p];
+        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
+          return entry.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
+        }
+      } catch(e){}
+      return [];
+    }
+
+    async function audioListFromGithubPath(p) {
+      try {
+        const api = await (async ()=> { try { return await ghListApi(p); } catch(e) { return []; } })();
+        return (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
+      } catch(e){}
+      return [];
+    }
+
+    // 1) difficultyPath
+    try {
+      let list = await audioListFromManifestPath(difficultyPath);
+      if (list && list.length>0) return list;
+      list = await audioListFromGithubPath(difficultyPath);
+      if (list && list.length>0) return list;
+    } catch(e){}
+
+    // 2) rootFolder
+    try {
+      let list = await audioListFromManifestPath(rootFolder);
+      if (list && list.length>0) return list;
+      list = await audioListFromGithubPath(rootFolder);
+      if (list && list.length>0) return list;
+    } catch(e){}
+
+    // 3) modFolder parent
+    try {
+      const parts = (rootFolder || "").split("/").filter(Boolean);
+      if (parts.length >= 2) {
+        const modFolder = parts.slice(0, parts.length - 1).join("/");
+        if (modFolder) {
+          let list = await audioListFromManifestPath(modFolder);
+          if (list && list.length>0) return list;
+          list = await audioListFromGithubPath(modFolder);
+          if (list && list.length>0) return list;
+        }
+      }
+    } catch(e){}
+    return [];
+  }
+
+  // ---------- AUDIO CONTEXT / ended watcher ----------
+  function attachEndedWatcherToChannel0(){
     const ch0 = window.gdjsChannels && window.gdjsChannels[0];
     if (!ch0) return;
-    if (ch0._gdjs_ended_handler) { try { ch0.removeEventListener('ended', ch0._gdjs_ended_handler); } catch(e){} ch0._gdjs_ended_handler = null; }
+    if (ch0._gdjs_ended_handler) { try{ ch0.removeEventListener('ended', ch0._gdjs_ended_handler); }catch(e){} ch0._gdjs_ended_handler = null; }
     ch0.loop = false;
     const handler = ()=> { setVarNumber("jsmusicfinish", 1); };
     ch0.addEventListener('ended', handler);
     ch0._gdjs_ended_handler = handler;
   }
 
-  // connect to AudioContext (best-effort)
-  async function ensureAudioContext() {
+  async function ensureAudioContext(){
     try {
       if (!window._gdjs_audio_ctx) window._gdjs_audio_ctx = new (window.AudioContext || window.webkitAudioContext)();
       const ctx = window._gdjs_audio_ctx;
       if (ctx.state === "suspended") { try { await ctx.resume(); } catch(e){} }
-      Object.keys(window.gdjsChannels).forEach(k=>{ try {
-        const a = window.gdjsChannels[k];
-        if (!a) return;
-        if (!a._gdjs_connected_to_audioctx && ctx.createMediaElementSource) {
-          const src = ctx.createMediaElementSource(a); const gain = ctx.createGain(); gain.gain.value = 1.0; src.connect(gain); gain.connect(ctx.destination);
-          a._gdjs_connected_to_audioctx = true; a._gdjs_gain_node = gain;
-        } else if (a._gdjs_gain_node) { a._gdjs_gain_node.gain.value = 1.0; }
-      } catch(e){} });
+      Object.keys(window.gdjsChannels).forEach(k=>{
+        try {
+          const a = window.gdjsChannels[k];
+          if (!a) return;
+          if (!a._gdjs_connected_to_audioctx && ctx.createMediaElementSource) {
+            try {
+              const src = ctx.createMediaElementSource(a);
+              const gain = ctx.createGain(); gain.gain.value = 1.0;
+              src.connect(gain); gain.connect(ctx.destination);
+              a._gdjs_connected_to_audioctx = true; a._gdjs_gain_node = gain;
+            } catch(e){}
+          } else if (a._gdjs_gain_node) { a._gdjs_gain_node.gain.value = 1.0; }
+        } catch(e){}
+      });
     } catch(e){}
   }
 
-  // ensure channels ready non-blocking
+  // ---------- STOP + CLEANUP (revoga blobs com controle) ----------
+  function stopAndCleanupAll(revokeBlobUrls = true){
+    try {
+      if (window.gdjsChannels) {
+        Object.keys(window.gdjsChannels).forEach(k=>{
+          try {
+            const a = window.gdjsChannels[k];
+            if (!a) return;
+            try{ a.pause(); }catch(e){}
+            try{ a.currentTime = 0; }catch(e){}
+            if (a._gdjs_ended_handler) {
+              try{ a.removeEventListener('ended', a._gdjs_ended_handler); }catch(e){} a._gdjs_ended_handler = null;
+            }
+            if (revokeBlobUrls && a.src && a.src.startsWith('blob:')) {
+              try{ audioPool.decBlobRef(a.src); }catch(e){}
+            }
+          } catch(e){}
+        });
+      }
+      if (window.gdjsCustomAudio) {
+        Object.keys(window.gdjsCustomAudio).forEach(folder=>{
+          try {
+            const entry = window.gdjsCustomAudio[folder] || {};
+            const audios = entry.audios || {};
+            Object.keys(audios).forEach(name=>{
+              try {
+                const info = audios[name] || {};
+                if (info && info.blobUrl && revokeBlobUrls) audioPool.decBlobRef(info.blobUrl);
+              } catch(e){}
+            });
+          } catch(e){}
+        });
+      }
+    } catch(e){}
+    window.gdjsChannels = {};
+  }
+
+  // ---------- carregador leve para reprodução-on-demand (mantém sem autoplay) ----------
+  // Garante que se existir entrada cached em window.gdjsCustomAudio[selected] ela será mapeada para channels
   async function ensureChannelsReadyNonBlocking() {
     try {
       let selected = getVarString("selectedTrackKey");
@@ -23115,35 +23611,95 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), 
       if (!selected) return;
       const folderName = selected.split("/").pop() || selected;
       if (!getVarString("SongName")) setVarString("SongName", basenameNoExt(folderName));
-      // if already loaded, rebuild channels list
       if (window.gdjsCustomAudio[selected] && Object.keys(window.gdjsCustomAudio[selected].audios||{}).length > 0) {
-        // rebuild gdjsChannels
-        Object.keys(window.gdjsChannels||{}).forEach(k=>{ try{ delete window.gdjsChannels[k]; } catch(e){} });
+        // rebuild channels mapping
+        window.gdjsChannels = {};
         let i = 0;
         for (const nm of Object.keys(window.gdjsCustomAudio[selected].audios)) {
           const info = window.gdjsCustomAudio[selected].audios[nm];
           const audioEl = info.audioEl || new Audio(info.blobUrl || info.url || "");
           audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
-          try { audioEl.volume = 1.0; audioEl.muted = false; } catch(e){}
-          window.gdjsChannels[i] = audioEl; i++;
+          window.gdjsChannels[i] = audioEl;
+          i++;
         }
         attachEndedWatcherToChannel0(); ensureAudioContext();
         setVarNumber("jsmusicfinish", 0);
         return;
       }
-      // otherwise load
+      // else try to load audios for track (non-blocking)
       const loaded = await loadAudiosForTrack(selected);
       if ((loaded || []).length > 0) { attachEndedWatcherToChannel0(); ensureAudioContext(); setVarNumber("jsmusicfinish", 0); }
     } catch(e){}
   }
 
-  // start without awaiting to avoid freeze
-  ensureChannelsReadyNonBlocking().catch(()=>{});
+  // ---------- loadAudiosForTrack (compatível, otimizado: usa idb se possível) ----------
+  async function loadAudiosForTrack(selected) {
+    if (!selected || !selected.trim()) return [];
+    window.gdjsCustomAudio[selected] = window.gdjsCustomAudio[selected] || { audios: {}, rawFiles: {} };
+    const entry = window.gdjsCustomAudio[selected];
+    const manifest = await loadManifestPreferLocalFor(getActiveRepo());
+    let files = null;
+    if (manifest && manifest.hasOwnProperty(selected)) {
+      const raw = manifest[selected];
+      if (Array.isArray(raw) && raw.length>0 && typeof raw[0] === "object") {
+        files = raw.map(e => ({ name: e.name, url: e.url }));
+      } else {
+        files = [];
+      }
+    } else {
+      try { const list = await ghListApi(selected); files = list.map(i => ({ name: i.name, url: i.download_url || `https://cdn.jsdelivr.net/gh/${getActiveRepo().owner}/${getActiveRepo().repo}@${getActiveRepo().branch}/${i.path}` })); } catch(e){ files = []; }
+    }
 
-  // unlock on first gesture
+    const audioFiles = (files||[]).filter(f=> isAudioFile(f.name));
+    const unlock = [];
+    let idx = 0;
+    const tasks = audioFiles.map(f => async () => {
+      try {
+        const cacheKeyBlob = "blob::" + selected + "::" + f.name;
+        let blob = null;
+        if (CONFIG.useIndexedDBCache) {
+          try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyBlob); if (cached) blob = cached; } catch(e){}
+        }
+        if (!blob) {
+          const b = await fetchAsBlob(f.url);
+          blob = b;
+          if (CONFIG.useIndexedDBCache) {
+            try { await idb.put(CONFIG.indexedDBStoreFiles, cacheKeyBlob, b); } catch(e){}
+          }
+        }
+        const blobUrl = URL.createObjectURL(blob);
+        audioPool.incBlobRef(blobUrl);
+        const audioEl = audioPool.acquire(blobUrl);
+        entry.audios[f.name] = { blobUrl, audioEl };
+        window.gdjsChannels[idx] = audioEl;
+        try {
+          const p = audioEl.play();
+          if (p && typeof p.then === "function") {
+            p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; }catch(e){} }).catch(()=>{ unlock.push({audioEl, name:f.name}); });
+          } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
+        } catch(e){ unlock.push({audioEl, name:f.name}); }
+        if (!getVarString("SongName")) setVarString("SongName", basenameNoExt(f.name));
+        idx++;
+      } catch(e){}
+    });
+    await Promise.all(tasks.map(t => limit(t)));
+    if (unlock.length>0) {
+      const handler = async ()=> { for (const it of unlock) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', handler); };
+      window.addEventListener('pointerdown', handler, { once: true });
+    }
+    return Object.keys(entry.audios || {});
+  }
+
+  // ---------- helper wrappers que o resto do sistema usa (mantive nomes) ----------
+  window._gdjs_manifest = window._gdjs_manifest || undefined;
+
+  async function ghListForFolderUsingEntryWrapper(entry, path="") {
+    return await ghListForFolderUsingEntry(entry, path);
+  }
+
+  // ---------- minimal prewarm unlock listener (mantém sem autoplay) ----------
   window.addEventListener("pointerdown", async function unlockOnce(){
     try { if (window._gdjs_audio_ctx && window._gdjs_audio_ctx.state === "suspended") await window._gdjs_audio_ctx.resume(); } catch(e){}
-    // Only attempt to play/unlock if Pause == 0 AND StopJsMusic == 0
     try {
       const pauseVal = Number(getVarNumber("Pause") || 0);
       const stopVal = Number(getVarNumber("StopJsMusic") || 0);
@@ -23154,71 +23710,77 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), 
     window.removeEventListener("pointerdown", unlockOnce);
   }, { once:true, passive:true });
 
-  // ---------- Optimization: only check SongName when needed ----------
-  // Cache last seen values and a flag to avoid per-frame string work when not necessary.
+  // ---------- initial ensure channels ready ----------
+  ensureChannelsReadyNonBlocking().catch(()=>{});
+
+  // ---------- sync loops (nome / jsmusicoffset / Pause respect) ----------
   let _lastSelectedForNameCheck = getVarString("selectedTrackKey") || "";
   let _lastSongNameForNameCheck = getVarString("SongName") || "";
-  let _nameCheckActive = true; // start active so we ensure initial sync
-  // -------------------------------------------------------------------
+  let _nameCheckActive = true;
 
-  // raf loop to update jsmusicoffset & Pause logic
   (function rafLoop(){
     try {
       const ch0 = window.gdjsChannels && window.gdjsChannels[0];
       if (ch0) { const cur = ch0.currentTime || 0; setVarNumber("jsmusicoffset", cur); }
 
-      // --- Optimized SongName sync: only run when necessary ---
       try {
         const selected = String(getVarString("selectedTrackKey") || "").trim();
         const currentSongName = String(getVarString("SongName") || "");
-        // compute expected only when selected exists
         const folderName = selected ? (selected.split("/").pop() || selected) : "";
         const expectedSong = basenameNoExt(folderName);
 
-        // if selected changed externally, re-enable check
         if (selected !== _lastSelectedForNameCheck) {
           _nameCheckActive = true;
           _lastSelectedForNameCheck = selected;
         }
 
-        // if SongName changed externally, re-evaluate (reactivate if it's wrong)
         if (currentSongName !== _lastSongNameForNameCheck) {
           if (expectedSong && currentSongName !== expectedSong) {
             _nameCheckActive = true;
           } else {
-            // if external change made SongName equal to expected, we can deactivate
             _nameCheckActive = false;
           }
           _lastSongNameForNameCheck = currentSongName;
         }
 
-        // do the actual sync only when active
         if (_nameCheckActive) {
           if (expectedSong && currentSongName !== expectedSong) {
             setVarString("SongName", expectedSong);
             _lastSongNameForNameCheck = expectedSong;
-            _nameCheckActive = false; // matched — stop further checks until a change
+            _nameCheckActive = false;
           } else {
-            // nothing to change -> deactivate until next detected change
             _nameCheckActive = false;
             _lastSongNameForNameCheck = currentSongName;
           }
         }
-      } catch(e){ /* swallow */ }
+      } catch(e){}
 
       const pauseVal = Number(getVarNumber("Pause") || 0);
       const stopVal = Number(getVarNumber("StopJsMusic") || 0);
-      // If either Pause or StopJsMusic is non-zero, ensure audios are paused.
       if (pauseVal !== 0 || stopVal !== 0) {
         Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (a && !a.paused && !a.ended) a.pause(); } catch(e){} });
       } else {
-        // Only unpause if BOTH Pause == 0 AND StopJsMusic == 0 (already guaranteed by else branch)
         Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (!a) return; if (a.paused && !a.ended) { a.play().then(()=>{}).catch(()=>{}); } } catch(e){} });
       }
     } catch(e){}
     requestAnimationFrame(rafLoop);
   })();
 
+  // ---------- Exports / util functions acessíveis via console (opcional) ----------
+  window._gdjs_loader_utils = window._gdjs_loader_utils || {};
+  window._gdjs_loader_utils.clearCaches = function() {
+    manifestMemoryCache.clear();
+    ghListMemoryCache.clear();
+    try { if (CONFIG.useIndexedDBCache) { idb.del(CONFIG.indexedDBStoreMeta, "manifest::" + repoKeyFrom(getActiveRepo())); } } catch(e){}
+    log("Caches cleared");
+  };
+  window._gdjs_loader_utils.setIndexedDB = function(enabled) {
+    CONFIG.useIndexedDBCache = !!enabled;
+    log("IndexedDB cache set to", CONFIG.useIndexedDBCache);
+  };
+
+  // ---------- fim do script ----------
+  log("Script B (optimized) loaded");
 })(runtimeScene);
 
 };
@@ -23239,7 +23801,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x17dc9d0(runtimeScene);
+gdjs.PlayCode.userFunc0x1705b50(runtimeScene);
 
 }
 
