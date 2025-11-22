@@ -135,7 +135,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0xdf4cd0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0xde5cf8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage
 // Base: watcher que você forneceu (mantive toda a lógica). Apenas resolvi o repositório ativo dinamicamente.
@@ -637,7 +637,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xdf4cd0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xde5cf8(runtimeScene);
 
 }
 
@@ -733,7 +733,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x181e988 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x16e6368 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — UI final (ajustes: modal de difficulties sobre a UI, remove "Abrir", hover animation)
 // Base: sua versão anterior (mantive toda a lógica de download/difficulty intacta).
@@ -1772,7 +1772,7 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x181e988(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x16e6368(runtimeScene);
 
 }
 
