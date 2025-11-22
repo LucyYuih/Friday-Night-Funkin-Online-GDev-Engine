@@ -17545,7 +17545,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xe0d618 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2d2a0c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -17735,7 +17735,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xe0d618(runtimeScene);
+gdjs.PlayCode.userFunc0x2d2a0c8(runtimeScene);
 
 }
 
@@ -17912,7 +17912,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x18e4bc0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2d28748 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18102,7 +18102,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x18e4bc0(runtimeScene);
+gdjs.PlayCode.userFunc0x2d28748(runtimeScene);
 
 }
 
@@ -22388,7 +22388,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0xe0f340 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2c54a18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22407,7 +22407,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0xe0f118 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x2c54ad0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22672,7 +22672,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0xe0f340(runtimeScene);
+gdjs.PlayCode.userFunc0x2c54a18(runtimeScene);
 
 }
 
@@ -22680,7 +22680,7 @@ gdjs.PlayCode.userFunc0xe0f340(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0xe0f118(runtimeScene);
+gdjs.PlayCode.userFunc0x2c54ad0(runtimeScene);
 
 }
 
@@ -22872,7 +22872,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x12862c8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2c57bb8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -22884,7 +22884,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   const CONFIG = {
     manifestTTLms: 1000 * 60 * 10,     // 10 min cache para manifest.json na memória
     ghListTTLms: 1000 * 60 * 5,        // 5 min cache para listagens GH
-    maxParallelDownloads: 4,           // nível de concorrência de downloads (pode reduzir p/ testes)
+    maxParallelDownloads: 4,           // nível de concorrência de downloads
     fetchRetries: 2,                   // número de retries (além da 1ª tentativa)
     fetchBackoffBase: 250,             // ms base para backoff exponencial
     useIndexedDBCache: true,           // persistir blobs/jsons no IndexedDB
@@ -22975,6 +22975,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   }
 
   // ---------- MANIFEST & GH LIST CACHE (memória) ----------
+  // Chave baseada no repo ativo (owner/repo@branch) ou no URL custom.
   const manifestMemoryCache = new Map(); // key -> { manifest, ts }
   const ghListMemoryCache = new Map();   // key -> { data, ts }
 
@@ -22985,6 +22986,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   }
 
   // ---------- IndexedDB (opcional) ----------
+  // simples wrapper minimal sem dependencies
   const idb = {
     db: null,
     async open() {
@@ -23083,6 +23085,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     try {
       const url = buildManifestCdnUrl(entry);
       if (!url) return null;
+      // verificar cache em idb primeiro
       if (CONFIG.useIndexedDBCache) {
         try {
           const cached = await idb.get(CONFIG.indexedDBStoreMeta, "manifest::" + repoKeyFrom(entry));
@@ -23095,6 +23098,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       const r = await fetchWithRetry(url, {cache:"no-cache"});
       if (r.ok) {
         const json = await r.json();
+        // store in idb
         try { if (CONFIG.useIndexedDBCache) await idb.put(CONFIG.indexedDBStoreMeta, "manifest::" + repoKeyFrom(entry), {ts: Date.now(), manifest: json}); } catch(e){}
         return json;
       }
@@ -23109,6 +23113,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       log("manifest memory cache hit", rk);
       return cached.manifest;
     }
+    // try order: game var -> project resource -> CDN -> null
     const a = await tryManifestFromGameVar(); if (a) { manifestMemoryCache.set(rk, { manifest: a, ts: Date.now() }); return a; }
     const b = await tryManifestFromProjectResource(); if (b) { manifestMemoryCache.set(rk, { manifest: b, ts: Date.now() }); return b; }
     const c = await tryManifestFromCdnOf(entry); if (c) { manifestMemoryCache.set(rk, { manifest: c, ts: Date.now() }); return c; }
@@ -23136,6 +23141,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     return out;
   }
 
+  // fallback wrapper used in multiple lugares (keeps same contract)
   async function ghListForFolderUsingEntry(entry, path="") {
     if (!entry || (!entry.owner || !entry.repo)) throw new Error("No GitHub owner/repo specified for ghList");
     return await ghListApi(path);
@@ -23162,6 +23168,9 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   const limit = createLimiter(CONFIG.maxParallelDownloads);
 
   // ---------- AUDIO POOL e gerenciamento de blobUrls ----------
+  // Objetos:
+  //   window.gdjsCustomAudio[folder] = { audios: { name: { blobUrl, audioElId } }, rawFiles: { name: text } }
+  //   audioPool: array de elements HTMLAudioElement pré-criados
   const audioPool = {
     pool: [],
     maxSize: 8,
@@ -23169,7 +23178,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     refsByBlob: new Map(), // blobUrl -> refcount
     createElement() {
       const el = new Audio();
-      el.preload = "metadata";
+      el.preload = "auto";
       el.crossOrigin = "anonymous";
       el.loop = false;
       const id = this.nextId++;
@@ -23181,7 +23190,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       while (this.pool.length < needed) this.pool.push(this.createElement());
     },
     acquire(blobUrl) {
-      // reuse existing element if available (not _gdjs_in_use)
+      // reuse existing element if its src equals blobUrl
       for (const el of this.pool) {
         if (!el._gdjs_in_use) {
           el._gdjs_in_use = true;
@@ -23197,7 +23206,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         this.pool.push(el);
         return el;
       }
-      // fallback: reuse first one forcibly (try pausing first)
+      // fallback: reuse first one forcibly
       const el = this.pool[0];
       try { el.pause(); } catch(e){}
       try { el.src = blobUrl; } catch(e){}
@@ -23219,15 +23228,15 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       const cur = this.refsByBlob.get(blobUrl) || 0;
       if (cur <= 1) {
         this.refsByBlob.delete(blobUrl);
-        // revoke no próximo tick para não bloquear o mesmo frame
-        try { setTimeout(()=>{ try{ URL.revokeObjectURL(blobUrl); }catch(e){} }, 0); } catch(e){}
+        // revoke URL to free memory
+        try { URL.revokeObjectURL(blobUrl); } catch(e){ }
       } else {
         this.refsByBlob.set(blobUrl, cur - 1);
       }
     }
   };
 
-  // init pool (padrão)
+  // init pool
   audioPool.init(4);
 
   // ---------- UTIL: basenameNoExt e isAudio/isJson ----------
@@ -23235,87 +23244,15 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
   function isJsonFile(name){ return /\.json$/i.test(name); }
 
-  // ---------- REUSABLE: contador para batching (controla micro-yields) ----------
-  let _audioCreationCounter = 0;
-  let _jsonCreationCounter = 0;
-
-  // ---------- STOP + CLEANUP (revoga blobs com controle) ----------
-  function stopAndCleanupAll(revokeBlobUrls = true){
-    try {
-      if (window.gdjsChannels) {
-        Object.keys(window.gdjsChannels).forEach(k=>{
-          try {
-            const a = window.gdjsChannels[k];
-            if (!a) return;
-            try{ a.pause(); }catch(e){}
-            try{ a.currentTime = 0; }catch(e){}
-            if (a._gdjs_ended_handler) {
-              try{ a.removeEventListener('ended', a._gdjs_ended_handler); }catch(e){} a._gdjs_ended_handler = null;
-            }
-            if (revokeBlobUrls && a.src && a.src.startsWith('blob:')) {
-              try{ audioPool.decBlobRef(a.src); }catch(e){}
-            }
-          } catch(e){}
-        });
-      }
-      if (window.gdjsCustomAudio) {
-        Object.keys(window.gdjsCustomAudio).forEach(folder=>{
-          try {
-            const entry = window.gdjsCustomAudio[folder] || {};
-            const audios = entry.audios || {};
-            Object.keys(audios).forEach(name=>{
-              try {
-                const info = audios[name] || {};
-                if (info && info.blobUrl && revokeBlobUrls) audioPool.decBlobRef(info.blobUrl);
-              } catch(e){}
-            });
-          } catch(e){}
-        });
-      }
-    } catch(e){}
-    window.gdjsChannels = {};
-  }
-
-  // ---------- AUDIO CONTEXT / ended watcher (connecta somente canal 0) ----------
-  function attachEndedWatcherToChannel0(){
-    const ch0 = window.gdjsChannels && window.gdjsChannels[0];
-    if (!ch0) return;
-    if (ch0._gdjs_ended_handler) { try{ ch0.removeEventListener('ended', ch0._gdjs_ended_handler); }catch(e){} ch0._gdjs_ended_handler = null; }
-    ch0.loop = false;
-    const handler = ()=> { setVarNumber("jsmusicfinish", 1); };
-    ch0.addEventListener('ended', handler);
-    ch0._gdjs_ended_handler = handler;
-  }
-
-  async function ensureAudioContext(){
-    try {
-      if (!window._gdjs_audio_ctx) window._gdjs_audio_ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const ctx = window._gdjs_audio_ctx;
-      if (ctx.state === "suspended") { try { await ctx.resume(); } catch(e){} }
-      // conecta somente canal 0 para evitar trabalho em massa
-      const ch0 = window.gdjsChannels && window.gdjsChannels[0];
-      if (ch0) {
-        try {
-          if (!ch0._gdjs_connected_to_audioctx && ctx.createMediaElementSource) {
-            try {
-              const src = ctx.createMediaElementSource(ch0);
-              const gain = ctx.createGain(); gain.gain.value = 1.0;
-              src.connect(gain); gain.connect(ctx.destination);
-              ch0._gdjs_connected_to_audioctx = true; ch0._gdjs_gain_node = gain;
-            } catch(e){}
-          } else if (ch0._gdjs_gain_node) { ch0._gdjs_gain_node.gain.value = 1.0; }
-        } catch(e){}
-      }
-    } catch(e){}
-  }
-
   // ---------- CARREGAMENTO DE ÁUDIOS/JSONS PARA UMA PASTA (melhorado) ----------
+  // Nota: esta função preserva a semântica original: NÃO chama play() automaticamente.
   async function downloadAndPrepareFolderFlexible(folderPathOrRoot, outerController, opts) {
     const ctrl = outerController;
     const difficultyName = opts && opts.difficultyName ? opts.difficultyName : null;
 
     try {
-      // cleanup anterior (não revoga tudo imediatamente; stopAndCleanupAll lida com refs)
+      // cleanup anterior (revoke se necessário)
+      // mas não revocar os blobUrls que vamos reutilizar; apenas limpar canais
       stopAndCleanupAll(true);
 
       const rootFolder = (() => {
@@ -23334,8 +23271,10 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       try { setVarString("SongName", basenameNoExt((rootFolder || "").split("/").pop()||"")); } catch(e){}
       try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPathOrRoot); } catch(e){}
 
+      // sinal de carregando
       setVarNumber("AllLoaded", 0);
 
+      // prepare manifest + active repo
       const activeRepo = getActiveRepo();
       const manifest = await loadManifestPreferLocalFor(activeRepo);
 
@@ -23394,6 +23333,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       const tasks = (audioFiles || []).map(f => async () => {
         if (ctrl.signal.aborted) throw new Error("aborted");
         try {
+          setVarString("SongName", setVarString || "" ); // noop guard to keep variable reference alive
           // tentar recuperar de IDB se ativado
           const cacheKeyBlob = "blob::" + folderPathOrRoot + "::" + f.name;
           let blob = null;
@@ -23401,6 +23341,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
             try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyBlob); if (cached) blob = cached; } catch(e){ /* ignore */ }
           }
           if (!blob) {
+            // fetch e salvar
             const b = await fetchAsBlob(f.url, ctrl.signal);
             blob = b;
             if (CONFIG.useIndexedDBCache) {
@@ -23410,17 +23351,12 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
           // create blobUrl e store
           const blobUrl = URL.createObjectURL(blob);
           audioPool.incBlobRef(blobUrl);
-          // create audio element from pool (não tocar aqui)
+          // create audio element from pool
           const audioEl = audioPool.acquire(blobUrl);
-          audioEl.preload = "metadata"; // mais leve
+          // store dest
           dest.audios[f.name] = { blobUrl, audioEl };
-          // somente mapeia channel 0 imediatamente; evita criar/atribuir muitos elementos de uma vez
-          if (nextChannelIndex === 0) {
-            window.gdjsChannels[0] = audioEl;
-            nextChannelIndex++;
-          }
-          _audioCreationCounter++;
-          if ((_audioCreationCounter % 3) === 0) await sleep(0); // cede event loop a cada 3 criações
+          window.gdjsChannels[nextChannelIndex] = audioEl;
+          nextChannelIndex++;
         } catch(e){
           // skip error for this file
         }
@@ -23434,6 +23370,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         if (ctrl.signal.aborted) throw new Error("aborted");
         try {
           const j = allJsonsMap[name];
+          // idb cache key
           const cacheKeyTxt = "txt::" + folderPathOrRoot + "::" + j.name;
           let txt = null;
           if (CONFIG.useIndexedDBCache) {
@@ -23468,17 +23405,16 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
               }
             }
           }
-          _jsonCreationCounter++;
-          if ((_jsonCreationCounter % 4) === 0) await sleep(0);
         } catch(e){}
       });
       await Promise.all(jsonTasks.map(t => limit(t)));
 
-      // finalize: attach ended watcher ao canal 0 e garantir audio context (sem tocar automaticamente)
+      // finalize: connect channel 0 watcher / audio context setup (sem tocar)
       attachEndedWatcherToChannel0();
       await ensureAudioContext();
       setVarNumber("jsmusicfinish", 0);
 
+      // success
       setVarNumber("AllLoaded", 1);
       return { ok:true };
     } catch(err) {
@@ -23513,18 +23449,23 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       return [];
     }
 
+    // 1) difficultyPath
     try {
       let list = await audioListFromManifestPath(difficultyPath);
       if (list && list.length>0) return list;
       list = await audioListFromGithubPath(difficultyPath);
       if (list && list.length>0) return list;
     } catch(e){}
+
+    // 2) rootFolder
     try {
       let list = await audioListFromManifestPath(rootFolder);
       if (list && list.length>0) return list;
       list = await audioListFromGithubPath(rootFolder);
       if (list && list.length>0) return list;
     } catch(e){}
+
+    // 3) modFolder parent
     try {
       const parts = (rootFolder || "").split("/").filter(Boolean);
       if (parts.length >= 2) {
@@ -23540,7 +23481,78 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     return [];
   }
 
+  // ---------- AUDIO CONTEXT / ended watcher ----------
+  function attachEndedWatcherToChannel0(){
+    const ch0 = window.gdjsChannels && window.gdjsChannels[0];
+    if (!ch0) return;
+    if (ch0._gdjs_ended_handler) { try{ ch0.removeEventListener('ended', ch0._gdjs_ended_handler); }catch(e){} ch0._gdjs_ended_handler = null; }
+    ch0.loop = false;
+    const handler = ()=> { setVarNumber("jsmusicfinish", 1); };
+    ch0.addEventListener('ended', handler);
+    ch0._gdjs_ended_handler = handler;
+  }
+
+  async function ensureAudioContext(){
+    try {
+      if (!window._gdjs_audio_ctx) window._gdjs_audio_ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = window._gdjs_audio_ctx;
+      if (ctx.state === "suspended") { try { await ctx.resume(); } catch(e){} }
+      Object.keys(window.gdjsChannels).forEach(k=>{
+        try {
+          const a = window.gdjsChannels[k];
+          if (!a) return;
+          if (!a._gdjs_connected_to_audioctx && ctx.createMediaElementSource) {
+            try {
+              const src = ctx.createMediaElementSource(a);
+              const gain = ctx.createGain(); gain.gain.value = 1.0;
+              src.connect(gain); gain.connect(ctx.destination);
+              a._gdjs_connected_to_audioctx = true; a._gdjs_gain_node = gain;
+            } catch(e){}
+          } else if (a._gdjs_gain_node) { a._gdjs_gain_node.gain.value = 1.0; }
+        } catch(e){}
+      });
+    } catch(e){}
+  }
+
+  // ---------- STOP + CLEANUP (revoga blobs com controle) ----------
+  function stopAndCleanupAll(revokeBlobUrls = true){
+    try {
+      if (window.gdjsChannels) {
+        Object.keys(window.gdjsChannels).forEach(k=>{
+          try {
+            const a = window.gdjsChannels[k];
+            if (!a) return;
+            try{ a.pause(); }catch(e){}
+            try{ a.currentTime = 0; }catch(e){}
+            if (a._gdjs_ended_handler) {
+              try{ a.removeEventListener('ended', a._gdjs_ended_handler); }catch(e){} a._gdjs_ended_handler = null;
+            }
+            if (revokeBlobUrls && a.src && a.src.startsWith('blob:')) {
+              try{ audioPool.decBlobRef(a.src); }catch(e){}
+            }
+          } catch(e){}
+        });
+      }
+      if (window.gdjsCustomAudio) {
+        Object.keys(window.gdjsCustomAudio).forEach(folder=>{
+          try {
+            const entry = window.gdjsCustomAudio[folder] || {};
+            const audios = entry.audios || {};
+            Object.keys(audios).forEach(name=>{
+              try {
+                const info = audios[name] || {};
+                if (info && info.blobUrl && revokeBlobUrls) audioPool.decBlobRef(info.blobUrl);
+              } catch(e){}
+            });
+          } catch(e){}
+        });
+      }
+    } catch(e){}
+    window.gdjsChannels = {};
+  }
+
   // ---------- carregador leve para reprodução-on-demand (mantém sem autoplay) ----------
+  // Garante que se existir entrada cached em window.gdjsCustomAudio[selected] ela será mapeada para channels
   async function ensureChannelsReadyNonBlocking() {
     try {
       let selected = getVarString("selectedTrackKey");
@@ -23551,23 +23563,22 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       if (!selected) return;
       const folderName = selected.split("/").pop() || selected;
       if (!getVarString("SongName")) setVarString("SongName", basenameNoExt(folderName));
-      const audiosObj = window.gdjsCustomAudio[selected] && window.gdjsCustomAudio[selected].audios || {};
-      const audioNames = Object.keys(audiosObj);
-      if (audioNames.length > 0) {
-        // somente mapeia o primeiro áudio como canal 0 para evitar criação em massa
-        const firstName = audioNames[0];
-        const info = audiosObj[firstName];
-        const audioEl = info.audioEl || info.blobUrl ? (info.audioEl || new Audio(info.blobUrl || info.url || "")) : null;
-        if (audioEl) {
-          audioEl.preload = "metadata"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
-          window.gdjsChannels = {};
-          window.gdjsChannels[0] = audioEl;
+      if (window.gdjsCustomAudio[selected] && Object.keys(window.gdjsCustomAudio[selected].audios||{}).length > 0) {
+        // rebuild channels mapping
+        window.gdjsChannels = {};
+        let i = 0;
+        for (const nm of Object.keys(window.gdjsCustomAudio[selected].audios)) {
+          const info = window.gdjsCustomAudio[selected].audios[nm];
+          const audioEl = info.audioEl || new Audio(info.blobUrl || info.url || "");
+          audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
+          window.gdjsChannels[i] = audioEl;
+          i++;
         }
         attachEndedWatcherToChannel0(); ensureAudioContext();
         setVarNumber("jsmusicfinish", 0);
         return;
       }
-      // else tente carregar os audios do track (não bloqueante)
+      // else try to load audios for track (non-blocking)
       const loaded = await loadAudiosForTrack(selected);
       if ((loaded || []).length > 0) { attachEndedWatcherToChannel0(); ensureAudioContext(); setVarNumber("jsmusicfinish", 0); }
     } catch(e){}
@@ -23611,41 +23622,21 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         const blobUrl = URL.createObjectURL(blob);
         audioPool.incBlobRef(blobUrl);
         const audioEl = audioPool.acquire(blobUrl);
-        // não chamar play() em lote aqui; só preparar metadata
-        try { audioEl.preload = "metadata"; } catch(e){}
         entry.audios[f.name] = { blobUrl, audioEl };
-        // mapeia apenas canal 0 para evitar preparar muitos elementos de áudio simultaneamente
-        if (idx === 0) {
-          window.gdjsChannels[0] = audioEl;
-        }
-        // incrementa idx apenas para rastrear mapeamento simples
+        window.gdjsChannels[idx] = audioEl;
+        try {
+          const p = audioEl.play();
+          if (p && typeof p.then === "function") {
+            p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; }catch(e){} }).catch(()=>{ unlock.push({audioEl, name:f.name}); });
+          } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
+        } catch(e){ unlock.push({audioEl, name:f.name}); }
+        if (!getVarString("SongName")) setVarString("SongName", basenameNoExt(f.name));
         idx++;
-        _audioCreationCounter++;
-        if ((_audioCreationCounter % 3) === 0) await sleep(0);
       } catch(e){}
     });
     await Promise.all(tasks.map(t => limit(t)));
-
-    // se alguns elementos ficaram bloqueados por autoplay policy, tentamos desbloquear somente canal 0 no primeiro pointerdown
-    if (Object.keys(window.gdjsChannels || {}).length === 0 && Object.keys(entry.audios || {}).length > 0) {
-      // mapear primeiro existente como canal 0
-      const firstKey = Object.keys(entry.audios || {})[0];
-      if (firstKey) {
-        window.gdjsChannels[0] = entry.audios[firstKey].audioEl;
-      }
-    }
-
     if (unlock.length>0) {
-      const handler = async ()=> {
-        // tenta apenas desbloquear audio do canal 0 (evita decodificação de todos)
-        try {
-          const ch0 = window.gdjsChannels && window.gdjsChannels[0];
-          if (ch0) {
-            try { await ch0.play(); ch0.pause(); ch0.currentTime = 0; } catch(e){}
-          }
-        } catch(e){}
-        window.removeEventListener('pointerdown', handler);
-      };
+      const handler = async ()=> { for (const it of unlock) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', handler); };
       window.addEventListener('pointerdown', handler, { once: true });
     }
     return Object.keys(entry.audios || {});
@@ -23665,11 +23656,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       const pauseVal = Number(getVarNumber("Pause") || 0);
       const stopVal = Number(getVarNumber("StopJsMusic") || 0);
       if (pauseVal === 0 && stopVal === 0) {
-        // tocar somente canal 0 para desbloquear decodificação sem forçar todos os arquivos
-        const ch0 = window.gdjsChannels && window.gdjsChannels[0];
-        if (ch0 && ch0.paused && !ch0.ended) {
-          ch0.play().then(()=>{}).catch(()=>{});
-        }
+        Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (!a) return; if (a.paused && !a.ended) { a.play().then(()=>{}).catch(()=>{}); } } catch(e){} });
       }
     } catch(e){}
     window.removeEventListener("pointerdown", unlockOnce);
@@ -23723,16 +23710,9 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       const pauseVal = Number(getVarNumber("Pause") || 0);
       const stopVal = Number(getVarNumber("StopJsMusic") || 0);
       if (pauseVal !== 0 || stopVal !== 0) {
-        // pausa todos se pedido
         Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (a && !a.paused && !a.ended) a.pause(); } catch(e){} });
       } else {
-        // tocar automaticamente somente canal 0 (evita decodificar/rodar todos os audios ao mesmo tempo)
-        try {
-          const a = window.gdjsChannels && window.gdjsChannels[0];
-          if (a && a.paused && !a.ended) {
-            a.play().then(()=>{}).catch(()=>{});
-          }
-        } catch(e){}
+        Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (!a) return; if (a.paused && !a.ended) { a.play().then(()=>{}).catch(()=>{}); } } catch(e){} });
       }
     } catch(e){}
     requestAnimationFrame(rafLoop);
@@ -23751,7 +23731,8 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     log("IndexedDB cache set to", CONFIG.useIndexedDBCache);
   };
 
-  log("Script B (optimized + non-blocking fixes) loaded");
+  // ---------- fim do script ----------
+  log("Script B (optimized) loaded");
 })(runtimeScene);
 
 };
@@ -23772,7 +23753,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x12862c8(runtimeScene);
+gdjs.PlayCode.userFunc0x2c57bb8(runtimeScene);
 
 }
 
