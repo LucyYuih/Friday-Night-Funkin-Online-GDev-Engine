@@ -130,9 +130,12 @@ gdjs.PlayonlineCode.GDOppRightNoteObjects3= [];
 gdjs.PlayonlineCode.GDLongNoteOppObjects1= [];
 gdjs.PlayonlineCode.GDLongNoteOppObjects2= [];
 gdjs.PlayonlineCode.GDLongNoteOppObjects3= [];
+gdjs.PlayonlineCode.GDStatistics2Objects1= [];
+gdjs.PlayonlineCode.GDStatistics2Objects2= [];
+gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x1a4a440 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0xdf4cd0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage
 // Base: watcher que você forneceu (mantive toda a lógica). Apenas resolvi o repositório ativo dinamicamente.
@@ -634,7 +637,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1a4a440(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xdf4cd0(runtimeScene);
 
 }
 
@@ -730,7 +733,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x1997098 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x181e988 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — UI final (ajustes: modal de difficulties sobre a UI, remove "Abrir", hover animation)
 // Base: sua versão anterior (mantive toda a lógica de download/difficulty intacta).
@@ -1769,7 +1772,7 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1997098(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x181e988(runtimeScene);
 
 }
 
@@ -1846,7 +1849,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34224220);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34125972);
 }
 }
 if (isConditionTrue_0) {
@@ -1869,7 +1872,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34227988);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34122324);
 }
 }
 }
@@ -1926,7 +1929,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34237604);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34135156);
 }
 }
 if (isConditionTrue_0) {
@@ -1953,7 +1956,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34234876);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34137028);
 }
 }
 if (isConditionTrue_0) {
@@ -2189,6 +2192,9 @@ gdjs.PlayonlineCode.GDOppRightNoteObjects3.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects1.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects2.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects3.length = 0;
+gdjs.PlayonlineCode.GDStatistics2Objects1.length = 0;
+gdjs.PlayonlineCode.GDStatistics2Objects2.length = 0;
+gdjs.PlayonlineCode.GDStatistics2Objects3.length = 0;
 
 gdjs.PlayonlineCode.eventsList5(runtimeScene);
 gdjs.PlayonlineCode.GDJoinObjects1.length = 0;
@@ -2320,6 +2326,9 @@ gdjs.PlayonlineCode.GDOppRightNoteObjects3.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects1.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects2.length = 0;
 gdjs.PlayonlineCode.GDLongNoteOppObjects3.length = 0;
+gdjs.PlayonlineCode.GDStatistics2Objects1.length = 0;
+gdjs.PlayonlineCode.GDStatistics2Objects2.length = 0;
+gdjs.PlayonlineCode.GDStatistics2Objects3.length = 0;
 
 
 return;

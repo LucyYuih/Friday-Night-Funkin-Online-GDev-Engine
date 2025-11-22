@@ -81,6 +81,8 @@ gdjs.CreditsCode.GDOppRightNoteObjects1= [];
 gdjs.CreditsCode.GDOppRightNoteObjects2= [];
 gdjs.CreditsCode.GDLongNoteOppObjects1= [];
 gdjs.CreditsCode.GDLongNoteOppObjects2= [];
+gdjs.CreditsCode.GDStatistics2Objects1= [];
+gdjs.CreditsCode.GDStatistics2Objects2= [];
 
 
 gdjs.CreditsCode.eventsList0 = function(runtimeScene) {
@@ -120,7 +122,7 @@ for (var i = 0, k = 0, l = gdjs.CreditsCode.GDPauseButton3Objects1.length;i<l;++
 gdjs.CreditsCode.GDPauseButton3Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33614876);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33530292);
 }
 }
 if (isConditionTrue_0) {
@@ -231,6 +233,8 @@ gdjs.CreditsCode.GDOppRightNoteObjects1.length = 0;
 gdjs.CreditsCode.GDOppRightNoteObjects2.length = 0;
 gdjs.CreditsCode.GDLongNoteOppObjects1.length = 0;
 gdjs.CreditsCode.GDLongNoteOppObjects2.length = 0;
+gdjs.CreditsCode.GDStatistics2Objects1.length = 0;
+gdjs.CreditsCode.GDStatistics2Objects2.length = 0;
 
 gdjs.CreditsCode.eventsList0(runtimeScene);
 gdjs.CreditsCode.GDfps2Objects1.length = 0;
@@ -313,6 +317,8 @@ gdjs.CreditsCode.GDOppRightNoteObjects1.length = 0;
 gdjs.CreditsCode.GDOppRightNoteObjects2.length = 0;
 gdjs.CreditsCode.GDLongNoteOppObjects1.length = 0;
 gdjs.CreditsCode.GDLongNoteOppObjects2.length = 0;
+gdjs.CreditsCode.GDStatistics2Objects1.length = 0;
+gdjs.CreditsCode.GDStatistics2Objects2.length = 0;
 
 
 return;

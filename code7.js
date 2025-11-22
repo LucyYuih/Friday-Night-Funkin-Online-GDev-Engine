@@ -71,6 +71,8 @@ gdjs.PauseCode.GDOppRightNoteObjects1= [];
 gdjs.PauseCode.GDOppRightNoteObjects2= [];
 gdjs.PauseCode.GDLongNoteOppObjects1= [];
 gdjs.PauseCode.GDLongNoteOppObjects2= [];
+gdjs.PauseCode.GDStatistics2Objects1= [];
+gdjs.PauseCode.GDStatistics2Objects2= [];
 
 
 gdjs.PauseCode.eventsList0 = function(runtimeScene) {
@@ -164,6 +166,8 @@ gdjs.PauseCode.GDOppRightNoteObjects1.length = 0;
 gdjs.PauseCode.GDOppRightNoteObjects2.length = 0;
 gdjs.PauseCode.GDLongNoteOppObjects1.length = 0;
 gdjs.PauseCode.GDLongNoteOppObjects2.length = 0;
+gdjs.PauseCode.GDStatistics2Objects1.length = 0;
+gdjs.PauseCode.GDStatistics2Objects2.length = 0;
 
 gdjs.PauseCode.eventsList0(runtimeScene);
 gdjs.PauseCode.GDStatisticsObjects1.length = 0;
@@ -236,6 +240,8 @@ gdjs.PauseCode.GDOppRightNoteObjects1.length = 0;
 gdjs.PauseCode.GDOppRightNoteObjects2.length = 0;
 gdjs.PauseCode.GDLongNoteOppObjects1.length = 0;
 gdjs.PauseCode.GDLongNoteOppObjects2.length = 0;
+gdjs.PauseCode.GDStatistics2Objects1.length = 0;
+gdjs.PauseCode.GDStatistics2Objects2.length = 0;
 
 
 return;

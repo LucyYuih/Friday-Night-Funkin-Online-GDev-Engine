@@ -81,6 +81,8 @@ gdjs.All_32songs_32Death_32SceneCode.GDOppRightNoteObjects1= [];
 gdjs.All_32songs_32Death_32SceneCode.GDOppRightNoteObjects2= [];
 gdjs.All_32songs_32Death_32SceneCode.GDLongNoteOppObjects1= [];
 gdjs.All_32songs_32Death_32SceneCode.GDLongNoteOppObjects2= [];
+gdjs.All_32songs_32Death_32SceneCode.GDStatistics2Objects1= [];
+gdjs.All_32songs_32Death_32SceneCode.GDStatistics2Objects2= [];
 
 
 gdjs.All_32songs_32Death_32SceneCode.eventsList0 = function(runtimeScene) {
@@ -117,7 +119,7 @@ for (var i = 0, k = 0, l = gdjs.All_32songs_32Death_32SceneCode.GDNoObjects1.len
 gdjs.All_32songs_32Death_32SceneCode.GDNoObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34241548);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34218548);
 }
 }
 if (isConditionTrue_0) {
@@ -146,7 +148,7 @@ for (var i = 0, k = 0, l = gdjs.All_32songs_32Death_32SceneCode.GDYesObjects1.le
 gdjs.All_32songs_32Death_32SceneCode.GDYesObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34240996);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34219804);
 }
 }
 if (isConditionTrue_0) {
@@ -242,6 +244,8 @@ gdjs.All_32songs_32Death_32SceneCode.GDOppRightNoteObjects1.length = 0;
 gdjs.All_32songs_32Death_32SceneCode.GDOppRightNoteObjects2.length = 0;
 gdjs.All_32songs_32Death_32SceneCode.GDLongNoteOppObjects1.length = 0;
 gdjs.All_32songs_32Death_32SceneCode.GDLongNoteOppObjects2.length = 0;
+gdjs.All_32songs_32Death_32SceneCode.GDStatistics2Objects1.length = 0;
+gdjs.All_32songs_32Death_32SceneCode.GDStatistics2Objects2.length = 0;
 
 gdjs.All_32songs_32Death_32SceneCode.eventsList0(runtimeScene);
 gdjs.All_32songs_32Death_32SceneCode.GDRestartObjects1.length = 0;
@@ -324,6 +328,8 @@ gdjs.All_32songs_32Death_32SceneCode.GDOppRightNoteObjects1.length = 0;
 gdjs.All_32songs_32Death_32SceneCode.GDOppRightNoteObjects2.length = 0;
 gdjs.All_32songs_32Death_32SceneCode.GDLongNoteOppObjects1.length = 0;
 gdjs.All_32songs_32Death_32SceneCode.GDLongNoteOppObjects2.length = 0;
+gdjs.All_32songs_32Death_32SceneCode.GDStatistics2Objects1.length = 0;
+gdjs.All_32songs_32Death_32SceneCode.GDStatistics2Objects2.length = 0;
 
 
 return;
