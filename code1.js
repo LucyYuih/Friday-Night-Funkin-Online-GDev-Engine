@@ -413,10 +413,9 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1d0b808 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1a7b538 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT A — UI final (ajustes: modal de difficulties sobre a UI, remove "Abrir", hover animation)
-// Base: sua versão anterior (mantive toda a lógica de download/difficulty intacta).
+// SCRIPT A — CORRIGIDO (funcionalidade original mantida)
 (function () {
   if (document.getElementById("gdjs-mod-list-ui-final")) return;
 
@@ -454,7 +453,6 @@ if (true) {
 
   function makeRepoId() { return "r_" + Math.random().toString(36).slice(2,10); }
 
-  // parse inputs like "owner/repo@branch" OR a full manifest URL
   function parseRepoInput(input) {
     if (!input) return null;
     input = input.trim();
@@ -482,6 +480,60 @@ if (true) {
   function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
   function isJsonFile(name){ return /\.json$/i.test(name); }
   function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
+
+  // --- FUNÇÕES PARA MANIFEST OTIMIZADO ---
+  function getBaseUrl(manifest) {
+    if (manifest && manifest._base) {
+      return `https://cdn.jsdelivr.net/gh/${manifest._base}/`;
+    }
+    // Fallback para manifest legado
+    const activeRepo = getActiveRepo();
+    return `https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/`;
+  }
+
+  function parseManifestEntry(entry, baseUrl = "") {
+    if (!entry) return null;
+    
+    // Se for array de strings (diretórios)
+    if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "string") {
+      // Verificar se são diretórios (não contém ponto) ou arquivos (contém ponto)
+      const firstItem = entry[0];
+      if (firstItem.includes('.') || firstItem.includes('/')) {
+        // São arquivos (nova estrutura otimizada)
+        return {
+          type: 'files',
+          value: entry.map(filePath => {
+            const fileName = filePath.split('/').pop();
+            return {
+              name: fileName,
+              type: "file",
+              url: baseUrl + filePath
+            };
+          })
+        };
+      } else {
+        // São diretórios
+        return {
+          type: 'subdirs', 
+          value: entry
+        };
+      }
+    }
+    
+    // Se for array de objetos (estrutura legada)
+    if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "object") {
+      return {
+        type: 'files',
+        value: entry.map(item => ({
+          name: item.n || item.name,
+          type: "file",
+          url: item.u || item.url
+        }))
+      };
+    }
+    
+    return null;
+  }
 
   // --- MANIFEST / GITHUB helpers ---
   async function tryManifestFromGameVar(runtimeScene) {
@@ -528,7 +580,7 @@ if (true) {
     const r = await fetch(apiUrl, { headers });
     if (!r.ok) throw new Error(`GitHub API: ${r.status}`);
     const json = await r.json();
-    return await json.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
+    return json.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
   }
 
   const _manifest_cache_by_repo = {};
@@ -793,7 +845,6 @@ if (true) {
       const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div>`;
       row.appendChild(left);
 
-      // IMPORTANT: remove the "Abrir" button; the row itself is clickable
       row.onclick = ()=> openMod(item.path);
 
       leftPane.appendChild(row);
@@ -809,6 +860,10 @@ if (true) {
       const row = document.createElement("div");
       Object.assign(row.style, { padding: "10px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", marginBottom: "8px", background: "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))" });
       const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div><div style="font-size:12px;opacity:0.8">${item.path}</div>`;
+      
+      // Adiciona o estilo 'alignItems: "center"' ao container 'row' para garantir o alinhamento vertical
+      Object.assign(row.style, { alignItems: "center" });
+      
       const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px";
       const checkBtn = document.createElement("button"); checkBtn.textContent = "Checando..."; checkBtn.disabled = true; checkBtn.style.padding="6px"; checkBtn.style.borderRadius="6px";
       right.appendChild(checkBtn);
@@ -837,20 +892,38 @@ if (true) {
         try {
           if (typeof hasSubCache[p] !== "undefined") { updateButtonsForDecisionFromCache(p, hasSubCache[p]); await sleep(0); continue; }
           const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
+          let hasSubdirs = false;
+          
           if (manifest && manifest.hasOwnProperty(p)) {
-            const entry = manifest[p];
-            if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "string") { hasSubCache[p] = true; updateButtonsForDecisionFromCache(p,true); await sleep(0); continue; }
-            if (Array.isArray(entry) && entry.length>=0 && typeof entry[0] === "object") { hasSubCache[p] = false; updateButtonsForDecisionFromCache(p,false); await sleep(0); continue; }
+            const baseUrl = getBaseUrl(manifest);
+            const parsed = parseManifestEntry(manifest[p], baseUrl);
+            
+            if (parsed && parsed.type === 'subdirs') {
+              hasSubdirs = true;
+            } else if (parsed && parsed.type === 'files') {
+              // CORREÇÃO: Se tem arquivos, NÃO tem subdiretórios
+              hasSubdirs = false;
+            } else {
+              // Se não parseou, tenta GitHub API
+              try {
+                const api = await ghListForFolderUsingEntry(activeRepo, p).catch(()=>[]);
+                hasSubdirs = Array.isArray(api) && api.some(x=>x.type==="dir");
+              } catch(e) {
+                hasSubdirs = false;
+              }
+            }
+          } else {
+            // Se não está no manifest, tenta GitHub API
+            try {
+              const api = await ghListForFolderUsingEntry(activeRepo, p).catch(()=>[]);
+              hasSubdirs = Array.isArray(api) && api.some(x=>x.type==="dir");
+            } catch(e) {
+              hasSubdirs = false;
+            }
           }
-          try {
-            const api = await ghListForFolderUsingEntry(activeRepo, p).catch(()=>[]);
-            const hasDir = Array.isArray(api) && api.some(x=>x.type==="dir");
-            hasSubCache[p] = Boolean(hasDir);
-            updateButtonsForDecisionFromCache(p, Boolean(hasDir));
-          } catch(e) {
-            hasSubCache[p] = false;
-            updateButtonsForDecisionFromCache(p, false);
-          }
+          
+          hasSubCache[p] = hasSubdirs;
+          updateButtonsForDecisionFromCache(p, hasSubdirs);
         } catch(e){}
         await sleep(40);
       }
@@ -878,6 +951,7 @@ if (true) {
       };
       right.appendChild(pickBtn);
     } else {
+      // CORREÇÃO: Botão para baixar diretamente (sem difficulties)
       const dlBtn = document.createElement("button"); dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px";
       dlBtn.onclick = ()=> downloadSongFolder(path);
       right.appendChild(dlBtn);
@@ -888,8 +962,10 @@ if (true) {
     try {
       const manifest = await loadManifestPreferLocalFor(entry, window.runtimeScene || undefined);
       if (manifest && manifest.hasOwnProperty(folderPath)) {
-        const entryv = manifest[folderPath];
-        if (Array.isArray(entryv) && entryv.length>0 && typeof entryv[0] === "string") return entryv.slice();
+        const parsed = parseManifestEntry(manifest[folderPath]);
+        if (parsed && parsed.type === 'subdirs') {
+          return parsed.value.slice();
+        }
       }
     } catch(e){}
     try {
@@ -907,9 +983,9 @@ if (true) {
       const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
       let items = [];
       if (manifest && manifest.hasOwnProperty(path)) {
-        const entry = manifest[path];
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "string") {
-          items = entry.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
+        const parsed = parseManifestEntry(manifest[path]);
+        if (parsed && parsed.type === 'subdirs') {
+          items = parsed.value.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
         }
       } else {
         try {
@@ -939,25 +1015,76 @@ if (true) {
       const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
       let items = [];
       if (manifest && manifest.hasOwnProperty(path)) {
-        const entry = manifest[path];
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "string") {
-          items = entry.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
+        const parsed = parseManifestEntry(manifest[path]);
+        if (parsed && parsed.type === 'subdirs') {
+          // Se for uma lista de subdiretórios (músicas)
+          items = parsed.value.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
+        } else if (parsed && parsed.type === 'files') {
+          // Se for uma lista de arquivos (músicas sem subdiretórios)
+          // Isso é um caso incomum para mods, mas pode acontecer se o mod for uma música única.
+          // No caso do Vs Agoti, a entrada "Vs Agoti" no manifesto retorna subdiretórios, então este bloco não deve ser atingido.
+          // No entanto, para garantir, vamos manter a lógica de listar arquivos.
+          items = parsed.value.map(file => ({ name: basenameNoExt(file.name), path: path, type: "file" }));
         }
       } else {
         try {
+          // Fallback para GitHub API
           const api = await ghListForFolderUsingEntry(activeRepo, path);
-          items = (api || []).filter(it => it.type === "dir").map(it => ({ name: it.name, path: it.path, type: "dir" }));
+          // Filtra tanto diretórios (músicas com difficulties) quanto arquivos (músicas sem difficulties)
+          items = (api || []).filter(it => it.type === "dir" || isJsonFile(it.name) || isAudioFile(it.name)).map(it => ({ 
+            name: it.type === "dir" ? it.name : basenameNoExt(it.name), 
+            path: it.path, 
+            type: it.type 
+          }));
+          // Remove duplicatas de arquivos (ex: .json e .ogg com o mesmo nome base)
+          const uniqueItems = [];
+          const names = new Set();
+          for (const item of items) {
+            if (!names.has(item.name)) {
+              names.add(item.name);
+              uniqueItems.push(item);
+            }
+          }
+          items = uniqueItems;
         } catch(e){ items = []; }
       }
       songsList = items || [];
       renderSongsList(songsList);
       setStatus(`${path} — ${songsList.length} músicas`);
+      setTimeout(()=> startBackgroundCheckOnSongs(songsList), 10); // Adicionado para verificar difficulties nas músicas
     } catch(e){
       setStatus("Erro ao abrir mod: " + (e && e.message ? e.message : e));
     }
   }
 
-  // --- download functions (mantive lógica original) ---
+  // --- FUNÇÕES DE DOWNLOAD CORRIGIDAS ---
+  async function getFilesFromManifest(path) {
+    try {
+      const activeRepo = getActiveRepo();
+      const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
+      if (!manifest || !manifest.hasOwnProperty(path)) return null;
+      
+      const baseUrl = getBaseUrl(manifest);
+      const parsed = parseManifestEntry(manifest[path], baseUrl);
+      
+      if (!parsed || parsed.type !== 'files') return null;
+      return parsed.value;
+    } catch(e){}
+    return null;
+  }
+
+  async function audioListFromManifestPath(p) {
+    try {
+      const files = await getFilesFromManifest(p);
+      if (!files) return [];
+      return files.filter(e => isAudioFile(e.name)).map(e => ({ 
+        name: e.name, 
+        url: e.url 
+      }));
+    } catch(e){}
+    return [];
+  }
+
   function stopAndCleanupPrevious(options){
     options = options || {};
     const revokeBlobUrls = options.revokeBlobUrls === true;
@@ -1003,12 +1130,12 @@ if (true) {
 
     async function audioListFromManifestPath(p) {
       try {
-        if (!manifest) return [];
-        if (!manifest.hasOwnProperty(p)) return [];
-        const entry = manifest[p];
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-          return entry.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
-        }
+        const files = await getFilesFromManifest(p);
+        if (!files) return [];
+        return files.filter(e => isAudioFile(e.name)).map(e => ({ 
+          name: e.name, 
+          url: e.url 
+        }));
       } catch(e){}
       return [];
     }
@@ -1065,12 +1192,9 @@ if (true) {
 
       let chartFiles = [];
       const activeRepo = getActiveRepo();
-      const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
-      if (manifest && manifest.hasOwnProperty(difficultyPath)) {
-        const entry = manifest[difficultyPath];
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-          chartFiles = entry.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url || e.raw_url || null }) );
-        }
+      const files = await getFilesFromManifest(difficultyPath);
+      if (files) {
+        chartFiles = files.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url }) );
       } else {
         try {
           const api = await ghListForFolderUsingEntry(activeRepo, difficultyPath);
@@ -1079,11 +1203,9 @@ if (true) {
       }
 
       let rootJsons = [];
-      if (manifest && manifest.hasOwnProperty(rootFolder)) {
-        const entry = manifest[rootFolder];
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-          rootJsons = entry.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url || e.raw_url || null }) );
-        }
+      const rootFiles = await getFilesFromManifest(rootFolder);
+      if (rootFiles) {
+        rootJsons = rootFiles.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url }) );
       } else {
         try {
           const api = await ghListForFolderUsingEntry(activeRepo, rootFolder);
@@ -1209,17 +1331,14 @@ if (true) {
       }
 
       const activeRepo = getActiveRepo();
-      const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
       for (const d of subdirs) {
         try {
           setStatus("Baixando charts: " + d + " ...");
           let chartFiles = [];
           const difficultyPath = (rootFolder? rootFolder + "/" + d : d);
-          if (manifest && manifest.hasOwnProperty(difficultyPath)) {
-            const entry = manifest[difficultyPath];
-            if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-              chartFiles = entry.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url || e.raw_url || null }) );
-            }
+          const files = await getFilesFromManifest(difficultyPath);
+          if (files) {
+            chartFiles = files.filter(e => isJsonFile(e.name)).map(e => ({ name: e.name, url: e.url }) );
           } else {
             try {
               const api = await ghListForFolderUsingEntry(activeRepo, difficultyPath);
@@ -1279,20 +1398,20 @@ if (true) {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
 
       setStatus("Listando arquivos em " + folderPath + "...");
-      const activeRepo = getActiveRepo();
-      const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
-      let files = null;
-      if (manifest && manifest.hasOwnProperty(folderPath)) {
-        const entry = manifest[folderPath];
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-          files = entry.map(e => ({ name: e.name, url: e.url || e.raw_url || null, type: e.type || "file" }));
-        } else {
-          files = [];
-        }
-      } else {
+      
+      // CORREÇÃO: Usar a função correta para obter arquivos
+      let files = await getFilesFromManifest(folderPath);
+      
+      if (!files) {
+        // Fallback para GitHub API
+        const activeRepo = getActiveRepo();
         try {
           const apiList = await ghListForFolderUsingEntry(activeRepo, folderPath);
-          files = (apiList || []).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`), type: i.type }));
+          files = (apiList || []).map(i => ({ 
+            name: i.name, 
+            url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`), 
+            type: i.type 
+          }));
           files = files.filter(x => x.type !== "dir");
         } catch(e){
           files = [];
@@ -1315,8 +1434,8 @@ if (true) {
 
       for (const f of files) {
         processed++; setStatus(`${processed} / ${totalFiles}`);
-        const fname = f.name || ("file" + processed);
-        const url = f.url || f.download_url || null;
+        const fname = f.name;
+        const url = f.url;
         if (!url) continue;
 
         if (isJsonFile(fname)) {
@@ -1386,7 +1505,7 @@ if (true) {
     }
   }
 
-  // --- difficulty chooser modal (z-index aumentado pra aparecer sobre a UI) ---
+  // --- difficulty chooser modal ---
   function showDifficultyChooser(rootFolder, subdirs) {
     const overlay = document.createElement("div");
     Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 10000010, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "auto" });
@@ -1406,7 +1525,6 @@ if (true) {
     box.appendChild(list); box.appendChild(cancel);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
-    // ensure focus / pointer events to overlay
     setTimeout(()=> { try { overlay.focus(); } catch(e){} }, 0);
   }
 
@@ -1429,11 +1547,34 @@ if (true) {
 
   searchInput.addEventListener("input", ()=> {
     const q = searchInput.value.trim().toLowerCase();
-    if (!q) { renderModsList(modsList); setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`); setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10); return; }
-    const filtered = modsList.filter(it => it.name.toLowerCase().includes(q));
-    renderModsList(filtered);
-    setStatus(`Resultado: ${filtered.length} / ${modsList.length}`);
-    setTimeout(()=> startBackgroundCheckOnSongs(filtered), 10);
+    
+    if (currentModPath) {
+      // Se um mod estiver aberto, filtra a lista de músicas (songsList)
+      if (!q) {
+        renderSongsList(songsList);
+        setStatus(`${currentModPath} — ${songsList.length} músicas`);
+        setTimeout(()=> startBackgroundCheckOnSongs(songsList), 10);
+        return;
+      }
+      const filteredSongs = songsList.filter(it => it.name.toLowerCase().includes(q));
+      renderSongsList(filteredSongs);
+      setStatus(`Resultado: ${filteredSongs.length} / ${songsList.length} músicas`);
+      setTimeout(()=> startBackgroundCheckOnSongs(filteredSongs), 10);
+    } else {
+      // Se nenhum mod estiver aberto, filtra a lista de mods (modsList)
+      if (!q) { 
+        renderModsList(modsList); 
+        renderSongsList([]); // Limpa a lista de músicas
+        setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`); 
+        setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10); 
+        return; 
+      }
+      const filteredMods = modsList.filter(it => it.name.toLowerCase().includes(q));
+      renderModsList(filteredMods);
+      renderSongsList([]); // Limpa a lista de músicas
+      setStatus(`Resultado: ${filteredMods.length} / ${modsList.length} mods`);
+      setTimeout(()=> startBackgroundCheckOnSongs(filteredMods), 10);
+    }
   });
 
   (function init() {
@@ -1445,14 +1586,13 @@ if (true) {
 
   try { if (typeof runtimeScene !== "undefined") window.runtimeScene = runtimeScene; } catch(e){}
 })();
-
 };
 gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0x1d0b808(runtimeScene);
+gdjs.InicioCode.userFunc0x1a7b538(runtimeScene);
 
 }
 
@@ -1490,7 +1630,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.asyncCallback33337556 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33443428 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(61), null);
 }
@@ -1504,7 +1644,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33337556, gdjs.InicioCode.asyncCallback33337556);
+gdjs.InicioCode.idToCallbackMap.set(33443428, gdjs.InicioCode.asyncCallback33443428);
 gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 
 {
@@ -1514,7 +1654,7 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback33337556(runtimeScene, asyncObjectsList)), 33337556, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback33443428(runtimeScene, asyncObjectsList)), 33443428, asyncObjectsList);
 }
 }
 
@@ -1679,14 +1819,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback33370332 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33481964 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
 gdjs.InicioCode.eventsList13(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33370332, gdjs.InicioCode.asyncCallback33370332);
+gdjs.InicioCode.idToCallbackMap.set(33481964, gdjs.InicioCode.asyncCallback33481964);
 gdjs.InicioCode.eventsList14 = function(runtimeScene) {
 
 {
@@ -1696,20 +1836,20 @@ gdjs.InicioCode.eventsList14 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33370332(runtimeScene, asyncObjectsList)), 33370332, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33481964(runtimeScene, asyncObjectsList)), 33481964, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback33379708 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33491340 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33379708, gdjs.InicioCode.asyncCallback33379708);
+gdjs.InicioCode.idToCallbackMap.set(33491340, gdjs.InicioCode.asyncCallback33491340);
 gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 
 {
@@ -1719,14 +1859,14 @@ gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback33379708(runtimeScene, asyncObjectsList)), 33379708, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback33491340(runtimeScene, asyncObjectsList)), 33491340, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback33385252 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33496884 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 
@@ -1736,7 +1876,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPoin
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33385252, gdjs.InicioCode.asyncCallback33385252);
+gdjs.InicioCode.idToCallbackMap.set(33496884, gdjs.InicioCode.asyncCallback33496884);
 gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 
 {
@@ -1747,7 +1887,7 @@ gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33385252(runtimeScene, asyncObjectsList)), 33385252, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33496884(runtimeScene, asyncObjectsList)), 33496884, asyncObjectsList);
 }
 }
 
@@ -1765,7 +1905,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33382732);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33494364);
 }
 }
 if (isConditionTrue_0) {
@@ -1801,7 +1941,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33385332);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33496964);
 }
 }
 if (isConditionTrue_0) {
@@ -1919,7 +2059,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects2.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects2.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33383924);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33457020);
 }
 }
 }
@@ -1940,7 +2080,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 /* Unknown object - skipped. */if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33341748);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33494116);
 }
 }
 }
@@ -1961,7 +2101,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 /* Unknown object - skipped. */if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33357580);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33490780);
 }
 }
 }
@@ -2039,7 +2179,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33322972);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33451500);
 }
 }
 if (isConditionTrue_0) {
@@ -2108,7 +2248,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33336116);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33448460);
 }
 }
 if (isConditionTrue_0) {
@@ -2420,7 +2560,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33368620);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33480252);
 }
 }
 }
@@ -2482,7 +2622,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33376068);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33487700);
 }
 }
 if (isConditionTrue_0) {
@@ -2553,7 +2693,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33381084);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33492716);
 }
 }
 if (isConditionTrue_0) {
@@ -2630,7 +2770,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33383204);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33469148);
 }
 }
 if (isConditionTrue_0) {

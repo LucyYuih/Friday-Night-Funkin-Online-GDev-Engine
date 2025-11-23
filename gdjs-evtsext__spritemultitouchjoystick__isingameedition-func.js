@@ -9,7 +9,7 @@ gdjs.evtsExt__SpriteMultitouchJoystick__IsInGameEdition = {};
 gdjs.evtsExt__SpriteMultitouchJoystick__IsInGameEdition.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__SpriteMultitouchJoystick__IsInGameEdition.userFunc0x1bec170 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__SpriteMultitouchJoystick__IsInGameEdition.userFunc0xed3598 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 const game = runtimeScene.getGame();
 eventsFunctionContext.returnValue = game.isInGameEdition && game.isInGameEdition();
@@ -19,7 +19,7 @@ gdjs.evtsExt__SpriteMultitouchJoystick__IsInGameEdition.eventsList0 = function(r
 {
 
 
-gdjs.evtsExt__SpriteMultitouchJoystick__IsInGameEdition.userFunc0x1bec170(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__SpriteMultitouchJoystick__IsInGameEdition.userFunc0xed3598(runtimeScene, eventsFunctionContext);
 
 }
 
