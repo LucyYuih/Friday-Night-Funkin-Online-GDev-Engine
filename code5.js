@@ -17915,7 +17915,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xe36ca8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xe7d0a8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18105,7 +18105,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xe36ca8(runtimeScene);
+gdjs.PlayCode.userFunc0xe7d0a8(runtimeScene);
 
 }
 
@@ -18282,7 +18282,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xe36ad0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x11dad78 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18472,7 +18472,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xe36ad0(runtimeScene);
+gdjs.PlayCode.userFunc0x11dad78(runtimeScene);
 
 }
 
@@ -22671,7 +22671,7 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 gdjs.copyArray(runtimeScene.getObjects("Statistics"), gdjs.PlayCode.GDStatisticsObjects2);
 {for(var i = 0, len = gdjs.PlayCode.GDStatisticsObjects2.length ;i < len;++i) {
-    gdjs.PlayCode.GDStatisticsObjects2[i].setBBText("BF: " + "score: " + gdjs.evtsExt__FormatNumber__FormatBySeparator.func(runtimeScene, runtimeScene.getScene().getVariables().getFromIndex(61).getAsNumber(), ".", 0, "", null) + " | misses: " + runtimeScene.getScene().getVariables().getFromIndex(62).getAsString() + " | accuracy: " + gdjs.evtTools.common.toString(gdjs.evtTools.common.roundTo(runtimeScene.getScene().getVariables().getFromIndex(63).getAsNumber(), 2)) + "%" + " | combo: " + runtimeScene.getGame().getVariables().getFromIndex(18).getAsString() + " (" + runtimeScene.getGame().getVariables().getFromIndex(73).getAsString() + ")");
+    gdjs.PlayCode.GDStatisticsObjects2[i].setBBText("BF: " + "score: " + gdjs.evtsExt__FormatNumber__FormatBySeparator.func(runtimeScene, runtimeScene.getScene().getVariables().getFromIndex(61).getAsNumber(), ".", 0, "", null) + " | misses: " + runtimeScene.getScene().getVariables().getFromIndex(62).getAsString() + " | combo: " + runtimeScene.getGame().getVariables().getFromIndex(18).getAsString() + " (" + runtimeScene.getGame().getVariables().getFromIndex(73).getAsString() + ")");
 }
 }
 }
@@ -22773,7 +22773,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x18df4d8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x18382f8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22792,7 +22792,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x93c8c8 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x1bcd188 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -23057,7 +23057,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x18df4d8(runtimeScene);
+gdjs.PlayCode.userFunc0x18382f8(runtimeScene);
 
 }
 
@@ -23065,7 +23065,7 @@ gdjs.PlayCode.userFunc0x18df4d8(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x93c8c8(runtimeScene);
+gdjs.PlayCode.userFunc0x1bcd188(runtimeScene);
 
 }
 
@@ -23077,7 +23077,12 @@ let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 isConditionTrue_0 = !(gdjs.multiplayer.isLobbyGameRunning());
 if (isConditionTrue_0) {
+gdjs.copyArray(runtimeScene.getObjects("Statistics2"), gdjs.PlayCode.GDStatistics2Objects3);
 {runtimeScene.getGame().getVariables().getFromIndex(10).setNumber(1);
+}
+{for(var i = 0, len = gdjs.PlayCode.GDStatistics2Objects3.length ;i < len;++i) {
+    gdjs.PlayCode.GDStatistics2Objects3[i].deleteFromScene(runtimeScene);
+}
 }
 }
 
@@ -23257,7 +23262,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x19af718 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xf0ad48 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -24140,7 +24145,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x19af718(runtimeScene);
+gdjs.PlayCode.userFunc0xf0ad48(runtimeScene);
 
 }
 
@@ -24315,6 +24320,8 @@ let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.evtTools.runtimeScene.sceneJustBegins(runtimeScene);
 if (isConditionTrue_0) {
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(8));
+}
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(21));
 }
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(22));

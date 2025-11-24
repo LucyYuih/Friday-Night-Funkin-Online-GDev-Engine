@@ -368,8 +368,6 @@ let isConditionTrue_0 = false;
 }
 {gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "Gameplay Modifiers");
 }
-{gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "Store");
-}
 {gdjs.evtTools.input.touchSimulateMouse(runtimeScene, true);
 }
 }
@@ -413,9 +411,9 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1a7b538 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1bccd98 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT A — CORRIGIDO (funcionalidade original mantida)
+// SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
 (function () {
   if (document.getElementById("gdjs-mod-list-ui-final")) return;
 
@@ -481,7 +479,7 @@ if (true) {
   function isJsonFile(name){ return /\.json$/i.test(name); }
   function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
 
-  // --- FUNÇÕES PARA MANIFEST OTIMIZADO ---
+  // --- FUNÇÕES PARA MANIFEST OTIMIZADO COM ÁUDIOS ---
   function getBaseUrl(manifest) {
     if (manifest && manifest._base) {
       return `https://cdn.jsdelivr.net/gh/${manifest._base}/`;
@@ -494,7 +492,7 @@ if (true) {
   function parseManifestEntry(entry, baseUrl = "") {
     if (!entry) return null;
     
-    // Se for array de strings (diretórios)
+    // Se for array de strings (diretórios ou arquivos)
     if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "string") {
       // Verificar se são diretórios (não contém ponto) ou arquivos (contém ponto)
       const firstItem = entry[0];
@@ -516,6 +514,24 @@ if (true) {
         return {
           type: 'subdirs', 
           value: entry
+        };
+      }
+    }
+    
+    // Se for objeto com subdirs e files (nova estrutura com áudios em pastas não-folhas)
+    if (typeof entry === 'object' && entry !== null && !Array.isArray(entry)) {
+      if (entry.subdirs && entry.files) {
+        return {
+          type: 'folder',
+          subdirs: entry.subdirs,
+          files: entry.files.map(filePath => {
+            const fileName = filePath.split('/').pop();
+            return {
+              name: fileName,
+              type: "file", 
+              url: baseUrl + filePath
+            };
+          })
         };
       }
     }
@@ -683,6 +699,7 @@ if (true) {
   }
 
   function showRepoManagerModal() {
+    // [código idêntico ao anterior...]
     const overlay = document.createElement("div");
     Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 10000000, display: "flex", alignItems: "center", justifyContent: "center" });
     const box = document.createElement("div");
@@ -736,6 +753,7 @@ if (true) {
 
   // --- CACHE manager modal ---
   function showCacheManager() {
+    // [código idêntico ao anterior...]
     const overlay = document.createElement("div");
     Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 10000000, display: "flex", alignItems: "center", justifyContent: "center" });
     const box = document.createElement("div");
@@ -860,10 +878,6 @@ if (true) {
       const row = document.createElement("div");
       Object.assign(row.style, { padding: "10px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", marginBottom: "8px", background: "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))" });
       const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div><div style="font-size:12px;opacity:0.8">${item.path}</div>`;
-      
-      // Adiciona o estilo 'alignItems: "center"' ao container 'row' para garantir o alinhamento vertical
-      Object.assign(row.style, { alignItems: "center" });
-      
       const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px";
       const checkBtn = document.createElement("button"); checkBtn.textContent = "Checando..."; checkBtn.disabled = true; checkBtn.style.padding="6px"; checkBtn.style.borderRadius="6px";
       right.appendChild(checkBtn);
@@ -898,19 +912,10 @@ if (true) {
             const baseUrl = getBaseUrl(manifest);
             const parsed = parseManifestEntry(manifest[p], baseUrl);
             
-            if (parsed && parsed.type === 'subdirs') {
+            if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs && parsed.subdirs.length > 0))) {
               hasSubdirs = true;
-            } else if (parsed && parsed.type === 'files') {
-              // CORREÇÃO: Se tem arquivos, NÃO tem subdiretórios
-              hasSubdirs = false;
             } else {
-              // Se não parseou, tenta GitHub API
-              try {
-                const api = await ghListForFolderUsingEntry(activeRepo, p).catch(()=>[]);
-                hasSubdirs = Array.isArray(api) && api.some(x=>x.type==="dir");
-              } catch(e) {
-                hasSubdirs = false;
-              }
+              hasSubdirs = false;
             }
           } else {
             // Se não está no manifest, tenta GitHub API
@@ -951,7 +956,6 @@ if (true) {
       };
       right.appendChild(pickBtn);
     } else {
-      // CORREÇÃO: Botão para baixar diretamente (sem difficulties)
       const dlBtn = document.createElement("button"); dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px";
       dlBtn.onclick = ()=> downloadSongFolder(path);
       right.appendChild(dlBtn);
@@ -965,6 +969,8 @@ if (true) {
         const parsed = parseManifestEntry(manifest[folderPath]);
         if (parsed && parsed.type === 'subdirs') {
           return parsed.value.slice();
+        } else if (parsed && parsed.type === 'folder' && parsed.subdirs) {
+          return parsed.subdirs.slice();
         }
       }
     } catch(e){}
@@ -984,8 +990,9 @@ if (true) {
       let items = [];
       if (manifest && manifest.hasOwnProperty(path)) {
         const parsed = parseManifestEntry(manifest[path]);
-        if (parsed && parsed.type === 'subdirs') {
-          items = parsed.value.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
+        if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
+          const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
+          items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
         }
       } else {
         try {
@@ -1016,42 +1023,19 @@ if (true) {
       let items = [];
       if (manifest && manifest.hasOwnProperty(path)) {
         const parsed = parseManifestEntry(manifest[path]);
-        if (parsed && parsed.type === 'subdirs') {
-          // Se for uma lista de subdiretórios (músicas)
-          items = parsed.value.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
-        } else if (parsed && parsed.type === 'files') {
-          // Se for uma lista de arquivos (músicas sem subdiretórios)
-          // Isso é um caso incomum para mods, mas pode acontecer se o mod for uma música única.
-          // No caso do Vs Agoti, a entrada "Vs Agoti" no manifesto retorna subdiretórios, então este bloco não deve ser atingido.
-          // No entanto, para garantir, vamos manter a lógica de listar arquivos.
-          items = parsed.value.map(file => ({ name: basenameNoExt(file.name), path: path, type: "file" }));
+        if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
+          const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
+          items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
         }
       } else {
         try {
-          // Fallback para GitHub API
           const api = await ghListForFolderUsingEntry(activeRepo, path);
-          // Filtra tanto diretórios (músicas com difficulties) quanto arquivos (músicas sem difficulties)
-          items = (api || []).filter(it => it.type === "dir" || isJsonFile(it.name) || isAudioFile(it.name)).map(it => ({ 
-            name: it.type === "dir" ? it.name : basenameNoExt(it.name), 
-            path: it.path, 
-            type: it.type 
-          }));
-          // Remove duplicatas de arquivos (ex: .json e .ogg com o mesmo nome base)
-          const uniqueItems = [];
-          const names = new Set();
-          for (const item of items) {
-            if (!names.has(item.name)) {
-              names.add(item.name);
-              uniqueItems.push(item);
-            }
-          }
-          items = uniqueItems;
+          items = (api || []).filter(it => it.type === "dir").map(it => ({ name: it.name, path: it.path, type: "dir" }));
         } catch(e){ items = []; }
       }
       songsList = items || [];
       renderSongsList(songsList);
       setStatus(`${path} — ${songsList.length} músicas`);
-      setTimeout(()=> startBackgroundCheckOnSongs(songsList), 10); // Adicionado para verificar difficulties nas músicas
     } catch(e){
       setStatus("Erro ao abrir mod: " + (e && e.message ? e.message : e));
     }
@@ -1067,8 +1051,15 @@ if (true) {
       const baseUrl = getBaseUrl(manifest);
       const parsed = parseManifestEntry(manifest[path], baseUrl);
       
-      if (!parsed || parsed.type !== 'files') return null;
-      return parsed.value;
+      if (!parsed) return null;
+      
+      if (parsed.type === 'files') {
+        return parsed.value;
+      } else if (parsed.type === 'folder' && parsed.files) {
+        return parsed.files;
+      }
+      
+      return null;
     } catch(e){}
     return null;
   }
@@ -1148,6 +1139,8 @@ if (true) {
       return [];
     }
 
+    // CORREÇÃO: Procurar áudios exatamente como no script original
+    // 1. Primeiro tenta na pasta da difficulty
     try {
       let list = await audioListFromManifestPath(difficultyPath);
       if (list && list.length>0) return list;
@@ -1155,6 +1148,7 @@ if (true) {
       if (list && list.length>0) return list;
     } catch(e){}
 
+    // 2. Se não achou, tenta na pasta da música (rootFolder)
     try {
       let list = await audioListFromManifestPath(rootFolder);
       if (list && list.length>0) return list;
@@ -1162,6 +1156,7 @@ if (true) {
       if (list && list.length>0) return list;
     } catch(e){}
 
+    // 3. Se não achou, tenta na pasta do mod (pai da rootFolder)
     try {
       const parts = (rootFolder || "").split("/").filter(Boolean);
       if (parts.length >= 2) {
@@ -1174,6 +1169,7 @@ if (true) {
         }
       }
     } catch(e){}
+    
     return [];
   }
 
@@ -1399,7 +1395,6 @@ if (true) {
 
       setStatus("Listando arquivos em " + folderPath + "...");
       
-      // CORREÇÃO: Usar a função correta para obter arquivos
       let files = await getFilesFromManifest(folderPath);
       
       if (!files) {
@@ -1547,34 +1542,11 @@ if (true) {
 
   searchInput.addEventListener("input", ()=> {
     const q = searchInput.value.trim().toLowerCase();
-    
-    if (currentModPath) {
-      // Se um mod estiver aberto, filtra a lista de músicas (songsList)
-      if (!q) {
-        renderSongsList(songsList);
-        setStatus(`${currentModPath} — ${songsList.length} músicas`);
-        setTimeout(()=> startBackgroundCheckOnSongs(songsList), 10);
-        return;
-      }
-      const filteredSongs = songsList.filter(it => it.name.toLowerCase().includes(q));
-      renderSongsList(filteredSongs);
-      setStatus(`Resultado: ${filteredSongs.length} / ${songsList.length} músicas`);
-      setTimeout(()=> startBackgroundCheckOnSongs(filteredSongs), 10);
-    } else {
-      // Se nenhum mod estiver aberto, filtra a lista de mods (modsList)
-      if (!q) { 
-        renderModsList(modsList); 
-        renderSongsList([]); // Limpa a lista de músicas
-        setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`); 
-        setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10); 
-        return; 
-      }
-      const filteredMods = modsList.filter(it => it.name.toLowerCase().includes(q));
-      renderModsList(filteredMods);
-      renderSongsList([]); // Limpa a lista de músicas
-      setStatus(`Resultado: ${filteredMods.length} / ${modsList.length} mods`);
-      setTimeout(()=> startBackgroundCheckOnSongs(filteredMods), 10);
-    }
+    if (!q) { renderModsList(modsList); setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`); setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10); return; }
+    const filtered = modsList.filter(it => it.name.toLowerCase().includes(q));
+    renderModsList(filtered);
+    setStatus(`Resultado: ${filtered.length} / ${modsList.length}`);
+    setTimeout(()=> startBackgroundCheckOnSongs(filtered), 10);
   });
 
   (function init() {
@@ -1592,7 +1564,7 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1a7b538(runtimeScene);
+gdjs.InicioCode.userFunc0x1bccd98(runtimeScene);
 
 }
 

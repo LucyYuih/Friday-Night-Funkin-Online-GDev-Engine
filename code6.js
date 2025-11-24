@@ -135,17 +135,16 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x16d20e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// WATCHER ADAPTADO — usa leitura/manipulação de manifest do Script A + lógica de download do watcher
-// Colar como um único arquivo. Usa localStorage keys já existentes (gdjs_repo_list_v1 / gdjs_active_repo_id_v1).
+// WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
-  // ---------- Repositório / helpers ----------
+  // --- REPO STORAGE / HELPERS (Copiado do Script A) ---
   const REPO_STORAGE_KEY = "gdjs_repo_list_v1";
   const ACTIVE_REPO_KEY = "gdjs_active_repo_id_v1";
 
   function defaultRepoEntry() {
-    return { id: "official", name: "oficial (LucyYuih/gdev-custom-charts)", owner: "LucyYuih", repo: "gdev-custom-charts", branch: "main", enabled: true };
+    return { id: "official", name: "oficial (LucyYuih/gdev-custom-charts)", owner: "LucyYuih", repo: "gdev-custom-skins", branch: "main", enabled: true };
   }
 
   function loadRepoList() {
@@ -153,11 +152,7 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
       const raw = localStorage.getItem(REPO_STORAGE_KEY);
       if (!raw) { const list = [defaultRepoEntry()]; localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list)); return list; }
       return JSON.parse(raw);
-    } catch (e) { const list = [defaultRepoEntry()]; try { localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list)); } catch(e){} return list; }
-  }
-
-  function saveRepoList(list) {
-    try { localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list || [])); } catch(e){}
+    } catch (e) { const list = [defaultRepoEntry()]; localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list)); return list; }
   }
 
   function getActiveRepo() {
@@ -170,24 +165,6 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
     } catch(e){ return defaultRepoEntry(); }
   }
 
-  function setActiveRepoById(id) { try { localStorage.setItem(ACTIVE_REPO_KEY, String(id)); } catch(e){} }
-  function makeRepoId() { return "r_" + Math.random().toString(36).slice(2,10); }
-
-  function parseRepoInput(input) {
-    if (!input) return null;
-    input = input.trim();
-    if (/manifest\.json/.test(input) || /^https?:\/\//.test(input)) {
-      const m = input.match(/cdn\.jsdelivr\.net\/gh\/([^\/]+)\/([^@\/]+)@([^\/]+)\/.*manifest\.json/i);
-      if (m) return { owner: m[1], repo: m[2], branch: m[3], manifestUrl: input };
-      return { owner: "", repo: "", branch: "", manifestUrl: input };
-    }
-    const m2 = input.match(/^([^\/\s]+)\/([^@\/\s]+)(?:@(.+))?$/);
-    if (m2) {
-      return { owner: m2[1], repo: m2[2], branch: m2[3] || "main" };
-    }
-    return null;
-  }
-
   function buildManifestCdnUrl(entry) {
     if (!entry) return null;
     if (entry.manifestUrl) return entry.manifestUrl;
@@ -195,29 +172,31 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
     return null;
   }
 
-  // ---------- util ----------
+  // --- small util helpers ---
   function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
   function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
   function isJsonFile(name){ return /\.json$/i.test(name); }
   function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
 
-  // ---------- Funções do Script A: parse/manifest helpers ----------
-  // (extraídas e adaptadas do Script A para uso aqui)
+  // --- FUNÇÕES PARA MANIFEST OTIMIZADO COM ÁUDIOS (Copiado do Script A) ---
   function getBaseUrl(manifest) {
     if (manifest && manifest._base) {
       return `https://cdn.jsdelivr.net/gh/${manifest._base}/`;
     }
+    // Fallback para manifest legado
     const activeRepo = getActiveRepo();
     return `https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/`;
   }
 
   function parseManifestEntry(entry, baseUrl = "") {
     if (!entry) return null;
-    // array de strings -> pode ser listagem de subdirs (strings simples) ou lista de caminhos de arquivos
+    
+    // Se for array de strings (diretórios ou arquivos)
     if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "string") {
+      // Verificar se são diretórios (não contém ponto) ou arquivos (contém ponto)
       const firstItem = entry[0];
       if (firstItem.includes('.') || firstItem.includes('/')) {
-        // arquivos (estrutura otimizada): cada item é um caminho relativo -> montar objetos {name,url}
+        // São arquivos (nova estrutura otimizada)
         return {
           type: 'files',
           value: entry.map(filePath => {
@@ -230,14 +209,33 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
           })
         };
       } else {
-        // subdiretórios (strings simples)
+        // São diretórios
         return {
-          type: 'subdirs',
-          value: entry.slice()
+          type: 'subdirs', 
+          value: entry
         };
       }
     }
-    // array de objetos (estrutura legada)
+    
+    // Se for objeto com subdirs e files (nova estrutura com áudios em pastas não-folhas)
+    if (typeof entry === 'object' && entry !== null && !Array.isArray(entry)) {
+      if (entry.subdirs && entry.files) {
+        return {
+          type: 'folder',
+          subdirs: entry.subdirs,
+          files: entry.files.map(filePath => {
+            const fileName = filePath.split('/').pop();
+            return {
+              name: fileName,
+              type: "file", 
+              url: baseUrl + filePath
+            };
+          })
+        };
+      }
+    }
+    
+    // Se for array de objetos (estrutura legada)
     if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "object") {
       return {
         type: 'files',
@@ -248,13 +246,15 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
         }))
       };
     }
+    
     return null;
   }
 
-  async function tryManifestFromGameVar(runtimeSceneLocal) {
+  // --- MANIFEST / GITHUB helpers (Copiado do Script A, simplificado para o watcher) ---
+  async function tryManifestFromGameVar(runtimeScene) {
     try {
-      if (typeof runtimeSceneLocal !== "undefined" && runtimeSceneLocal.getGame) {
-        const gg = runtimeSceneLocal.getGame().getVariables();
+      if (typeof runtimeScene !== "undefined" && runtimeScene.getGame) {
+        const gg = runtimeScene.getGame().getVariables();
         if (gg.has("manifestjson")) {
           const s = gg.get("manifestjson").getAsString();
           if (s && s.trim()) {
@@ -286,11 +286,27 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
     return null;
   }
 
-  async function tryManifestFromGithubApiFor(entry, path="") {
-    if (!entry || (!entry.owner || !entry.repo)) throw new Error("Invalid repo entry");
-    const apiUrl = `https://api.github.com/repos/${entry.owner}/${entry.repo}/contents/${encodeURIComponent(path)}?ref=${entry.branch || "main"}`;
+  const _manifest_cache_by_repo = {};
+
+  async function loadManifestPreferLocalFor(entry, runtimeScene) {
+    const repoId = (entry && entry.id) ? entry.id : "__default__";
+    if (typeof _manifest_cache_by_repo[repoId] !== "undefined") return _manifest_cache_by_repo[repoId];
+
+    const a = await tryManifestFromGameVar(runtimeScene); if (a) { _manifest_cache_by_repo[repoId] = a; return a; }
+    const b = await tryManifestFromProjectResource(); if (b) { _manifest_cache_by_repo[repoId] = b; return b; }
+    const c = await tryManifestFromCdnOf(entry); if (c) { _manifest_cache_by_repo[repoId] = c; return c; }
+    _manifest_cache_by_repo[repoId] = null;
+    return null;
+  }
+
+  // A função ghListApi do watcher original é mantida, mas renomeada para evitar conflito
+  async function ghListApi(path="") {
+    const active = getActiveRepo();
+    if (!active.owner || !active.repo) throw new Error("No active GH repo configured");
+    const apiUrl = `https://api.github.com/repos/${active.owner}/${active.repo}/contents/${encodeURIComponent(path)}?ref=${active.branch || "main"}`;
     let token = "";
     try { token = localStorage.getItem("gdjs_github_token") || ""; } catch(e){}
+    try { if ((!token || token.trim()==="") && runtimeScene && runtimeScene.getGame) { const gv = runtimeScene.getGame().getVariables(); if (gv.has("GitHubToken")) token = gv.get("GitHubToken").getAsString(); } } catch(e){}
     const headers = token ? { "Authorization": "token " + token } : {};
     const r = await fetch(apiUrl, { headers });
     if (!r.ok) throw new Error(`GitHub API: ${r.status}`);
@@ -298,39 +314,30 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
     return json.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
   }
 
-  const _manifest_cache_by_repo = {};
-  async function loadManifestPreferLocalFor(entry, runtimeSceneLocal) {
-    const repoId = (entry && entry.id) ? entry.id : "__default__";
-    if (typeof _manifest_cache_by_repo[repoId] !== "undefined") return _manifest_cache_by_repo[repoId];
+  // --- Variáveis e Funções do Watcher Original (Mantidas) ---
+  const gg = runtimeScene.getGame().getVariables();
+  function getVarString(name){ try { return gg.get(name).getAsString(); } catch(e){ return ""; } }
+  function setVarString(name, v){ try { gg.get(name).setString(String(v)); } catch(e){} }
+  function ensureVarString(name, def=""){ try { if(!gg.has(name)) gg.get(name).setString(def); } catch(e){} }
+  function ensureVarNumber(name, def=0){ try { if(!gg.has(name)) gg.get(name).setNumber(def); } catch(e){} }
+  function getVarNumber(name){ try { return gg.get(name).getAsNumber(); } catch(e){ return 0; } }
+  function setVarNumber(name, n){ try { gg.get(name).setNumber(Number(n) || 0); } catch(e){} }
 
-    const a = await tryManifestFromGameVar(runtimeSceneLocal); if (a) { _manifest_cache_by_repo[repoId] = a; return a; }
-    const b = await tryManifestFromProjectResource(); if (b) { _manifest_cache_by_repo[repoId] = b; return b; }
-    const c = await tryManifestFromCdnOf(entry); if (c) { _manifest_cache_by_repo[repoId] = c; return c; }
-    _manifest_cache_by_repo[repoId] = null;
-    return null;
-  }
+  ensureVarString("selectedTrackKey","");
+  ensureVarString("BfChartJsonLoader","");
+  ensureVarString("OppChartJsonLoader","");
+  ensureVarString("metadatajson","");
+  ensureVarString("SongName","");
+  ensureVarNumber("jsmusicoffset",0);
+  ensureVarNumber("jsmusicfinish",0);
+  ensureVarNumber("Pause",0);
 
-  async function ghListForFolderUsingEntry(entry, path="") {
-    // wrapper: usa a GitHub API com o entry dado
-    return await tryManifestFromGithubApiFor(entry, path);
-  }
+  ensureVarNumber("AllLoaded", 1);
 
-  async function getFilesFromManifest(path, entry, runtimeSceneLocal) {
-    // tenta pegar lista de arquivos para path usando manifest otimizado (Script A)
-    try {
-      const active = entry || getActiveRepo();
-      const manifest = await loadManifestPreferLocalFor(active, runtimeSceneLocal || runtimeScene);
-      if (!manifest || !manifest.hasOwnProperty(path)) return null;
-      const baseUrl = getBaseUrl(manifest);
-      const parsed = parseManifestEntry(manifest[path], baseUrl);
-      if (!parsed || parsed.type !== 'files') return null;
-      return parsed.value; // [{name,type,url}, ...]
-    } catch(e){}
-    return null;
-  }
+  window.gdjsCustomAudio = window.gdjsCustomAudio || {};
+  window.gdjsChannels = window.gdjsChannels || {};
+  window._gdjs_manifest = window._gdjs_manifest || undefined; // Mantido para compatibilidade, mas não usado
 
-  // ---------- funções do watcher (download/prepare) ----------
-  // Stop/cleanup
   function stopAndCleanupAll(revokeBlobUrls = true){
     try {
       if (window.gdjsChannels) {
@@ -366,102 +373,118 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
     window.gdjsChannels = {};
   }
 
-  // tryManifestFromGameVar for watcher (uses runtimeScene)
-  async function tryManifestFromGameVar_watcher() {
-    try { if (runtimeScene && runtimeScene.getGame) { const v = runtimeScene.getGame().getVariables(); if (v.has("manifestjson")) { const s = v.get("manifestjson").getAsString(); if (s && s.trim()) { try { return JSON.parse(s); } catch(e){ return null; } } } } } catch(e){} return null;
-  }
+  // Funções de Manifest do Watcher Original (Removidas/Substituídas)
+  // tryManifestFromGameVar, tryManifestFromProjectResource, tryManifestFromCDN, loadManifestPreferLocal
 
-  // loadManifestPreferLocal wrapper for watcher (keeps same global caching var name used pelo watcher)
-  async function loadManifestPreferLocal() {
-    if (typeof window._gdjs_manifest !== "undefined") return window._gdjs_manifest;
-    const a = await tryManifestFromGameVar_watcher(); if (a) { window._gdjs_manifest = a; return a; }
-    const b = await tryManifestFromProjectResource(); if (b) { window._gdjs_manifest = b; return b; }
-    // CDN usando repositório ativo
-    const active = getActiveRepo();
-    const c = await tryManifestFromCdnOf(active); if (c) { window._gdjs_manifest = c; return c; }
-    window._gdjs_manifest = null; return null;
-  }
+  // --- NOVA LÓGICA DE LISTAGEM DE ARQUIVOS (Adaptada do Script A) ---
+  async function getFilesFromManifest(folderPath, manifest, baseUrl) {
+    if (!manifest || !manifest.hasOwnProperty(folderPath)) return [];
+    
+    const entry = manifest[folderPath];
+    const parsed = parseManifestEntry(entry, baseUrl);
 
-  async function ghListApi(path="") {
-    const active = getActiveRepo();
-    if (!active.owner || !active.repo) throw new Error("No active GH repo configured");
-    const apiUrl = `https://api.github.com/repos/${active.owner}/${active.repo}/contents/${encodeURIComponent(path)}?ref=${active.branch || "main"}`;
-    let token = "";
-    try { token = localStorage.getItem("gdjs_github_token") || ""; } catch(e){}
-    try { if ((!token || token.trim()==="") && runtimeScene && runtimeScene.getGame) { const gv = runtimeScene.getGame().getVariables(); if (gv.has("GitHubToken")) token = gv.get("GitHubToken").getAsString(); } } catch(e){}
-    const headers = token ? { "Authorization": "token " + token } : {};
-    const r = await fetch(apiUrl, { headers });
-    if (!r.ok) throw new Error(`GitHub API: ${r.status}`);
-    const json = await r.json();
-    return json.map(item => ({ name: item.name, path: item.path, type: item.type, download_url: item.download_url || null }));
-  }
-
-  // find audio list with fallback: usa getFilesFromManifest (do Script A) e fallback para GH API (ou CDN)
-  async function findAudioFilesWithFallback(rootFolder, difficultyPath) {
-    const manifest = await loadManifestPreferLocalFor(getActiveRepo(), runtimeScene);
-    async function audioListFromManifestPath(p) {
-      try {
-        if (!manifest) return [];
-        if (!manifest.hasOwnProperty(p)) return [];
-        const entry = manifest[p];
-        // estrutura legada de objetos
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-          return entry.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
-        }
-        // se for array de strings (otimizado) e representa arquivos (com paths), montar urls baseado em base
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0]==="string") {
-          const base = getBaseUrl(manifest);
-          const parsed = parseManifestEntry(entry, base);
-          if (parsed && parsed.type === 'files') {
-            return parsed.value.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url }));
-          }
-        }
-      } catch(e){}
-      return [];
+    if (parsed && parsed.type === 'files') {
+      return parsed.value;
     }
-    async function audioListFromGithubPath(p) {
-      try {
-        const api = await (async ()=> { try { return await ghListApi(p); } catch(e) { return []; } })();
-        return (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${getActiveRepo().owner}/${getActiveRepo().repo}@${getActiveRepo().branch}/${i.path}`) }));
-      } catch(e){ return []; }
+    
+    if (parsed && parsed.type === 'folder') {
+      return parsed.files;
     }
 
-    try {
-      let list = await audioListFromManifestPath(difficultyPath);
-      if (list && list.length>0) return list;
-      list = await audioListFromGithubPath(difficultyPath);
-      if (list && list.length>0) return list;
-    } catch(e){}
-
-    try {
-      let list = await audioListFromManifestPath(rootFolder);
-      if (list && list.length>0) return list;
-      list = await audioListFromGithubPath(rootFolder);
-      if (list && list.length>0) return list;
-    } catch(e){}
-
-    try {
-      const parts = (rootFolder || "").split("/").filter(Boolean);
-      if (parts.length >= 2) {
-        const modFolder = parts.slice(0, parts.length - 1).join("/");
-        if (modFolder) {
-          let list = await audioListFromManifestPath(modFolder);
-          if (list && list.length>0) return list;
-          list = await audioListFromGithubPath(modFolder);
-          if (list && list.length>0) return list;
-        }
-      }
-    } catch(e){}
     return [];
   }
 
-  // audio context / ended watcher helpers
+  async function findAudioFilesWithFallback(rootFolder, difficultyPath) {
+    const activeRepo = getActiveRepo();
+    const manifest = await loadManifestPreferLocalFor(activeRepo, runtimeScene);
+    const baseUrl = getBaseUrl(manifest);
+
+    // 1. Tenta a pasta de dificuldade no manifest (estrutura otimizada)
+    let list = await getFilesFromManifest(difficultyPath, manifest, baseUrl);
+    if (list && list.length > 0) return list.filter(e => isAudioFile(e.name));
+
+    // 2. Tenta a pasta raiz no manifest (estrutura otimizada)
+    list = await getFilesFromManifest(rootFolder, manifest, baseUrl);
+    if (list && list.length > 0) return list.filter(e => isAudioFile(e.name));
+
+    // 3. Tenta a pasta pai no manifest (fallback do watcher original)
+    const parts = (rootFolder || "").split("/").filter(Boolean);
+    if (parts.length >= 2) {
+      const modFolder = parts.slice(0, parts.length - 1).join("/");
+      if (modFolder) {
+        list = await getFilesFromManifest(modFolder, manifest, baseUrl);
+        if (list && list.length > 0) return list.filter(e => isAudioFile(e.name));
+      }
+    }
+
+    // 4. Fallback para GitHub API (ghListApi)
+    try {
+      const api = await (async ()=> { try { return await ghListApi(difficultyPath); } catch(e) { return []; } })();
+      list = (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
+      if (list && list.length > 0) return list;
+    } catch(e){}
+
+    try {
+      const api = await (async ()=> { try { return await ghListApi(rootFolder); } catch(e) { return []; } })();
+      list = (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
+      if (list && list.length > 0) return list;
+    } catch(e){}
+
+    return [];
+  }
+
+  async function findJsonFilesWithFallback(rootFolder, difficultyPath) {
+    const activeRepo = getActiveRepo();
+    const manifest = await loadManifestPreferLocalFor(activeRepo, runtimeScene);
+    const baseUrl = getBaseUrl(manifest);
+    const allJsonsMap = {};
+
+    // Função auxiliar para processar arquivos encontrados
+    function processFiles(files, origin) {
+      (files || []).filter(e => isJsonFile(e.name)).forEach(e => {
+        if (!allJsonsMap[e.name]) {
+          allJsonsMap[e.name] = { name: e.name, url: e.url, origin: origin };
+        }
+      });
+    }
+
+    // 1. Tenta a pasta de dificuldade no manifest (estrutura otimizada)
+    processFiles(await getFilesFromManifest(difficultyPath, manifest, baseUrl), difficultyPath);
+
+    // 2. Tenta a pasta raiz no manifest (estrutura otimizada)
+    processFiles(await getFilesFromManifest(rootFolder, manifest, baseUrl), rootFolder);
+
+    // 3. Fallback para GitHub API (ghListApi)
+    try {
+      const api = await (async ()=> { try { return await ghListApi(difficultyPath); } catch(e){ return []; } })();
+      (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i => {
+        const name = i.name;
+        if (!allJsonsMap[name]) {
+          allJsonsMap[name] = { name: name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`), origin: difficultyPath };
+        }
+      });
+    } catch(e){}
+
+    try {
+      const api = await (async ()=> { try { return await ghListApi(rootFolder); } catch(e){ return []; } })();
+      (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i=> {
+        const name = i.name;
+        if (!allJsonsMap[name]) {
+          allJsonsMap[name] = { name: name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`), origin: rootFolder };
+        }
+      });
+    } catch(e){}
+
+    return Object.values(allJsonsMap);
+  }
+
+  // --- Funções de Download e UI (Mantidas) ---
   function attachEndedWatcherToChannel0(){
     const ch0 = window.gdjsChannels && window.gdjsChannels[0];
     if (!ch0) return;
     if (ch0._gdjs_ended_handler) { try{ ch0.removeEventListener('ended', ch0._gdjs_ended_handler); }catch(e){} ch0._gdjs_ended_handler = null; }
     ch0.loop = false;
-    const handler = ()=> { try { runtimeScene.getGame().getVariables().get("jsmusicfinish").setNumber(1); } catch(e){} };
+    const handler = ()=> { setVarNumber("jsmusicfinish", 1); };
     ch0.addEventListener('ended', handler);
     ch0._gdjs_ended_handler = handler;
   }
@@ -474,8 +497,11 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
         try {
           const a = window.gdjsChannels[k];
           if (!a) return;
-          if (!a._gdjs_connected_to_audioctx && ctx.createMediaElementSource) {
-            const src = ctx.createMediaElementSource(a); const gain = ctx.createGain(); gain.gain.value = 1.0; src.connect(gain); gain.connect(ctx.destination);
+          if (!a._gdjs_connected_to_audioctx) {
+            const source = ctx.createMediaElementSource(a);
+            const gain = ctx.createGain();
+            source.connect(gain);
+            gain.connect(ctx.destination);
             a._gdjs_connected_to_audioctx = true; a._gdjs_gain_node = gain;
           } else if (a._gdjs_gain_node) { a._gdjs_gain_node.gain.value = 1.0; }
         } catch(e){}
@@ -483,7 +509,6 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
     } catch(e){}
   }
 
-  // fetch helpers
   async function fetchAsBlob(url, signal){
     const resp = await fetch(url, { signal });
     if (!resp.ok) throw new Error(`Fetch ${url} failed ${resp.status}`);
@@ -495,7 +520,6 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
     return await resp.text();
   }
 
-  // overlay UI used during downloads
   const OVERLAY_ID = "gdjs-download-overlay";
   function showDownloadOverlay(message){
     try {
@@ -533,7 +557,6 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
     } catch(e){}
   }
 
-  // download & prepare function (core) - adaptado para usar getFilesFromManifest / ghListForFolderUsingEntry
   async function downloadAndPrepareFolderFlexible(folderPathOrRoot, outerController, opts){
     const ctrl = outerController;
     const difficultyName = opts && opts.difficultyName ? opts.difficultyName : null;
@@ -554,106 +577,54 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
         inferredDifficulty = parts.slice(-1)[0];
       }
 
+      try { setVarString("SongName", basenameNoExt((rootFolder || "").split("/").pop()||"")); } catch(e){}
       try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPathOrRoot); } catch(e){}
-      try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt((rootFolder || "").split("/").pop()||"")); } catch(e){}
 
-      // mark not loaded
-      try { runtimeScene.getGame().getVariables().get("AllLoaded").setNumber(0); } catch(e){}
+      setVarNumber("AllLoaded", 0);
 
       showDownloadOverlay("Preparando download...");
 
-      const manifest = await loadManifestPreferLocalFor(getActiveRepo(), runtimeScene);
+      // --- ALTERAÇÃO PRINCIPAL: Usar as novas funções de listagem ---
+      const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
+      const audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
+      const allJsonsMap = await findJsonFilesWithFallback(rootFolder, difficultyPath);
+      // --- FIM ALTERAÇÃO PRINCIPAL ---
 
-      let audioFiles = [];
-      if (inferredDifficulty) {
-        const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
-        audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
-      } else {
-        // tenta manifest para a pasta alvo
-        const mp = (manifest && manifest.hasOwnProperty(folderPathOrRoot)) ? manifest[folderPathOrRoot] : null;
-        if (mp && Array.isArray(mp) && mp.length>0 && typeof mp[0] === "object") {
-          audioFiles = mp.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
-        } else {
-          try {
-            const api = await (async ()=> { try { return await ghListApi(folderPathOrRoot); } catch(e) { return []; } })();
-            audioFiles = (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${getActiveRepo().owner}/${getActiveRepo().repo}@${getActiveRepo().branch}/${i.path}`) }));
-          } catch(e){}
-        }
-      }
-
-      const allJsonsMap = {};
-      if (inferredDifficulty) {
-        const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
-        // get JSONs from manifest difficultyPath OR GitHub list
-        if (manifest && manifest.hasOwnProperty(difficultyPath)) {
-          const entry = manifest[difficultyPath];
-          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-            entry.filter(e=> isJsonFile(e.name)).forEach(e=> allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: difficultyPath });
-          }
-        } else {
-          try {
-            const api = await (async ()=> { try { return await ghListApi(difficultyPath); } catch(e){ return []; } })();
-            (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i => allJsonsMap[i.name] = { name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${getActiveRepo().owner}/${getActiveRepo().repo}@${getActiveRepo().branch}/${i.path}`), origin: difficultyPath });
-          } catch(e){}
-        }
-      }
-
-      // root-level JSONs
-      try {
-        if (manifest && manifest.hasOwnProperty(rootFolder)) {
-          const entry = manifest[rootFolder];
-          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-            entry.filter(e=> isJsonFile(e.name)).forEach(e=> { if (!allJsonsMap[e.name]) allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: rootFolder }; });
-          }
-        } else {
-          const api = await (async ()=> { try { return await ghListApi(rootFolder); } catch(e){ return []; } })();
-          (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i=> { if (!allJsonsMap[i.name]) allJsonsMap[i.name] = { name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${getActiveRepo().owner}/${getActiveRepo().repo}@${getActiveRepo().branch}/${i.path}`), origin: rootFolder }; });
-        }
-      } catch(e){}
-
-      window.gdjsCustomAudio = window.gdjsCustomAudio || {};
       window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
       const dest = window.gdjsCustomAudio[rootFolder];
 
-      // download audios
       let nextChannelIndex = 0;
-      const unlockQueue = [];
       for (const f of (audioFiles || [])) {
-        if (ctrl && ctrl.signal && ctrl.signal.aborted) throw new Error("aborted");
+        if (ctrl.signal.aborted) throw new Error("aborted");
         try {
           showDownloadOverlay(`Baixando áudio: ${f.name} ...`);
-          const blob = await fetchAsBlob(f.url, ctrl && ctrl.signal);
+          const blob = await fetchAsBlob(f.url, ctrl.signal);
           const blobUrl = URL.createObjectURL(blob);
 
-          const audioEl = new Audio(blobUrl);
+          const audioEl = new Audio();
           audioEl.preload = "auto";
           audioEl.crossOrigin = "anonymous";
           audioEl.loop = false;
+
+          try { audioEl.src = blobUrl; } catch(e){}
+          try { audioEl.pause(); } catch(e){}
+          try { audioEl.currentTime = 0; } catch(e){}
+
           dest.audios[f.name] = { blobUrl, audioEl };
           window.gdjsChannels[nextChannelIndex] = audioEl;
           nextChannelIndex++;
-
-          // try to unlock autoplay by playing short
-          try {
-            const p = audioEl.play();
-            if (p && typeof p.then === "function") {
-              p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: f.name}); });
-            } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
-          } catch(e){ unlockQueue.push({audioEl, name: f.name}); }
+          setVarString("SongName", setVarString || "" );
         } catch(e){
-          // ignore per original behavior
         }
         await sleep(0);
       }
 
-      // download jsons (charts/metadata)
       const ggvars = runtimeScene.getGame().getVariables();
-      for (const key in allJsonsMap) {
-        if (ctrl && ctrl.signal && ctrl.signal.aborted) throw new Error("aborted");
+      for (const j of allJsonsMap) {
+        if (ctrl.signal.aborted) throw new Error("aborted");
         try {
-          const j = allJsonsMap[key];
           showDownloadOverlay(`Baixando chart: ${j.name} ...`);
-          const txt = await fetchAsText(j.url, ctrl && ctrl.signal);
+          const txt = await fetchAsText(j.url, ctrl.signal);
           const storeKey = (j.origin && j.origin !== rootFolder ? (j.origin.split("/").pop() + "/" + j.name) : j.name);
           dest.rawFiles[storeKey] = txt;
           const lname = j.name.toLowerCase();
@@ -674,116 +645,26 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
               if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
             }
           }
-        } catch(e){}
+        } catch(e){
+        }
         await sleep(0);
-      }
-
-      // autoplay unlock handler
-      if (unlockQueue.length > 0) {
-        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
-        window.addEventListener('pointerdown', unlock, { once: true });
       }
 
       attachEndedWatcherToChannel0();
       await ensureAudioContext();
-      try { runtimeScene.getGame().getVariables().get("jsmusicfinish").setNumber(0); } catch(e){}
-      try { runtimeScene.getGame().getVariables().get("AllLoaded").setNumber(1); } catch(e){}
+      setVarNumber("jsmusicfinish", 0);
+
+      setVarNumber("AllLoaded", 1);
       hideDownloadOverlay();
+
       return { ok:true };
     } catch(err){
       try { stopAndCleanupAll(true); } catch(e){}
-      try { runtimeScene.getGame().getVariables().get("AllLoaded").setNumber(0); } catch(e){}
+      setVarNumber("AllLoaded", 0);
       hideDownloadOverlay();
       return { ok:false, reason: err && err.message ? err.message : String(err) };
     }
   }
-
-  // ---------- funções de download simples (folder with files) ----------
-  async function downloadSongFolder(folderPath) {
-    try { /* no btnClose here in watcher context — keep behavior minimal */ } catch(e){}
-    try {
-      stopAndCleanupAll(true);
-      // listar arquivos usando getFilesFromManifest (Script A) ou GH API fallback
-      let files = await getFilesFromManifest(folderPath, getActiveRepo(), runtimeScene);
-      if (!files) {
-        const activeRepo = getActiveRepo();
-        try {
-          const apiList = await ghListForFolderUsingEntry(activeRepo, folderPath);
-          files = (apiList || []).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`), type: i.type }));
-          files = files.filter(x => x.type !== "dir");
-        } catch(e){
-          files = [];
-        }
-      }
-      if (!Array.isArray(files) || files.length === 0) { return; }
-      window.gdjsCustomAudio = window.gdjsCustomAudio || {};
-      window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || {audios:{}, rawFiles:{}};
-      const dest = window.gdjsCustomAudio[folderPath];
-      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath); } catch(e){}
-      try { runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(folderPath.split("/").pop()||folderPath)); } catch(e){}
-      let nextChannelIndex = (window.gdjsChannels) ? Object.keys(window.gdjsChannels).length : 0;
-      const gg = runtimeScene.getGame().getVariables();
-      for (const f of files) {
-        try {
-          const fname = f.name || f;
-          const url = f.url || (typeof f === "string" ? f : null);
-          if (!url) continue;
-          if (isJsonFile(fname)) {
-            const r = await fetch(url);
-            if (!r.ok) continue;
-            const txt = await r.text();
-            dest.rawFiles[fname] = txt;
-            const lname = fname.toLowerCase();
-            if (/metadata|meta/.test(lname)) gg.get("metadatajson").setString(txt);
-            else if (/(bf|chartbf|chart_bf)/.test(lname)) gg.get("BfChartJsonLoader").setString(txt);
-            else if (/(dad|opp|opponent)/.test(lname)) gg.get("OppChartJsonLoader").setString(txt);
-            else {
-              try {
-                const parsed = JSON.parse(txt);
-                if (parsed && parsed.notes) {
-                  if (!gg.get("BfChartJsonLoader").getAsString()) gg.get("BfChartJsonLoader").setString(txt);
-                  else if (!gg.get("OppChartJsonLoader").getAsString()) gg.get("OppChartJsonLoader").setString(txt);
-                  else if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
-                } else {
-                  if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
-                }
-              } catch(e){
-                if (!gg.get("metadatajson").getAsString()) gg.get("metadatajson").setString(txt);
-              }
-            }
-          } else if (isAudioFile(fname)) {
-            const resp = await fetch(url);
-            if (!resp.ok) continue;
-            const blob = await resp.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            const audioEl = new Audio(blobUrl);
-            audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
-            dest.audios[fname] = { blobUrl, audioEl, audioElRef: audioEl };
-            window.gdjsChannels = window.gdjsChannels || {};
-            window.gdjsChannels[nextChannelIndex] = audioEl;
-            nextChannelIndex++;
-            try {
-              const p = audioEl.play();
-              if (p && typeof p.then === "function") {
-                p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ /* ignore unlock queue in this simplified flow */ });
-              } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
-            } catch(e){}
-            try { if (gg && !gg.get("SongName").getAsString()) gg.get("SongName").setString(basenameNoExt(fname)); } catch(e){}
-          }
-        } catch(e){}
-        await sleep(0);
-      }
-      attachEndedWatcherToChannel0();
-      await ensureAudioContext();
-    } catch(e){
-      // swallow errors (consistent with original watcher)
-    }
-  }
-
-  // ---------- watcher loop (watch selectedTrackKey) ----------
-  const ggVars = runtimeScene.getGame().getVariables();
-  function getVarString(name){ try { return ggVars.get(name).getAsString(); } catch(e){ return ""; } }
-  function setVarNumber(name, n){ try { ggVars.get(name).setNumber(Number(n) || 0); } catch(e){} }
 
   let lastSelected = getVarString("selectedTrackKey") || "";
   let currentDownloadController = null;
@@ -816,25 +697,34 @@ gdjs.PlayonlineCode.userFunc0x1880628 = function GDJSInlineCode(runtimeScene) {
 
         if (!cur || !cur.trim()) {
           stopAndCleanupAll(true);
-          try { setVarNumber("AllLoaded", 1); } catch(e){}
+          setVarNumber("AllLoaded", 1);
         } else {
-          // start download flow (if path looks like folder with difficulty -> the download function will detect)
-          downloadAndPrepareFolderFlexible(cur, currentDownloadController, {}).then(res=>{
-            // noop
-          }).catch(()=>{});
+          (async ()=>{
+            setVarNumber("AllLoaded", 0);
+            setVarNumber("jsmusicfinish", 0);
+            try { setVarString("SongName", basenameNoExt((cur.split("/").pop()||cur))); } catch(e){}
+            await downloadAndPrepareFolderFlexible(cur, currentDownloadController, {});
+            if (myId === currentDownloadId) {
+            }
+          })().catch(()=>{});
         }
       }
     } catch(e){}
-    setTimeout(pollLoop, 250);
+    requestAnimationFrame(pollLoop);
   })();
 
-  // Expose small API on window for debug if needed
-  try {
-    window._gdjs_watcher_adapted = window._gdjs_watcher_adapted || {};
-    window._gdjs_watcher_adapted.getActiveRepo = getActiveRepo;
-    window._gdjs_watcher_adapted.loadManifestPreferLocalFor = loadManifestPreferLocalFor;
-    window._gdjs_watcher_adapted.getFilesFromManifest = getFilesFromManifest;
-  } catch(e){}
+  (function rafLoop(){
+    try {
+      const ch0 = window.gdjsChannels && window.gdjsChannels[0];
+      if (ch0) { const cur = ch0.currentTime || 0; setVarNumber("jsmusicoffset", cur); }
+      const pauseVal = Number(getVarNumber("Pause") || 0);
+      if (pauseVal) {
+        Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (a && !a.paused && !a.ended) a.pause(); } catch(e){} });
+      } else {
+      }
+    } catch(e){}
+    requestAnimationFrame(rafLoop);
+  })();
 
 })(runtimeScene);
 
@@ -844,7 +734,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1880628(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x16d20e0(runtimeScene);
 
 }
 
@@ -940,9 +830,9 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xdda290 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x8bcd38 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT A — CORRIGIDO (funcionalidade original mantida)
+// SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
 (function () {
   if (document.getElementById("gdjs-mod-list-ui-final")) return;
 
@@ -1008,7 +898,7 @@ let isConditionTrue_0 = false;
   function isJsonFile(name){ return /\.json$/i.test(name); }
   function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
 
-  // --- FUNÇÕES PARA MANIFEST OTIMIZADO ---
+  // --- FUNÇÕES PARA MANIFEST OTIMIZADO COM ÁUDIOS ---
   function getBaseUrl(manifest) {
     if (manifest && manifest._base) {
       return `https://cdn.jsdelivr.net/gh/${manifest._base}/`;
@@ -1021,7 +911,7 @@ let isConditionTrue_0 = false;
   function parseManifestEntry(entry, baseUrl = "") {
     if (!entry) return null;
     
-    // Se for array de strings (diretórios)
+    // Se for array de strings (diretórios ou arquivos)
     if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "string") {
       // Verificar se são diretórios (não contém ponto) ou arquivos (contém ponto)
       const firstItem = entry[0];
@@ -1043,6 +933,24 @@ let isConditionTrue_0 = false;
         return {
           type: 'subdirs', 
           value: entry
+        };
+      }
+    }
+    
+    // Se for objeto com subdirs e files (nova estrutura com áudios em pastas não-folhas)
+    if (typeof entry === 'object' && entry !== null && !Array.isArray(entry)) {
+      if (entry.subdirs && entry.files) {
+        return {
+          type: 'folder',
+          subdirs: entry.subdirs,
+          files: entry.files.map(filePath => {
+            const fileName = filePath.split('/').pop();
+            return {
+              name: fileName,
+              type: "file", 
+              url: baseUrl + filePath
+            };
+          })
         };
       }
     }
@@ -1210,6 +1118,7 @@ let isConditionTrue_0 = false;
   }
 
   function showRepoManagerModal() {
+    // [código idêntico ao anterior...]
     const overlay = document.createElement("div");
     Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 10000000, display: "flex", alignItems: "center", justifyContent: "center" });
     const box = document.createElement("div");
@@ -1263,6 +1172,7 @@ let isConditionTrue_0 = false;
 
   // --- CACHE manager modal ---
   function showCacheManager() {
+    // [código idêntico ao anterior...]
     const overlay = document.createElement("div");
     Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 10000000, display: "flex", alignItems: "center", justifyContent: "center" });
     const box = document.createElement("div");
@@ -1387,10 +1297,6 @@ let isConditionTrue_0 = false;
       const row = document.createElement("div");
       Object.assign(row.style, { padding: "10px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", marginBottom: "8px", background: "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))" });
       const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div><div style="font-size:12px;opacity:0.8">${item.path}</div>`;
-      
-      // Adiciona o estilo 'alignItems: "center"' ao container 'row' para garantir o alinhamento vertical
-      Object.assign(row.style, { alignItems: "center" });
-      
       const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px";
       const checkBtn = document.createElement("button"); checkBtn.textContent = "Checando..."; checkBtn.disabled = true; checkBtn.style.padding="6px"; checkBtn.style.borderRadius="6px";
       right.appendChild(checkBtn);
@@ -1425,19 +1331,10 @@ let isConditionTrue_0 = false;
             const baseUrl = getBaseUrl(manifest);
             const parsed = parseManifestEntry(manifest[p], baseUrl);
             
-            if (parsed && parsed.type === 'subdirs') {
+            if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs && parsed.subdirs.length > 0))) {
               hasSubdirs = true;
-            } else if (parsed && parsed.type === 'files') {
-              // CORREÇÃO: Se tem arquivos, NÃO tem subdiretórios
-              hasSubdirs = false;
             } else {
-              // Se não parseou, tenta GitHub API
-              try {
-                const api = await ghListForFolderUsingEntry(activeRepo, p).catch(()=>[]);
-                hasSubdirs = Array.isArray(api) && api.some(x=>x.type==="dir");
-              } catch(e) {
-                hasSubdirs = false;
-              }
+              hasSubdirs = false;
             }
           } else {
             // Se não está no manifest, tenta GitHub API
@@ -1478,7 +1375,6 @@ let isConditionTrue_0 = false;
       };
       right.appendChild(pickBtn);
     } else {
-      // CORREÇÃO: Botão para baixar diretamente (sem difficulties)
       const dlBtn = document.createElement("button"); dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px";
       dlBtn.onclick = ()=> downloadSongFolder(path);
       right.appendChild(dlBtn);
@@ -1492,6 +1388,8 @@ let isConditionTrue_0 = false;
         const parsed = parseManifestEntry(manifest[folderPath]);
         if (parsed && parsed.type === 'subdirs') {
           return parsed.value.slice();
+        } else if (parsed && parsed.type === 'folder' && parsed.subdirs) {
+          return parsed.subdirs.slice();
         }
       }
     } catch(e){}
@@ -1511,8 +1409,9 @@ let isConditionTrue_0 = false;
       let items = [];
       if (manifest && manifest.hasOwnProperty(path)) {
         const parsed = parseManifestEntry(manifest[path]);
-        if (parsed && parsed.type === 'subdirs') {
-          items = parsed.value.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
+        if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
+          const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
+          items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
         }
       } else {
         try {
@@ -1543,42 +1442,19 @@ let isConditionTrue_0 = false;
       let items = [];
       if (manifest && manifest.hasOwnProperty(path)) {
         const parsed = parseManifestEntry(manifest[path]);
-        if (parsed && parsed.type === 'subdirs') {
-          // Se for uma lista de subdiretórios (músicas)
-          items = parsed.value.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
-        } else if (parsed && parsed.type === 'files') {
-          // Se for uma lista de arquivos (músicas sem subdiretórios)
-          // Isso é um caso incomum para mods, mas pode acontecer se o mod for uma música única.
-          // No caso do Vs Agoti, a entrada "Vs Agoti" no manifesto retorna subdiretórios, então este bloco não deve ser atingido.
-          // No entanto, para garantir, vamos manter a lógica de listar arquivos.
-          items = parsed.value.map(file => ({ name: basenameNoExt(file.name), path: path, type: "file" }));
+        if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
+          const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
+          items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
         }
       } else {
         try {
-          // Fallback para GitHub API
           const api = await ghListForFolderUsingEntry(activeRepo, path);
-          // Filtra tanto diretórios (músicas com difficulties) quanto arquivos (músicas sem difficulties)
-          items = (api || []).filter(it => it.type === "dir" || isJsonFile(it.name) || isAudioFile(it.name)).map(it => ({ 
-            name: it.type === "dir" ? it.name : basenameNoExt(it.name), 
-            path: it.path, 
-            type: it.type 
-          }));
-          // Remove duplicatas de arquivos (ex: .json e .ogg com o mesmo nome base)
-          const uniqueItems = [];
-          const names = new Set();
-          for (const item of items) {
-            if (!names.has(item.name)) {
-              names.add(item.name);
-              uniqueItems.push(item);
-            }
-          }
-          items = uniqueItems;
+          items = (api || []).filter(it => it.type === "dir").map(it => ({ name: it.name, path: it.path, type: "dir" }));
         } catch(e){ items = []; }
       }
       songsList = items || [];
       renderSongsList(songsList);
       setStatus(`${path} — ${songsList.length} músicas`);
-      setTimeout(()=> startBackgroundCheckOnSongs(songsList), 10); // Adicionado para verificar difficulties nas músicas
     } catch(e){
       setStatus("Erro ao abrir mod: " + (e && e.message ? e.message : e));
     }
@@ -1594,8 +1470,15 @@ let isConditionTrue_0 = false;
       const baseUrl = getBaseUrl(manifest);
       const parsed = parseManifestEntry(manifest[path], baseUrl);
       
-      if (!parsed || parsed.type !== 'files') return null;
-      return parsed.value;
+      if (!parsed) return null;
+      
+      if (parsed.type === 'files') {
+        return parsed.value;
+      } else if (parsed.type === 'folder' && parsed.files) {
+        return parsed.files;
+      }
+      
+      return null;
     } catch(e){}
     return null;
   }
@@ -1675,6 +1558,8 @@ let isConditionTrue_0 = false;
       return [];
     }
 
+    // CORREÇÃO: Procurar áudios exatamente como no script original
+    // 1. Primeiro tenta na pasta da difficulty
     try {
       let list = await audioListFromManifestPath(difficultyPath);
       if (list && list.length>0) return list;
@@ -1682,6 +1567,7 @@ let isConditionTrue_0 = false;
       if (list && list.length>0) return list;
     } catch(e){}
 
+    // 2. Se não achou, tenta na pasta da música (rootFolder)
     try {
       let list = await audioListFromManifestPath(rootFolder);
       if (list && list.length>0) return list;
@@ -1689,6 +1575,7 @@ let isConditionTrue_0 = false;
       if (list && list.length>0) return list;
     } catch(e){}
 
+    // 3. Se não achou, tenta na pasta do mod (pai da rootFolder)
     try {
       const parts = (rootFolder || "").split("/").filter(Boolean);
       if (parts.length >= 2) {
@@ -1701,6 +1588,7 @@ let isConditionTrue_0 = false;
         }
       }
     } catch(e){}
+    
     return [];
   }
 
@@ -1926,7 +1814,6 @@ let isConditionTrue_0 = false;
 
       setStatus("Listando arquivos em " + folderPath + "...");
       
-      // CORREÇÃO: Usar a função correta para obter arquivos
       let files = await getFilesFromManifest(folderPath);
       
       if (!files) {
@@ -2074,34 +1961,11 @@ let isConditionTrue_0 = false;
 
   searchInput.addEventListener("input", ()=> {
     const q = searchInput.value.trim().toLowerCase();
-    
-    if (currentModPath) {
-      // Se um mod estiver aberto, filtra a lista de músicas (songsList)
-      if (!q) {
-        renderSongsList(songsList);
-        setStatus(`${currentModPath} — ${songsList.length} músicas`);
-        setTimeout(()=> startBackgroundCheckOnSongs(songsList), 10);
-        return;
-      }
-      const filteredSongs = songsList.filter(it => it.name.toLowerCase().includes(q));
-      renderSongsList(filteredSongs);
-      setStatus(`Resultado: ${filteredSongs.length} / ${songsList.length} músicas`);
-      setTimeout(()=> startBackgroundCheckOnSongs(filteredSongs), 10);
-    } else {
-      // Se nenhum mod estiver aberto, filtra a lista de mods (modsList)
-      if (!q) { 
-        renderModsList(modsList); 
-        renderSongsList([]); // Limpa a lista de músicas
-        setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`); 
-        setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10); 
-        return; 
-      }
-      const filteredMods = modsList.filter(it => it.name.toLowerCase().includes(q));
-      renderModsList(filteredMods);
-      renderSongsList([]); // Limpa a lista de músicas
-      setStatus(`Resultado: ${filteredMods.length} / ${modsList.length} mods`);
-      setTimeout(()=> startBackgroundCheckOnSongs(filteredMods), 10);
-    }
+    if (!q) { renderModsList(modsList); setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`); setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10); return; }
+    const filtered = modsList.filter(it => it.name.toLowerCase().includes(q));
+    renderModsList(filtered);
+    setStatus(`Resultado: ${filtered.length} / ${modsList.length}`);
+    setTimeout(()=> startBackgroundCheckOnSongs(filtered), 10);
   });
 
   (function init() {
@@ -2119,7 +1983,7 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xdda290(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x8bcd38(runtimeScene);
 
 }
 
@@ -2171,6 +2035,8 @@ if (isConditionTrue_0) {
 {gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "Play");
 }
 {runtimeScene.getGame().getVariables().getFromIndex(5).setNumber(1);
+}
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(8));
 }
 
 { //Subevents
