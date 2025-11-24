@@ -135,7 +135,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x16d20e0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0xe1e0b0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
@@ -734,7 +734,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x16d20e0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xe1e0b0(runtimeScene);
 
 }
 
@@ -830,7 +830,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x8bcd38 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1accd48 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
 (function () {
@@ -1983,7 +1983,7 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x8bcd38(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1accd48(runtimeScene);
 
 }
 
@@ -2032,6 +2032,8 @@ if (isConditionTrue_0) {
 }
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(55).getChild(4));
 }
+{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(51));
+}
 {gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "Play");
 }
 {runtimeScene.getGame().getVariables().getFromIndex(5).setNumber(1);
@@ -2062,7 +2064,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34266132);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34416604);
 }
 }
 if (isConditionTrue_0) {
@@ -2085,7 +2087,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34268564);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34419036);
 }
 }
 }
@@ -2142,7 +2144,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34263572);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34413044);
 }
 }
 if (isConditionTrue_0) {
@@ -2169,7 +2171,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34256804);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34406724);
 }
 }
 if (isConditionTrue_0) {
