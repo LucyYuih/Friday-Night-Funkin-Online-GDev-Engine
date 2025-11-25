@@ -411,7 +411,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1927718 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1a8e428 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
 (function () {
@@ -1564,13 +1564,13 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1927718(runtimeScene);
+gdjs.InicioCode.userFunc0x1a8e428(runtimeScene);
 
 }
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDHardObjects1Objects = Hashtable.newFrom({"Hard": gdjs.InicioCode.GDHardObjects1});
-gdjs.InicioCode.userFunc0x176d7c0 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1a8de48 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js
 // UI / downloader. Agora: NÃO aplica automaticamente em outras cenas.
@@ -1869,7 +1869,7 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x176d7c0(runtimeScene);
+gdjs.InicioCode.userFunc0x1a8de48(runtimeScene);
 
 }
 

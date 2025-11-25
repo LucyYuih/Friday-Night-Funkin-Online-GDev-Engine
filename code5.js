@@ -17915,7 +17915,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xe23bc8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1c204d8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18105,7 +18105,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xe23bc8(runtimeScene);
+gdjs.PlayCode.userFunc0x1c204d8(runtimeScene);
 
 }
 
@@ -18285,7 +18285,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1a9c140 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x15eade8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18475,7 +18475,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1a9c140(runtimeScene);
+gdjs.PlayCode.userFunc0x15eade8(runtimeScene);
 
 }
 
@@ -22517,7 +22517,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0xdfa818 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a5d690 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22536,7 +22536,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x197d898 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x173f0e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22801,7 +22801,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0xdfa818(runtimeScene);
+gdjs.PlayCode.userFunc0x1a5d690(runtimeScene);
 
 }
 
@@ -22809,7 +22809,7 @@ gdjs.PlayCode.userFunc0xdfa818(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x197d898(runtimeScene);
+gdjs.PlayCode.userFunc0x173f0e0(runtimeScene);
 
 }
 
@@ -22931,7 +22931,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x18c20a8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1bbc808 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js
 // Player que aplica skins (posicionamento dos pés + animações).
@@ -22995,7 +22995,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     const entries = Object.keys(zip.files);
     let jsonFile = null;
     for (const name of entries) {
-      if (name.endsWith("/POCOYO.json") || name.endsWith("POCOYO.json")) { jsonFile = name; break; }
+      if (name.toLowerCase().endsWith("/metadata.json") || name.toLowerCase().endsWith("metadata.json") || name.toLowerCase().includes("metadata")) { jsonFile = name; break; }
     }
     if (!jsonFile) {
       for (const name of entries) { if (name.toLowerCase().endsWith(".json")) { jsonFile = name; break; } }
@@ -23138,13 +23138,9 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         try {
           obj.getRendererObject().texture = tex;
 
-          const centerX = (typeof state._originalCenterX === "number" && state._originalCenterX !== 0) ? state._originalCenterX : obj.getX();
+          const centerX = state._originalCenterX;
 
-          let feetY = state._originalFeetY;
-          if (!feetY || feetY === 0) {
-            const bfSize = getObjectSize(obj);
-            feetY = obj.getY() + ((typeof bfSize.h === "number") ? (bfSize.h / 2) : 0);
-          }
+          const feetY = state._originalFeetY;
 
           const ox = (offsets && typeof offsets[0] === "number") ? offsets[0] : 0;
           const oy = (offsets && typeof offsets[1] === "number") ? offsets[1] : 0;
@@ -23338,7 +23334,7 @@ gdjs.PlayCode.eventsList274 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x18c20a8(runtimeScene);
+gdjs.PlayCode.userFunc0x1bbc808(runtimeScene);
 
 }
 
@@ -23418,7 +23414,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x18c0ec0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1194260 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -24299,7 +24295,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x18c0ec0(runtimeScene);
+gdjs.PlayCode.userFunc0x1194260(runtimeScene);
 
 }
 

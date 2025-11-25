@@ -135,7 +135,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x1ae46b0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x1b2c938 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
@@ -734,7 +734,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1ae46b0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1b2c938(runtimeScene);
 
 }
 
@@ -830,7 +830,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x18c02d8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x173f0e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
 (function () {
@@ -1983,7 +1983,7 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x18c02d8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x173f0e0(runtimeScene);
 
 }
 
