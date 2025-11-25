@@ -135,7 +135,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x18051b0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x172d6b8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
@@ -734,7 +734,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x18051b0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x172d6b8(runtimeScene);
 
 }
 
@@ -830,7 +830,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xeb15d0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1b1e728 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
 (function () {
@@ -1983,7 +1983,7 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xeb15d0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1b1e728(runtimeScene);
 
 }
 
@@ -2064,7 +2064,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34670220);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34729188);
 }
 }
 if (isConditionTrue_0) {
@@ -2087,7 +2087,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34672652);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34731620);
 }
 }
 }
@@ -2144,7 +2144,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34665140);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34716980);
 }
 }
 if (isConditionTrue_0) {
@@ -2171,7 +2171,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34662796);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34719740);
 }
 }
 if (isConditionTrue_0) {

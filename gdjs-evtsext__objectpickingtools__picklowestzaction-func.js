@@ -10,7 +10,7 @@ gdjs.evtsExt__ObjectPickingTools__PickLowestZAction.idToCallbackMap = new Map();
 gdjs.evtsExt__ObjectPickingTools__PickLowestZAction.GDObjectObjects1= [];
 
 
-gdjs.evtsExt__ObjectPickingTools__PickLowestZAction.userFunc0x11cc858 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__ObjectPickingTools__PickLowestZAction.userFunc0x11d8490 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 // Create an empty array to hold the objects with the lowest value
 let lowestValueObjects = [];
@@ -50,7 +50,7 @@ gdjs.evtsExt__ObjectPickingTools__PickLowestZAction.eventsList0 = function(runti
 {
 
 
-gdjs.evtsExt__ObjectPickingTools__PickLowestZAction.userFunc0x11cc858(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__ObjectPickingTools__PickLowestZAction.userFunc0x11d8490(runtimeScene, eventsFunctionContext);
 
 }
 
