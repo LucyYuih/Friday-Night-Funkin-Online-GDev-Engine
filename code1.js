@@ -411,7 +411,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x3aeed08 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x127b028 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
 (function () {
@@ -1564,19 +1564,15 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x3aeed08(runtimeScene);
+gdjs.InicioCode.userFunc0x127b028(runtimeScene);
 
 }
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDHardObjects1Objects = Hashtable.newFrom({"Hard": gdjs.InicioCode.GDHardObjects1});
-gdjs.InicioCode.userFunc0x3aeef20 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x127a560 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_loader.js
-// UI / downloader. Agora: NÃO aplica automaticamente em outras cenas.
-// Ele baixa, popula thumbs e salva SelectedSkin + zip_cdn.
-// Se você quiser aplicar imediatamente na cena atual (quando o player estiver presente), tem botão "Aplicar agora".
-
+// skin_loader.js (versão responsiva + touch-scroll para lista de skins)
 (async function(runtimeScene) {
   const MANIFEST_NAME = "manifestskins.json";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
@@ -1621,61 +1617,126 @@ gdjs.InicioCode.userFunc0x3aeef20 = function GDJSInlineCode(runtimeScene) {
   }
 
   function createModal(defaultOwner="LucyYuih", defaultRepo="gdev-custom-skins", defaultBranch="main") {
+    // CSS responsivo: usa grid, unidades relativas, media queries e touch-scrolling.
     const css = `
-      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; }
-      .skin-panel { width: 960px; max-width:95%; height: 680px; background: #111; color:#eee; border-radius:10px; display:flex; overflow:hidden; font-family:Arial, sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
-      .skin-left { width: 260px; border-right:1px solid rgba(255,255,255,0.05); padding:12px; overflow:auto; }
-      .skin-right { flex:1; padding:12px; display:flex; flex-direction:column; }
-      .skin-mod { padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:6px; cursor:pointer; }
+      :root {
+        --modal-gap: 12px;
+        --panel-bg: #0f0f11;
+        --panel-radius: 12px;
+        --accent: #1976d2;
+        --muted: #999;
+      }
+      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; box-sizing: border-box; -webkit-overflow-scrolling: touch; }
+      .skin-panel {
+        width: min(1100px, 98%);
+        max-width: 1100px;
+        height: min(86vh, 820px);
+        background: var(--panel-bg);
+        color:#eee;
+        border-radius:var(--panel-radius);
+        display:grid;
+        grid-template-columns: 300px 1fr;
+        gap: var(--modal-gap);
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      }
+
+      /* small screens: left column collapses on top */
+      @media (max-width: 720px) {
+        .skin-panel { grid-template-columns: 1fr; height: calc(100vh - 36px); width: 100%; border-radius: 8px; }
+        .skin-left { order: 0; height: auto; max-height: 160px; overflow:auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.04); padding:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+        .skin-left .skin-mod { flex: 0 0 auto; padding:6px 8px; font-size:13px; margin:4px; }
+        .skin-right { order: 1; padding:10px; overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+      }
+
+      .skin-left { padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto; min-width: 180px; box-sizing:border-box; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+      .skin-right { padding:14px; display:flex; flex-direction:column; box-sizing:border-box; min-width: 0; overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+
+      .skin-left-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px; }
+      .skin-toggle-btn { background:transparent; border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color: #ddd; cursor:pointer; font-size:13px; }
+      .skin-mod { padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
       .skin-mod:hover { background: rgba(255,255,255,0.03); }
-      .skin-list { display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; }
-      .skin-card { width:120px; background: rgba(255,255,255,0.02); border-radius:6px; padding:6px; text-align:center; cursor:pointer; }
-      .skin-card img { width:100%; height:80px; object-fit:contain; background:#222; border-radius:4px; }
-      .skin-card .label { margin-top:6px; font-size:12px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-      .skin-controls { display:flex; gap:8px; align-items:center; margin-top:8px; }
-      .skin-btn { padding:8px 10px; border-radius:6px; background:#1976d2; color:white; border:none; cursor:pointer; }
-      .skin-btn:disabled { opacity:0.4; cursor:default; }
-      .skin-title { font-weight:600; font-size:16px; margin-bottom:6px; }
-      .skin-loading { color:#aaa; font-size:13px; }
-      .cdn-inputs { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-      .cdn-inputs input { background: #0f0f0f; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:6px; border-radius:4px; width:140px; }
+
+      .skin-top { display:flex; flex-direction:column; gap:8px; }
+      .skin-title-row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+      .skin-title { font-weight:700; font-size:1rem; }
+      .skin-controls { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
+      .skin-btn { padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px; }
+      .skin-btn:disabled { opacity:0.45; cursor:default; }
+
+      .cdn-inputs { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+      .cdn-inputs input { background: #0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px; border-radius:6px; min-width:100px; box-sizing:border-box; font-size:13px; }
+
+      .skin-loading { color:var(--muted); font-size:13px; margin:6px 0; }
+      .skin-list { display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+      .skin-list::-webkit-scrollbar { height:8px; width:8px; }
+      .skin-left-list { overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+
+      .skin-card { width: clamp(110px, 22%, 160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; -webkit-user-select: none; user-select: none; }
+      .skin-card img { width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none; }
+      .skin-card .label { font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+      .skin-card .card-footer { display:flex; gap:6px; justify-content:center; align-items:center; }
+      .skin-card button.skin-btn { padding:6px 8px; font-size:12px; border-radius:6px; }
+
+      /* scrollbars: subtle */
+      .skin-left::-webkit-scrollbar, .skin-list::-webkit-scrollbar, .skin-right::-webkit-scrollbar { height:8px; width:8px; }
+      .skin-left::-webkit-scrollbar-thumb, .skin-list::-webkit-scrollbar-thumb, .skin-right::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.04); border-radius:8px; }
+
+      /* small tweaks */
+      .note-small { color:#9aa; font-size:12px; }
+      .skin-info-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     `;
-    const style = document.createElement("style"); style.textContent = css; document.head.appendChild(style);
+    const style = document.createElement("style");
+    style.className = "skin-loader-style";
+    style.textContent = css;
+    document.head.appendChild(style);
 
     const modal = document.createElement("div"); modal.className = "skin-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+
     const panel = document.createElement("div"); panel.className = "skin-panel";
     const left = document.createElement("div"); left.className = "skin-left";
+    const leftList = document.createElement("div"); leftList.className = "skin-left-list";
     const right = document.createElement("div"); right.className = "skin-right";
 
-    const leftHeader = document.createElement("div"); leftHeader.style.fontWeight = "700"; leftHeader.style.marginBottom = "8px";
-    leftHeader.textContent = "Mods"; left.appendChild(leftHeader);
+    // left header (with toggle for small screens)
+    const leftHeader = document.createElement("div"); leftHeader.className = "skin-left-header";
+    const leftTitle = document.createElement("div"); leftTitle.textContent = "Mods"; leftTitle.style.fontWeight = "700";
+    const toggleBtn = document.createElement("button"); toggleBtn.className = "skin-toggle-btn"; toggleBtn.textContent = "Toggle";
+    leftHeader.appendChild(leftTitle); leftHeader.appendChild(toggleBtn);
+    left.appendChild(leftHeader);
+    left.appendChild(leftList);
 
-    const top = document.createElement("div"); top.style.display = "flex"; top.style.flexDirection = "column"; top.style.marginBottom = "6px";
-    const topRow = document.createElement("div"); topRow.style.display = "flex"; topRow.style.justifyContent = "space-between"; topRow.style.alignItems = "center";
-
-    const title = document.createElement("div"); title.className = "skin-title"; title.textContent = "Skins"; topRow.appendChild(title);
-
-    const controls = document.createElement("div");
+    // right top: title, cdn inputs, controls
+    const top = document.createElement("div"); top.className = "skin-top";
+    const titleRow = document.createElement("div"); titleRow.className = "skin-title-row";
+    const title = document.createElement("div"); title.className = "skin-title"; title.textContent = "Skins";
+    const controls = document.createElement("div"); controls.className = "skin-controls";
     const closeBtn = document.createElement("button"); closeBtn.className = "skin-btn"; closeBtn.textContent = "Fechar";
-    controls.appendChild(closeBtn); topRow.appendChild(controls);
+    controls.appendChild(closeBtn);
+    titleRow.appendChild(title); titleRow.appendChild(controls);
 
     const cdnRow = document.createElement("div"); cdnRow.className = "cdn-inputs";
     const ownerIn = document.createElement("input"); ownerIn.placeholder = "Owner"; ownerIn.value = defaultOwner;
     const repoIn = document.createElement("input"); repoIn.placeholder = "Repo"; repoIn.value = defaultRepo;
     const branchIn = document.createElement("input"); branchIn.placeholder = "Branch"; branchIn.value = defaultBranch;
-    const note = document.createElement("div"); note.style.color = "#999"; note.style.fontSize = "12px";
-    note.textContent = "CDN-first: thumbs/zips serão buscados no jsDelivr.";
+    const note = document.createElement("div"); note.className = "note-small"; note.textContent = "CDN-first: thumbs/zips serão buscados no jsDelivr.";
     cdnRow.appendChild(ownerIn); cdnRow.appendChild(repoIn); cdnRow.appendChild(branchIn); cdnRow.appendChild(note);
-
-    top.appendChild(topRow); top.appendChild(cdnRow);
 
     const info = document.createElement("div"); info.className = "skin-loading"; info.textContent = "Selecione um mod à esquerda.";
     const skinListWrap = document.createElement("div"); skinListWrap.style.flex = "1"; skinListWrap.style.overflow = "auto";
 
+    top.appendChild(titleRow); top.appendChild(cdnRow);
+
     right.appendChild(top); right.appendChild(info); right.appendChild(skinListWrap);
     panel.appendChild(left); panel.appendChild(right); modal.appendChild(panel); document.body.appendChild(modal);
 
-    return { modal, left, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap };
+    // return elements for external use
+    return {
+      modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style
+    };
   }
 
   function findSkinInManifest(manifest, modName, skinName){
@@ -1698,14 +1759,55 @@ gdjs.InicioCode.userFunc0x3aeef20 = function GDJSInlineCode(runtimeScene) {
     }
 
     const ui = createModal(baseOwner||"LucyYuih", baseRepo||"gdev-custom-skins", baseBranch||"main");
-    const { modal, left, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap } = ui;
+    const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl } = ui;
     let currentMod = null; let thumbsCache = {}; let downloading = false;
 
+    // prevent background scroll while modal open
+    const prevOverflow = document.documentElement.style.overflow;
+    try { document.documentElement.style.overflow = 'hidden'; } catch(e){}
+
+    // add passive touch listeners so touch scrolling isn't blocked by JS
+    [leftList, skinListWrap, right, left].forEach(el => {
+      try {
+        if (!el) return;
+        el.addEventListener('touchstart', ()=>{}, {passive:true});
+        el.addEventListener('touchmove', ()=>{}, {passive:true});
+      } catch(e){}
+    });
+
+    // build left mod list
     const mods = manifest[""] || [];
-    if (!Array.isArray(mods) || mods.length === 0) left.appendChild(Object.assign(document.createElement("div"), { textContent: "No mods found", style: "color:#aaa" }));
-    else { for (const m of mods) { const el=document.createElement("div"); el.className="skin-mod"; el.textContent=m; el.onclick=()=>selectMod(m); left.appendChild(el); } }
+    if (!Array.isArray(mods) || mods.length === 0) {
+      const no = Object.assign(document.createElement("div"), { textContent: "No mods found", style: "color:#aaa; padding:8px;" });
+      leftList.appendChild(no);
+    } else {
+      for (const m of mods) {
+        const el=document.createElement("div"); el.className="skin-mod"; el.textContent=m;
+        el.onclick=()=>selectMod(m);
+        // make sure mod items don't capture dragging
+        el.addEventListener('touchstart', ()=>{}, {passive:true});
+        leftList.appendChild(el);
+      }
+    }
+
+    // toggle button for small screens: hide/show left column
+    let leftHidden = false;
+    function setLeftHidden(hide){
+      leftHidden = !!hide;
+      if (window.innerWidth <= 720) {
+        left.style.display = hide ? 'none' : 'flex';
+      } else {
+        left.style.display = 'block';
+      }
+    }
+    toggleBtn.onclick = ()=> setLeftHidden(!leftHidden);
+    window.addEventListener('resize', ()=> { if (window.innerWidth > 720) left.style.display = 'block'; else if (leftHidden) left.style.display='none'; });
 
     closeBtn.onclick = () => { if (downloading) { alert("Download em progresso — aguarde."); return; } cleanupAndRemove(); };
+
+    // close on Esc
+    function onKeyDown(e){ if (e.key === 'Escape') { closeBtn.click(); } }
+    window.addEventListener('keydown', onKeyDown);
 
     function unloadModThumbs(modName){ const arr = thumbsCache[modName]; if (!arr) return; for (const it of arr) { if (it.blobUrl) try{URL.revokeObjectURL(it.blobUrl)}catch(e){} } delete thumbsCache[modName]; log("Unloaded thumbs for",modName); }
 
@@ -1722,16 +1824,22 @@ gdjs.InicioCode.userFunc0x3aeef20 = function GDJSInlineCode(runtimeScene) {
       const cdnBase={ owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
       for (const sk of skins){
         const card=document.createElement("div"); card.className="skin-card";
-        const img=document.createElement("img"); img.alt=sk.name; img.src="";
+        const img=document.createElement("img"); img.alt=sk.name; img.src=""; img.draggable = false; // prevent image drag
         const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=sk.name;
+        const footer = document.createElement("div"); footer.className="card-footer";
         const applyBtn = document.createElement("button"); applyBtn.className="skin-btn"; applyBtn.textContent="Aplicar agora";
-        card.appendChild(img); card.appendChild(lbl); card.appendChild(applyBtn);
-        applyBtn.onclick = ()=> applyNow(modName, sk);
+        applyBtn.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk); };
+        card.appendChild(img); card.appendChild(lbl); footer.appendChild(applyBtn);
+        card.appendChild(footer);
+        // card click downloads and saves but don't block touch scroll
         card.onclick = ()=> downloadAndSaveOnly(modName, sk, false);
+        // add passive touch listeners so scrolling is not blocked by card listeners
+        card.addEventListener('touchstart', ()=>{}, {passive:true});
         list.appendChild(card);
         thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card, applyBtn });
       }
 
+      // load thumbs
       for (const item of thumbsCache[modName]){
         const sk = item.skin; let thumb = sk.thumb || "";
         if (!thumb) { item.imgEl.style.background="#222"; continue; }
@@ -1845,7 +1953,20 @@ gdjs.InicioCode.userFunc0x3aeef20 = function GDJSInlineCode(runtimeScene) {
       }
     } catch(e){ warn("Loader selectedskin check failed", e); }
 
-    function cleanupAndRemove(){ for (const k in thumbsCache) unloadModThumbs(k); try { document.body.removeChild(document.querySelector(".skin-modal")); } catch(e){} }
+    function cleanupAndRemove(){
+      try {
+        for (const k in thumbsCache) unloadModThumbs(k);
+        // remove modal and style
+        const m = document.querySelector(".skin-modal");
+        if (m) document.body.removeChild(m);
+        try { document.head.removeChild(styleEl); } catch(e){}
+      } catch(e){ console.error("cleanup failed", e); }
+      // restore scroll
+      try { document.documentElement.style.overflow = prevOverflow || ""; } catch(e){}
+      // cleanup listeners
+      window.removeEventListener('keydown', onKeyDown);
+      try { window.removeEventListener('resize', ()=>{}); } catch(e){}
+    }
 
     return { close: cleanupAndRemove, unloadModThumbs };
   }
@@ -1869,7 +1990,7 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x3aeef20(runtimeScene);
+gdjs.InicioCode.userFunc0x127a560(runtimeScene);
 
 }
 
