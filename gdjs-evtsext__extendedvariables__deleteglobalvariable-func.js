@@ -9,7 +9,7 @@ gdjs.evtsExt__ExtendedVariables__DeleteGlobalVariable = {};
 gdjs.evtsExt__ExtendedVariables__DeleteGlobalVariable.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__ExtendedVariables__DeleteGlobalVariable.userFunc0xfab478 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__ExtendedVariables__DeleteGlobalVariable.userFunc0x125a480 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 runtimeScene.getGame().getVariables().remove(eventsFunctionContext.getArgument("GlobalVariableName"));
 };
@@ -18,7 +18,7 @@ gdjs.evtsExt__ExtendedVariables__DeleteGlobalVariable.eventsList0 = function(run
 {
 
 
-gdjs.evtsExt__ExtendedVariables__DeleteGlobalVariable.userFunc0xfab478(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__ExtendedVariables__DeleteGlobalVariable.userFunc0x125a480(runtimeScene, eventsFunctionContext);
 
 }
 
