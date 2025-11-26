@@ -411,7 +411,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x172d6b8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1d1cc48 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
 (function () {
@@ -1564,15 +1564,15 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x172d6b8(runtimeScene);
+gdjs.InicioCode.userFunc0x1d1cc48(runtimeScene);
 
 }
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDHardObjects1Objects = Hashtable.newFrom({"Hard": gdjs.InicioCode.GDHardObjects1});
-gdjs.InicioCode.userFunc0xd9ce30 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1a220f0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_loader.js (versão responsiva + touch-scroll para lista de skins)
+// skin_loader.js (versão responsiva + touch-scroll para lista de skins + botão RESET)
 (async function(runtimeScene) {
   const MANIFEST_NAME = "manifestskins.json";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
@@ -1735,7 +1735,7 @@ gdjs.InicioCode.userFunc0xd9ce30 = function GDJSInlineCode(runtimeScene) {
 
     // return elements for external use
     return {
-      modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style
+      modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls
     };
   }
 
@@ -1759,7 +1759,7 @@ gdjs.InicioCode.userFunc0xd9ce30 = function GDJSInlineCode(runtimeScene) {
     }
 
     const ui = createModal(baseOwner||"LucyYuih", baseRepo||"gdev-custom-skins", baseBranch||"main");
-    const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl } = ui;
+    const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl, controlsEl } = ui;
     let currentMod = null; let thumbsCache = {}; let downloading = false;
 
     // prevent background scroll while modal open
@@ -1774,6 +1774,32 @@ gdjs.InicioCode.userFunc0xd9ce30 = function GDJSInlineCode(runtimeScene) {
         el.addEventListener('touchmove', ()=>{}, {passive:true});
       } catch(e){}
     });
+
+    // Add "Reset Selected" button to controls
+    const resetSelectedBtn = document.createElement("button");
+    resetSelectedBtn.className = "skin-btn";
+    resetSelectedBtn.textContent = "Reset Selected";
+    resetSelectedBtn.title = "Remove SelectedSkin do cache/localStorage e rebaixa se possível";
+    resetSelectedBtn.onclick = async () => {
+      if (downloading) { alert("Operação em progresso. Aguarde."); return; }
+      try {
+        let selStr = null;
+        try {
+          const gv = runtimeScene.getGame().getVariables();
+          if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString();
+        } catch(e){}
+        if ((!selStr || selStr.trim()==="") && window.localStorage) selStr = localStorage.getItem("gd_selected_skin");
+        if (!selStr) { alert("Nenhum SelectedSkin encontrado."); return; }
+        const parsed = JSON.parse(selStr);
+        if (!parsed || (!parsed.zip && !parsed.zip_cdn)) { alert("SelectedSkin não contém referência de zip para rebaixar."); return; }
+        // attempt reset
+        await resetAndRedownload(parsed.mod || parsed.modName || "", { name: parsed.name || "", zip: parsed.zip || parsed.zip_cdn }, true);
+      } catch(e){
+        console.error("Reset Selected failed:", e);
+        alert("Falha ao resetar selected: " + (e && e.message ? e.message : e));
+      }
+    };
+    controlsEl.insertBefore(resetSelectedBtn, controlsEl.firstChild);
 
     // build left mod list
     const mods = manifest[""] || [];
@@ -1829,14 +1855,20 @@ gdjs.InicioCode.userFunc0xd9ce30 = function GDJSInlineCode(runtimeScene) {
         const footer = document.createElement("div"); footer.className="card-footer";
         const applyBtn = document.createElement("button"); applyBtn.className="skin-btn"; applyBtn.textContent="Aplicar agora";
         applyBtn.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk); };
-        card.appendChild(img); card.appendChild(lbl); footer.appendChild(applyBtn);
-        card.appendChild(footer);
+
+        const resetBtn = document.createElement("button"); resetBtn.className="skin-btn"; resetBtn.textContent="Reset";
+        resetBtn.title = "Apaga cache/localStorage relacionado e rebaixa o .zip";
+        resetBtn.onclick = (ev)=> { ev.stopPropagation(); resetAndRedownload(modName, sk, false); };
+
+        footer.appendChild(applyBtn);
+        footer.appendChild(resetBtn);
+        card.appendChild(img); card.appendChild(lbl); card.appendChild(footer);
         // card click downloads and saves but don't block touch scroll
         card.onclick = ()=> downloadAndSaveOnly(modName, sk, false);
         // add passive touch listeners so scrolling is not blocked by card listeners
         card.addEventListener('touchstart', ()=>{}, {passive:true});
         list.appendChild(card);
-        thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card, applyBtn });
+        thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card, applyBtn, resetBtn });
       }
 
       // load thumbs
@@ -1938,6 +1970,94 @@ gdjs.InicioCode.userFunc0xd9ce30 = function GDJSInlineCode(runtimeScene) {
       }
     }
 
+    // NEW: reset and redownload a given skin (remove cached SelectedSkin, try to clear GD_SKIN_PLAYER caches, then re-download)
+    async function resetAndRedownload(modName, skinObj, auto=false){
+      if (downloading) { if (!auto) alert("Já há uma operação em progresso."); return; }
+      let zipPath = skinObj.zip || "";
+      if (!zipPath) {
+        const found = findSkinInManifest(manifest, modName, skinObj.name);
+        if (found && found.zip) zipPath = found.zip;
+      }
+      if (!zipPath) { if (!auto) alert("Skin não possui arquivo .zip configurado."); return; }
+
+      downloading = true;
+      try {
+        const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
+        const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+
+        // 1) attempt to clear local references
+        try {
+          // clear SelectedSkin variable in runtime (if matches)
+          try {
+            const gv = runtimeScene.getGame().getVariables();
+            if (gv.has("SelectedSkin")) {
+              const cur = gv.get("SelectedSkin").getAsString();
+              if (cur && cur.includes(skinObj.name)) gv.get("SelectedSkin").setString("");
+            }
+          } catch(e2){}
+          // clear localStorage key if matches
+          try {
+            const ls = localStorage.getItem("gd_selected_skin");
+            if (ls && ls.includes(skinObj.name)) localStorage.removeItem("gd_selected_skin");
+          } catch(e2){}
+
+          // attempt to call player cache removal APIs if available (best effort, wrapped)
+          if (window.GD_SKIN_PLAYER) {
+            try {
+              if (typeof window.GD_SKIN_PLAYER.uninstallPackage === "function") {
+                await window.GD_SKIN_PLAYER.uninstallPackage(modName, skinObj.name);
+                log("Called GD_SKIN_PLAYER.uninstallPackage");
+              } else if (typeof window.GD_SKIN_PLAYER.removePackageByUrl === "function") {
+                await window.GD_SKIN_PLAYER.removePackageByUrl(cdnCandidate);
+                log("Called GD_SKIN_PLAYER.removePackageByUrl");
+              } else if (typeof window.GD_SKIN_PLAYER.clearCache === "function") {
+                await window.GD_SKIN_PLAYER.clearCache();
+                log("Called GD_SKIN_PLAYER.clearCache");
+              }
+            } catch(e3){
+              warn("player cache clear attempt failed", e3);
+            }
+          }
+        } catch(eClear){
+          warn("Reset: local cache removal failed", eClear);
+        }
+
+        // 2) force re-download
+        const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+
+        // 3) save SelectedSkin again (with cdn link)
+        const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+        if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
+        else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+        try {
+          const gv = runtimeScene.getGame().getVariables();
+          if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
+          else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(sel));
+        } catch(e2){}
+        try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e2){}
+        log("Reset: saved SelectedSkin after redownload", sel);
+
+        // 4) if player present, load & apply (like applyNow)
+        if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
+          try {
+            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: "BF" });
+            await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: "BF" });
+            if (!auto) alert("Reset completo: pacote rebaixado e aplicado.");
+          } catch(e){
+            warn("Reset apply via player failed", e);
+            if (!auto) alert("Reset completo: rebaixado mas aplicação falhou: " + (e && e.message ? e.message : e));
+          }
+        } else {
+          if (!auto) alert("Reset completo: .zip rebaixado e SelectedSkin atualizado. Abra a cena com skin_player para aplicar.");
+        }
+      } catch(e){
+        console.error("resetAndRedownload failed:", e);
+        if (!auto) alert("Falha no reset/rebaixamento: " + (e && e.message ? e.message : e));
+      } finally {
+        downloading = false;
+      }
+    }
+
     // Auto-apply loader: se manifest e SelectedSkin existirem, não aplique automaticamente em outra cena.
     // Apenas pre-fill ou chamar downloadAndSaveOnly quando loader for usado especificamente.
     try {
@@ -1990,7 +2110,7 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xd9ce30(runtimeScene);
+gdjs.InicioCode.userFunc0x1a220f0(runtimeScene);
 
 }
 
@@ -2028,7 +2148,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.asyncCallback33819788 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33840636 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(62), null);
 }
@@ -2042,7 +2162,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33819788, gdjs.InicioCode.asyncCallback33819788);
+gdjs.InicioCode.idToCallbackMap.set(33840636, gdjs.InicioCode.asyncCallback33840636);
 gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 
 {
@@ -2052,7 +2172,7 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback33819788(runtimeScene, asyncObjectsList)), 33819788, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback33840636(runtimeScene, asyncObjectsList)), 33840636, asyncObjectsList);
 }
 }
 
@@ -2217,14 +2337,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback33848524 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33869372 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
 gdjs.InicioCode.eventsList14(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33848524, gdjs.InicioCode.asyncCallback33848524);
+gdjs.InicioCode.idToCallbackMap.set(33869372, gdjs.InicioCode.asyncCallback33869372);
 gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 
 {
@@ -2234,20 +2354,20 @@ gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33848524(runtimeScene, asyncObjectsList)), 33848524, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33869372(runtimeScene, asyncObjectsList)), 33869372, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback33857612 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33878460 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33857612, gdjs.InicioCode.asyncCallback33857612);
+gdjs.InicioCode.idToCallbackMap.set(33878460, gdjs.InicioCode.asyncCallback33878460);
 gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 
 {
@@ -2257,14 +2377,14 @@ gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback33857612(runtimeScene, asyncObjectsList)), 33857612, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback33878460(runtimeScene, asyncObjectsList)), 33878460, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback33835172 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33856020 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 
@@ -2274,7 +2394,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPoin
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33835172, gdjs.InicioCode.asyncCallback33835172);
+gdjs.InicioCode.idToCallbackMap.set(33856020, gdjs.InicioCode.asyncCallback33856020);
 gdjs.InicioCode.eventsList17 = function(runtimeScene) {
 
 {
@@ -2285,7 +2405,7 @@ gdjs.InicioCode.eventsList17 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33835172(runtimeScene, asyncObjectsList)), 33835172, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33856020(runtimeScene, asyncObjectsList)), 33856020, asyncObjectsList);
 }
 }
 
@@ -2303,7 +2423,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33844524);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33865372);
 }
 }
 if (isConditionTrue_0) {
@@ -2339,7 +2459,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33844780);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33865628);
 }
 }
 if (isConditionTrue_0) {
@@ -2457,7 +2577,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects2.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects2.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33989868);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34010716);
 }
 }
 }
@@ -2478,7 +2598,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 /* Unknown object - skipped. */if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33990868);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34011716);
 }
 }
 }
@@ -2499,7 +2619,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 /* Unknown object - skipped. */if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33991868);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34012716);
 }
 }
 }
@@ -2577,7 +2697,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33816436);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33837284);
 }
 }
 if (isConditionTrue_0) {
@@ -2598,7 +2718,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.evtTools.input.cursorOnObject(gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDHardObjects1Objects, runtimeScene, true, false);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33802604);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33823452);
 }
 }
 if (isConditionTrue_0) {
@@ -2667,7 +2787,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33809452);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33830300);
 }
 }
 if (isConditionTrue_0) {
@@ -2979,7 +3099,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33846812);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33867660);
 }
 }
 }
@@ -3041,7 +3161,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33853972);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33874820);
 }
 }
 if (isConditionTrue_0) {
@@ -3112,7 +3232,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33846540);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33867388);
 }
 }
 if (isConditionTrue_0) {
@@ -3189,7 +3309,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33993244);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34014092);
 }
 }
 if (isConditionTrue_0) {
