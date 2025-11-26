@@ -17915,7 +17915,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x16ff518 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2731588 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18105,7 +18105,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x16ff518(runtimeScene);
+gdjs.PlayCode.userFunc0x2731588(runtimeScene);
 
 }
 
@@ -18285,7 +18285,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x18577c0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x289d138 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18475,7 +18475,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x18577c0(runtimeScene);
+gdjs.PlayCode.userFunc0x289d138(runtimeScene);
 
 }
 
@@ -22493,7 +22493,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x1d91ca8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1784c80 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22512,7 +22512,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x1d91d10 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0xc5c418 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22777,7 +22777,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x1d91ca8(runtimeScene);
+gdjs.PlayCode.userFunc0x1784c80(runtimeScene);
 
 }
 
@@ -22785,7 +22785,7 @@ gdjs.PlayCode.userFunc0x1d91ca8(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x1d91d10(runtimeScene);
+gdjs.PlayCode.userFunc0xc5c418(runtimeScene);
 
 }
 
@@ -22907,9 +22907,9 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0xdd9100 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a420f0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_player.js (versão ajustada para usar o JSON do último ZIP baixado sempre)
+// skin_player.js (corrigido: usa pixelToScene baseado em altura + cálculo correto de feet usando anchorY + idle espera 1s entre loops)
 (function(){
   const JSZIP_CDN = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
@@ -22952,6 +22952,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       return { w: 0, h: 0 };
     } catch(e){ return {w:0,h:0}; }
   }
+  
   function getTexturePixelSize(tex){
     try {
       if (!tex) return {w:0,h:0};
@@ -22965,23 +22966,18 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   }
 
   // Encontrar JSON dentro do ZIP
-  // Escolhe, por prioridade:
-  // 1) arquivos contendo "metadata" (metadata.json) — escolhe o mais recentemente modificado se houver vários
-  // 2) qualquer .json — escolhe o .json mais recentemente modificado
   function findJsonAndBasePath(zip){
     const entries = Object.keys(zip.files);
     const candidates = [];
     for (const name of entries) {
       if (name.toLowerCase().endsWith(".json")) {
         const f = zip.files[name];
-        // JSZip file objects normalmente têm propriedade 'date' (Date) quando disponível
         const ts = (f && f.date && f.date instanceof Date) ? f.date.getTime() : 0;
         candidates.push({ name, ts });
       }
     }
     if (candidates.length === 0) throw new Error("Metadata JSON not found in ZIP");
 
-    // Prefer metadata-like names first
     const metaMatches = candidates.filter(c => {
       const n = c.name.toLowerCase();
       return n.endsWith("/metadata.json") || n.endsWith("metadata.json") || n.includes("metadata");
@@ -22989,7 +22985,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 
     let chosen;
     if (metaMatches.length) {
-      metaMatches.sort((a,b) => b.ts - a.ts); // mais recente primeiro
+      metaMatches.sort((a,b) => b.ts - a.ts);
       chosen = metaMatches[0];
     } else {
       candidates.sort((a,b) => b.ts - a.ts);
@@ -23047,8 +23043,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     return textures;
   }
 
-  // Carrega um ArrayBuffer (ZIP) e retorna pacote com animations + metadata.
-  // Após o parse, registra metadata do último ZIP processado em window.GD_SKIN_PLAYER.lastDownloadedMetadata
   async function loadFromArrayBuffer(runtimeScene, arrayBuffer, opts = {}) {
     await ensureJSZip();
     const zip = await window.JSZip().loadAsync(arrayBuffer);
@@ -23072,15 +23066,13 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       }
     } catch(e){ throw new Error("Failed reading metadata: " + (e && e.message)); }
 
-    // registra metadata do último ZIP processado para uso externo /
-    // garante que sempre usemos o JSON deste último ZIP
     try {
       if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
       window.GD_SKIN_PLAYER.lastDownloadedMetadata = metadata;
       window.GD_SKIN_PLAYER.lastDownloadedJsonEntry = jsonEntryName;
       window.GD_SKIN_PLAYER.lastDownloadedBaseFolder = baseFolderPrefix;
       window.GD_SKIN_PLAYER.lastDownloadedAt = (new Date()).toISOString();
-    } catch(e){ /* não falhar por conta do registro */ }
+    } catch(e){ }
 
     const allEntries = Object.keys(zip.files);
     const groups = groupImageEntries(allEntries, baseFolderPrefix, metadata);
@@ -23102,11 +23094,10 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     return { animations, metadata, _createdBlobUrls: (function collect(){ const arr=[]; for(const k of Object.keys(animations)){ const a=animations[k]; if (a.frames) for(const t of a.frames){ try{ const res = t.baseTexture && t.baseTexture.resource; if (res && res.url && res.url.startsWith("blob:")) arr.push(res.url); }catch(e){} } } return arr; })() };
   }
 
-  // detect anchor/pivot (0..1) and compute center/feet for an object robustly
   function computeCenterAndFeetForObject(obj){
     const size = getObjectSize(obj);
     const ro = (obj.getRendererObject && obj.getRendererObject()) || null;
-    let anchorX = 0.5, anchorY = 0.5;
+    let anchorX = 0.5, anchorY = 0;
     try {
       if (ro) {
         if (ro.anchor && typeof ro.anchor.x === "number" && typeof ro.anchor.y === "number"){
@@ -23119,12 +23110,30 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     } catch(e){}
     const gx = (typeof obj.getX === "function") ? obj.getX() : 0;
     const gy = (typeof obj.getY === "function") ? obj.getY() : 0;
+    
+    // CENTER X exato do objeto
     const centerX = gx + (0.5 - anchorX) * (size.w || 0);
-    const feetY = gy + (1 - anchorY) * (size.h || 0);
-    return { centerX, feetY, anchorX, anchorY, size };
+    
+    // PÉS exatos: considerar anchorY corretamente:
+    // feetY = objY + (1 - anchorY) * height
+    const feetY = gy + (1 - (typeof anchorY === "number" ? anchorY : 0)) * (size.h || 0);
+
+    // Tentar extrair textura atual do renderer para computar pixels->scene ratio original (usar altura)
+    let pixelToSceneOriginal = 1;
+    try {
+      const tex = ro && (ro.texture || (ro.sprite && ro.sprite.texture));
+      if (tex) {
+        const texPx = getTexturePixelSize(tex);
+        if (texPx && texPx.h > 0 && size.h > 0) {
+          // usar altura pra mapear pixels verticais corretamente
+          pixelToSceneOriginal = size.h / texPx.h;
+        }
+      }
+    } catch(e){ /* fallback -> 1 */ }
+
+    return { centerX, feetY, anchorX, anchorY, size, originalX: gx, originalY: gy, pixelToSceneOriginal };
   }
 
-  // apply a skinPackage to the runtimeScene -> supports mapping from sprite-pixel offsets -> scene units
   async function applyPackageToScene(runtimeScene, packageObj, opts = {}) {
     const TARGET_NAME = (opts && opts.targetName) ? opts.targetName : "BF";
     const invertOffsetY = (typeof opts.invertOffsetY === "boolean") ? opts.invertOffsetY : false;
@@ -23137,6 +23146,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       return null;
     }
 
+    // CAPTURAR POSIÇÕES ORIGINAIS EXATAS ANTES DE QUALQUER MODIFICAÇÃO
     const bfInfos = [];
     for (const obj of bfObjects) {
       try {
@@ -23149,12 +23159,37 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
             else if (typeof ro.scaleX === "number") originalScaleX = ro.scaleX;
           }
         } catch(e){}
-        bfInfos.push({ obj, centerX: info.centerX, feetY: info.feetY, anchorX: info.anchorX, anchorY: info.anchorY, size: info.size, originalScaleX });
+        
+        bfInfos.push({ 
+          obj, 
+          centerX: info.centerX, 
+          feetY: info.feetY, 
+          anchorX: info.anchorX, 
+          anchorY: info.anchorY, 
+          size: info.size, 
+          originalScaleX,
+          originalX: info.originalX,
+          originalY: info.originalY,
+          pixelToSceneOriginal: (typeof info.pixelToSceneOriginal === "number" && isFinite(info.pixelToSceneOriginal)) ? info.pixelToSceneOriginal : 1
+        });
+        
+        log(`Original BF pos - X:${info.originalX} Y:${info.originalY} centerX:${info.centerX} feetY:${info.feetY} size:${info.size.w}x${info.size.h} anchor:(${info.anchorX},${info.anchorY}) pxToScene:${info.pixelToSceneOriginal}`);
       } catch(e){
         const fallbackSize = getObjectSize(obj);
         const gx = (typeof obj.getX === "function") ? obj.getX() : 0;
         const gy = (typeof obj.getY === "function") ? obj.getY() : 0;
-        bfInfos.push({ obj, centerX: gx, feetY: gy + (fallbackSize.h||0)/2, anchorX:0.5, anchorY:0.5, size: fallbackSize, originalScaleX:1 });
+        bfInfos.push({ 
+          obj, 
+          centerX: gx, 
+          feetY: gy + (fallbackSize.h || 0),
+          anchorX: 0.5, 
+          anchorY: 0, 
+          size: fallbackSize, 
+          originalScaleX: 1,
+          originalX: gx,
+          originalY: gy,
+          pixelToSceneOriginal: 1
+        });
       }
     }
 
@@ -23171,7 +23206,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 
     const meta = packageObj.metadata || {};
     const invertSideGlobal = !!meta.OPPSide;
-    const adjusoffMeta = (Array.isArray(meta.adjusoff) && meta.adjusoff.length >= 2) ? [Number(meta.adjusoff[0])||0, Number(meta.adjusoff[1])||0] : [0,0];
 
     function mapBFAnimToKey(rawBFAnim, invertSide){
       if (!rawBFAnim) return "";
@@ -23197,6 +23231,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       for (const info of bfInfos) {
         const obj = info.obj;
         try {
+          // Aplicar textura
           const ro = obj.getRendererObject && obj.getRendererObject();
           if (ro && ro.texture !== undefined) {
             ro.texture = tex;
@@ -23207,53 +23242,45 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
           const ox_meta = (offsets && typeof offsets[0] === "number") ? offsets[0] : 0;
           const oy_meta = (offsets && typeof offsets[1] === "number") ? offsets[1] : 0;
 
+          // Calcular escala de pixel para cena - USAR a relação ORIGINAL baseada em altura
           let pixelToScene = 1;
           if (coordinateMode === "psych") {
-            const displayedW = (info.size && info.size.w) || 0;
-            if (texPxW > 0 && displayedW > 0) pixelToScene = displayedW / texPxW;
-            else pixelToScene = 1;
+            pixelToScene = (typeof info.pixelToSceneOriginal === "number" && info.pixelToSceneOriginal > 0) ? info.pixelToSceneOriginal : 1;
           } else {
             pixelToScene = 1;
           }
 
           const ox_scene = ox_meta * pixelToScene;
           const oy_scene = oy_meta * pixelToScene;
+          
+          // Inverter Y se pedido
           const oyAdjusted = invertOffsetY ? -oy_scene : oy_scene;
 
-          const adjx_meta = adjusoffMeta[0] || 0;
-          const adjy_meta = adjusoffMeta[1] || 0;
-          const adjx_scene = (coordinateMode === "psych") ? adjx_meta * pixelToScene : adjx_meta;
-          const adjy_scene = (coordinateMode === "psych") ? adjy_meta * pixelToScene : adjy_meta;
-          const adjyAdjusted = invertOffsetY ? -adjy_scene : adjy_scene;
+          // Dimensões da nova textura em unidades de cena (usando altura-based pixelToScene)
+          const scaledTexWidth = texPxW * pixelToScene;
+          const scaledTexHeight = texPxH * pixelToScene;
 
-          let centerYOffsetFromFeet_scene = 0;
-          if (coordinateMode === "psych") {
-            if (texPxH > 0) {
-              centerYOffsetFromFeet_scene = (texPxH * pixelToScene) / 2;
-            } else {
-              centerYOffsetFromFeet_scene = ((info.size && info.size.h) || 0) / 2;
-            }
-          } else {
-            centerYOffsetFromFeet_scene = ((info.size && info.size.h) || 0) / 2;
-          }
-
-          let finalX = info.centerX + ox_scene;
-          let finalCenterY = info.feetY - centerYOffsetFromFeet_scene + oyAdjusted;
-
-          finalX += adjx_scene;
-          finalCenterY += adjyAdjusted;
+          // Mantém os pés exatamente no mesmo lugar + offsets
+          const targetFeetY = info.feetY + oyAdjusted;
+          const targetCenterX = info.centerX + ox_scene;
 
           const anchorX = (typeof info.anchorX === "number") ? info.anchorX : 0.5;
-          const anchorY = (typeof info.anchorY === "number") ? info.anchorY : 0.5;
-          const ow = (info.size && info.size.w) || 0;
-          const oh = (info.size && info.size.h) || 0;
+          const anchorY = (typeof info.anchorY === "number") ? info.anchorY : 0;
 
-          const targetObjX = finalX - (0.5 - anchorX) * ow;
-          const targetObjY = finalCenterY - (0.5 - anchorY) * oh;
+          // Usar dimensões calculadas (fallback para info.size se necessário)
+          const currentWidth = scaledTexWidth || (info.size && info.size.w) || 0;
+          const currentHeight = scaledTexHeight || (info.size && info.size.h) || 0;
+
+          // CORRETA fórmula para objY dado anchorY:
+          // feetY = objY + (1 - anchorY) * height
+          // -> objY = feetY - (1 - anchorY) * height
+          const targetObjX = targetCenterX - (0.5 - anchorX) * currentWidth;
+          const targetObjY = targetFeetY - (1 - anchorY) * currentHeight;
 
           if (typeof obj.setX === "function") obj.setX(targetObjX);
           if (typeof obj.setY === "function") obj.setY(targetObjY);
 
+          // aplicar escala X se necessário (flip do lado)
           try {
             if (ro) {
               const wantScaleX = info.originalScaleX * (invertSideGlobal ? -1 : 1);
@@ -23265,32 +23292,50 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
               }
             }
           } catch(e){}
+
+          // verificação de debug
+          const newFeetY = targetObjY + (1 - anchorY) * currentHeight;
+          const newCenterX = targetObjX + (0.5 - anchorX) * currentWidth;
+          log(`Applied frame - TargetFeetY:${targetFeetY} ActualFeetY:${newFeetY} TargetCenterX:${targetCenterX} ActualCenterX:${newCenterX} pxToScene:${pixelToScene}`);
         } catch(e){
           console.error("Error applying frame to object:", e);
         }
       }
     }
 
+    // Aplicar frame inicial (idle)
     if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
       applyFrameToAllObjects(animations.idle.frames[0], animations.idle.offsets);
     }
 
     let rafHandle = null;
-    function clearAllTimeouts(){ if (state._idleBeatTimeout){ clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout=null; } if (state._returnToIdleTimeout){ clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout=null; } }
+    function clearAllTimeouts(){ 
+      if (state._idleBeatTimeout){ clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout=null; } 
+      if (state._returnToIdleTimeout){ clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout=null; } 
+    }
+    
     function tick(now){
-      const dt = Math.min(100, now - (state.lastTick || now)); state.lastTick = now;
+      const dt = Math.min(100, now - (state.lastTick || now)); 
+      state.lastTick = now;
+      
       let BFAnim = "";
       try {
         const sv = runtimeScene.getVariables();
         const gv = runtimeScene.getGame().getVariables();
         BFAnim = sv.has("BFAnim") ? sv.get("BFAnim").getAsString() : (gv.has("BFAnim") ? gv.get("BFAnim").getAsString() : "");
       } catch(e){}
+      
       if (BFAnim && BFAnim.trim() !== "" && BFAnim !== state.lastBFAnimValue){
         clearAllTimeouts();
         const key = mapBFAnimToKey(BFAnim, invertSideGlobal);
         if (animations[key] && animations[key].frames && animations[key].frames.length > 0){
-          state.current = key; state.frameIndex = 0; state.elapsed = 0; state._isPlayingSingAnimation = true;
-          const anim = animations[key]; applyFrameToAllObjects(anim.frames[0], anim.offsets); log("Started animation:", key);
+          state.current = key; 
+          state.frameIndex = 0; 
+          state.elapsed = 0; 
+          state._isPlayingSingAnimation = true;
+          const anim = animations[key]; 
+          applyFrameToAllObjects(anim.frames[0], anim.offsets); 
+          log("Started animation:", key);
         }
       }
       state.lastBFAnimValue = BFAnim;
@@ -23301,25 +23346,56 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         state.elapsed += dt;
         let frameChanged = false;
         while (state.elapsed >= msPerFrame && !frameChanged){
-          state.elapsed -= msPerFrame; state.frameIndex++; frameChanged = true;
+          state.elapsed -= msPerFrame; 
+          state.frameIndex++; 
+          frameChanged = true;
           if (state.frameIndex >= anim.frames.length){
-            if (anim.loop) state.frameIndex = 0;
-            else {
+            // Se for animação que deve dar loop
+            if (anim.loop){
+              // Se for idle, aguardar 1s antes de reiniciar
+              if (anim.name === "idle" || state.current === "idle"){
+                // manter no último frame e agendar restart após 1000ms (1s)
+                state.frameIndex = anim.frames.length - 1;
+                if (!state._idleBeatTimeout){
+                  state._idleBeatTimeout = setTimeout(()=>{
+                    state._idleBeatTimeout = null;
+                    // reinicia idle
+                    state.current = "idle";
+                    state.frameIndex = 0;
+                    state.elapsed = 0;
+                    if (animations.idle && animations.idle.frames && animations.idle.frames[0]){
+                      applyFrameToAllObjects(animations.idle.frames[0], animations.idle.offsets);
+                    }
+                    log("Idle loop restarted after 1s delay");
+                  }, 1000);
+                }
+              } else {
+                // comportamento normal de loop imediato para outras animações
+                state.frameIndex = 0;
+              }
+            } else {
+              // non-looping animation finished: keep last frame and schedule return to idle
               state.frameIndex = anim.frames.length - 1;
               if (state._isPlayingSingAnimation){
                 state._isPlayingSingAnimation = false;
                 if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
                 state._returnToIdleTimeout = setTimeout(()=>{
-                  state.current = "idle"; state.frameIndex = 0; state.elapsed = 0;
-                  if (animations.idle && animations.idle.frames[0]) applyFrameToAllObjects(animations.idle.frames[0], animations.idle.offsets);
-                  state._returnToIdleTimeout = null; log("Returned to idle after animation completion");
+                  state.current = "idle"; 
+                  state.frameIndex = 0; 
+                  state.elapsed = 0;
+                  if (animations.idle && animations.idle.frames[0]) {
+                    applyFrameToAllObjects(animations.idle.frames[0], animations.idle.offsets);
+                  }
+                  state._returnToIdleTimeout = null; 
+                  log("Returned to idle after animation completion");
                 }, 300);
               }
             }
           }
         }
         if (frameChanged){
-          const tex = anim.frames[state.frameIndex]; if (tex) applyFrameToAllObjects(tex, anim.offsets);
+          const tex = anim.frames[state.frameIndex]; 
+          if (tex) applyFrameToAllObjects(tex, anim.offsets);
         }
       }
 
@@ -23330,7 +23406,11 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     function cleanup(){
       if (rafHandle) cancelAnimationFrame(rafHandle);
       clearAllTimeouts();
-      try { for (const b of state._createdBlobUrls){ try{ URL.revokeObjectURL(b);}catch(e){} } } catch(e){}
+      try { 
+        for (const b of state._createdBlobUrls){ 
+          try{ URL.revokeObjectURL(b); }catch(e){} 
+        } 
+      } catch(e){}
       log("Player cleaned");
     }
 
@@ -23370,7 +23450,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       try { const r = await fetch("resources/manifestskins.json"); if (r.ok) manifest = await r.json(); } catch(e){}
       if (!manifest) {
         const cdnTry = buildCdnUrl(defaults.owner, defaults.repo, defaults.branch, "manifestskins.json");
-        try { const r2 = await fetch(cdnTry); if (r2.ok) manifest = await r2.json(); } catch(e){}
+        try { const r2 = await fetch(cdnTry); if (r2.ok) manifest = await r.json(); } catch(e){}
       }
       if (manifest && manifest._base) {
         const [ownerRepo, branch] = manifest._base.split("@");
@@ -23393,7 +23473,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         const pkg = await loadFromArrayBuffer(runtimeScene, arr);
         const inst = await applyPackageToScene(runtimeScene, pkg, opts);
 
-        // registra fonte do último zip aplicado (útil pra garantir que o JSON usado é deste ZIP)
         try {
           if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
           window.GD_SKIN_PLAYER.lastAppliedZipSource = c;
@@ -23418,12 +23497,23 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     return null;
   }
 
-  function cleanupGlobal(){ try { if (window[PLAYER_GLOBAL] && typeof window[PLAYER_GLOBAL].cleanup === "function") window[PLAYER_GLOBAL].cleanup(); } catch(e){} window[PLAYER_GLOBAL] = null; }
+  function cleanupGlobal(){ 
+    try { 
+      if (window[PLAYER_GLOBAL] && typeof window[PLAYER_GLOBAL].cleanup === "function") 
+        window[PLAYER_GLOBAL].cleanup(); 
+    } catch(e){} 
+    window[PLAYER_GLOBAL] = null; 
+  }
 
-  // expõe as funções principais
-  window.GD_SKIN_PLAYER = Object.assign(window.GD_SKIN_PLAYER || {}, { autoApplySelectedSkin, loadFromArrayBuffer, applyPackageToScene, cleanup: cleanupGlobal, lastDownloadedMetadata: window.GD_SKIN_PLAYER ? window.GD_SKIN_PLAYER.lastDownloadedMetadata : null });
+  window.GD_SKIN_PLAYER = Object.assign(window.GD_SKIN_PLAYER || {}, { 
+    autoApplySelectedSkin, 
+    loadFromArrayBuffer, 
+    applyPackageToScene, 
+    cleanup: cleanupGlobal, 
+    lastDownloadedMetadata: window.GD_SKIN_PLAYER ? window.GD_SKIN_PLAYER.lastDownloadedMetadata : null 
+  });
 
-  log("GD_SKIN_PLAYER ready. (Watcher file available at /mnt/data/watcher.txt if needed)");
+  log("GD_SKIN_PLAYER ready. (fixes Y to exact feet pixel + idle 1s gap)");
 
   (async ()=>{
     try {
@@ -23431,18 +23521,23 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       try { if (typeof runtimeScene !== "undefined") rs = runtimeScene; } catch(e){}
       if (!rs && window.__gd_runtimeScene_for_skin) rs = window.__gd_runtimeScene_for_skin;
       if (!rs) { log("player: no runtimeScene on load; waiting for manual call."); return; }
-      try { await window.GD_SKIN_PLAYER.autoApplySelectedSkin(rs, { extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } }); } catch(e){ warn("initial autoApply failed", e); }
+      try { 
+        await window.GD_SKIN_PLAYER.autoApplySelectedSkin(rs, { 
+          extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } 
+        }); 
+      } catch(e){ warn("initial autoApply failed", e); }
     } catch(e){}
   })();
 
 })();
+
 };
 gdjs.PlayCode.eventsList274 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayCode.userFunc0xdd9100(runtimeScene);
+gdjs.PlayCode.userFunc0x1a420f0(runtimeScene);
 
 }
 
@@ -23522,7 +23617,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1b38bc8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x13b3728 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -24403,7 +24498,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x1b38bc8(runtimeScene);
+gdjs.PlayCode.userFunc0x13b3728(runtimeScene);
 
 }
 
@@ -24803,9 +24898,10 @@ for (var i = 0, k = 0, l = gdjs.PlayCode.GDStatisticsObjects1.length;i<l;++i) {
 }
 gdjs.PlayCode.GDStatisticsObjects1.length = k;
 if (isConditionTrue_0) {
+gdjs.copyArray(runtimeScene.getObjects("BF"), gdjs.PlayCode.GDBFObjects1);
 /* Reuse gdjs.PlayCode.GDStatisticsObjects1 */
 {for(var i = 0, len = gdjs.PlayCode.GDStatisticsObjects1.length ;i < len;++i) {
-    gdjs.PlayCode.GDStatisticsObjects1[i].setBBText(runtimeScene.getGame().getVariables().getFromIndex(8).getAsString());
+    gdjs.PlayCode.GDStatisticsObjects1[i].setBBText(gdjs.evtTools.common.toString((( gdjs.PlayCode.GDBFObjects1.length === 0 ) ? 0 :gdjs.PlayCode.GDBFObjects1[0].getAABBBottom())));
 }
 }
 }

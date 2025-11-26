@@ -411,7 +411,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0xa8f778 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1b2f138 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
 (function () {
@@ -1564,13 +1564,13 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xa8f778(runtimeScene);
+gdjs.InicioCode.userFunc0x1b2f138(runtimeScene);
 
 }
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDHardObjects1Objects = Hashtable.newFrom({"Hard": gdjs.InicioCode.GDHardObjects1});
-gdjs.InicioCode.userFunc0x191d618 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1a02c58 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão responsiva + touch-scroll para lista de skins + botão RESET)
 (async function(runtimeScene) {
@@ -2110,7 +2110,7 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x191d618(runtimeScene);
+gdjs.InicioCode.userFunc0x1a02c58(runtimeScene);
 
 }
 
