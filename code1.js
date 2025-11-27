@@ -411,15 +411,16 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1b2f138 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1684c68 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios)
+// SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
   if (document.getElementById("gdjs-mod-list-ui-final")) return;
 
   // --- REPO STORAGE / HELPERS ---
   const REPO_STORAGE_KEY = "gdjs_repo_list_v1";
   const ACTIVE_REPO_KEY = "gdjs_active_repo_id_v1";
+  const FAVORITES_STORAGE_KEY = "gdjs_fav_songs_v1";
 
   function defaultRepoEntry() {
     return { id: "official", name: "oficial (LucyYuih/gdev-custom-charts)", owner: "LucyYuih", repo: "gdev-custom-skins", branch: "main", enabled: true };
@@ -682,6 +683,51 @@ if (true) {
   let songsList = [];
   let modElementMap = {};
   let songElementMap = {};
+  let favorites = loadFavorites(); // array of { path, name, repoId }
+
+  // --- Favorites helpers ---
+  function loadFavorites() {
+    try {
+      const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+      if (!raw) return [];
+      return JSON.parse(raw) || [];
+    } catch(e){ return []; }
+  }
+  function saveFavorites() {
+    try { localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites || [])); } catch(e){}
+    // also push to game variable so "entra no jogo ja com eles"
+    try {
+      if (window.runtimeScene && window.runtimeScene.getGame) {
+        runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || []));
+      }
+    } catch(e){}
+  }
+  function isFavorite(path) {
+    if (!path) return false;
+    return favorites.some(f => f.path === path);
+  }
+  function addFavorite(path, name) {
+    if (!path) return;
+    if (isFavorite(path)) return;
+    const entry = { path: path, name: name || basenameNoExt(path.split("/").pop()||path), repoId: getActiveRepo().id || null };
+    favorites.push(entry);
+    saveFavorites();
+  }
+  function removeFavorite(path) {
+    if (!path) return;
+    favorites = (favorites || []).filter(f => f.path !== path);
+    saveFavorites();
+  }
+  function toggleFavorite(path, name) {
+    if (isFavorite(path)) removeFavorite(path);
+    else addFavorite(path, name);
+    // refresh UI icon for this song item if exists
+    if (songElementMap[path] && songElementMap[path].favIcon) {
+      try { songElementMap[path].favIcon.textContent = isFavorite(path) ? "★" : "☆"; } catch(e){}
+    }
+    // If Favorites pane open, refresh
+    if (currentModPath === "__favorites__") openMod("__favorites__");
+  }
 
   // --- REPO UI / MANAGEMENT ---
   function renderRepoSelect() {
@@ -828,6 +874,26 @@ if (true) {
   function renderModsList(items) {
     leftPane.innerHTML = "";
     modElementMap = {};
+    // Insert Favorites fake item as first entry
+    const favCount = (favorites || []).length;
+    const favRow = document.createElement("div");
+    Object.assign(favRow.style, {
+      padding: "10px",
+      borderRadius: "8px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: "8px",
+      marginBottom: "8px",
+      cursor: "pointer",
+      background: "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))"
+    });
+    const leftFav = document.createElement("div"); leftFav.style.display = "flex"; leftFav.style.flexDirection = "column"; leftFav.innerHTML = `<div style="font-weight:600">Favorites</div><div style="font-size:12px;opacity:0.8">${favCount} músicas</div>`;
+    favRow.appendChild(leftFav);
+    favRow.onclick = ()=> openMod("__favorites__");
+    leftPane.appendChild(favRow);
+    modElementMap["__favorites__"] = { element: favRow, data: { name: "Favorites", path: "__favorites__" } };
+
     if (!items || items.length === 0) { const e = document.createElement("div"); e.textContent = "Nenhum mod encontrado."; e.style.opacity = "0.8"; leftPane.appendChild(e); return; }
     for (const item of items) {
       const row = document.createElement("div");
@@ -877,12 +943,21 @@ if (true) {
     for (const item of items) {
       const row = document.createElement("div");
       Object.assign(row.style, { padding: "10px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", marginBottom: "8px", background: "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))" });
-      const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div><div style="font-size:12px;opacity:0.8">${item.path}</div>`;
-      const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px";
+      // left column: name only (removed path below name)
+      const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div>`;
+      const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px"; right.style.alignItems = "center";
+      // star favorite icon
+      const favIcon = document.createElement("div");
+      favIcon.textContent = isFavorite(item.path) ? "★" : "☆";
+      favIcon.title = isFavorite(item.path) ? "Remover dos favoritos" : "Adicionar aos favoritos";
+      Object.assign(favIcon.style, { cursor: "pointer", fontSize: "18px", userSelect: "none" });
+      favIcon.onclick = (ev) => { ev.stopPropagation(); toggleFavorite(item.path, item.name); };
+      // action buttons container
       const checkBtn = document.createElement("button"); checkBtn.textContent = "Checando..."; checkBtn.disabled = true; checkBtn.style.padding="6px"; checkBtn.style.borderRadius="6px";
+      right.appendChild(favIcon);
       right.appendChild(checkBtn);
       row.appendChild(left); row.appendChild(right); rightPane.appendChild(row);
-      songElementMap[item.path] = { element: row, data: item, rightContainer: right, placeholderBtn: checkBtn, name: item.name };
+      songElementMap[item.path] = { element: row, data: item, rightContainer: right, placeholderBtn: checkBtn, name: item.name, favIcon: favIcon };
     }
     startBackgroundCheckOnSongs(items);
   }
@@ -942,9 +1017,16 @@ if (true) {
     const right = el.rightContainer; right.innerHTML = "";
     const itemName = el.name || path.split("/").pop();
 
+    // favorite icon (recreate to keep consistent)
+    const favIcon = document.createElement("div");
+    favIcon.textContent = isFavorite(path) ? "★" : "☆";
+    favIcon.title = isFavorite(path) ? "Remover dos favoritos" : "Adicionar aos favoritos";
+    Object.assign(favIcon.style, { cursor: "pointer", fontSize: "18px", userSelect: "none" });
+    favIcon.onclick = (ev) => { ev.stopPropagation(); toggleFavorite(path, itemName); };
+
     if (hasSubdirs) {
       const pickBtn = document.createElement("button"); pickBtn.textContent = "Selecionar difficulty"; pickBtn.style.padding="6px"; pickBtn.style.borderRadius="6px";
-      pickBtn.onclick = async ()=>{
+      pickBtn.onclick = async ()=>{ 
         try {
           setStatus("Carregando difficulties de " + itemName + "...");
           const activeRepo = getActiveRepo();
@@ -954,12 +1036,16 @@ if (true) {
           setStatus("");
         } catch(e){ setStatus("Erro listando difficulties."); }
       };
+      right.appendChild(favIcon);
       right.appendChild(pickBtn);
     } else {
       const dlBtn = document.createElement("button"); dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px";
       dlBtn.onclick = ()=> downloadSongFolder(path);
+      right.appendChild(favIcon);
       right.appendChild(dlBtn);
     }
+    // update map ref
+    if (songElementMap[path]) songElementMap[path].favIcon = favIcon;
   }
 
   async function fetchSubdirsUsingEntry(entry, folderPath) {
@@ -1006,8 +1092,10 @@ if (true) {
       currentModPath = "";
       renderModsList(modsList);
       renderSongsList([]);
-      setStatus(((path||"Mods")) + ` — ${modsList.length}`);
+      setStatus(((path||"Mods")) + ` — ${modsList.length} pastas`);
       setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10);
+      // update saved favorites variable in runtime scene
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || [])); } catch(e){}
     } catch (err) {
       modsList = []; renderModsList(modsList);
       setStatus("Erro carregando pasta: " + (err && err.message ? err.message : err));
@@ -1018,6 +1106,16 @@ if (true) {
     try {
       setStatus("Abrindo " + path + "...");
       currentModPath = path;
+
+      // Special handling for Favorites
+      if (path === "__favorites__") {
+        const items = (favorites || []).map(f => ({ name: f.name || basenameNoExt(f.path.split("/").pop()||f.path), path: f.path }));
+        songsList = items;
+        renderSongsList(songsList);
+        setStatus(`Favorites — ${songsList.length} músicas`);
+        return;
+      }
+
       const activeRepo = getActiveRepo();
       const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
       let items = [];
@@ -1123,10 +1221,7 @@ if (true) {
       try {
         const files = await getFilesFromManifest(p);
         if (!files) return [];
-        return files.filter(e => isAudioFile(e.name)).map(e => ({ 
-          name: e.name, 
-          url: e.url 
-        }));
+        return files.filter(e => isAudioFile(e.name)).map(e => ({ name: e.name, url: e.url }));
       } catch(e){}
       return [];
     }
@@ -1394,9 +1489,9 @@ if (true) {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
 
       setStatus("Listando arquivos em " + folderPath + "...");
-      
+
       let files = await getFilesFromManifest(folderPath);
-      
+
       if (!files) {
         // Fallback para GitHub API
         const activeRepo = getActiveRepo();
@@ -1416,7 +1511,7 @@ if (true) {
       if (!Array.isArray(files) || files.length === 0) { setStatus("Pasta vazia."); return; }
 
       window.gdjsCustomAudio = window.gdjsCustomAudio || {};
-      window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || {audios:{}, rawFiles:{}};
+      window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || {audios:{}, rawFiles:{}}; 
       const dest = window.gdjsCustomAudio[folderPath];
 
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath); } catch(e){}
@@ -1528,25 +1623,85 @@ if (true) {
   btnManage.onclick = ()=> showRepoManagerModal();
   btnCache.onclick = ()=> showCacheManager();
   btnRefresh.onclick = async ()=> {
-    try { setStatus("Atualizando..."); } catch(e){}
-    try { for (const it of modsList) delete hasSubCache[it.path]; } catch(e){}
-    try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
-    await loadFolder(currentModPath || "");
-  };
+  try { setStatus("Atualizando..."); } catch(e){}
+  try { for (const it of modsList) delete hasSubCache[it.path]; } catch(e){}
+  try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
 
-  repoSelect.onchange = ()=> {
-    try { setActiveRepoById(repoSelect.value); } catch(e){}
-    Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]);
-    loadFolder("");
-  };
+  // guarda qual mod estava aberto antes do refresh
+  const prevOpen = currentModPath;
 
+  // Recarrega a lista raiz (evita transformar songs em mods)
+  await loadFolder("");
+
+  // tenta reabrir o mod antigo (se ainda existir)
+  try {
+    if (prevOpen && prevOpen === "__favorites__") {
+      openMod("__favorites__");
+    } else if (prevOpen) {
+      // pequeno delay para garantir que modsList foi populada
+      setTimeout(()=>{
+        try {
+          const found = modsList.find(m => m.path === prevOpen);
+          if (found) openMod(prevOpen);
+        } catch(e){}
+      }, 60);
+    }
+  } catch(e){}
+};
+
+// Substitua o handler de troca de repo (repoSelect.onchange) por este
+repoSelect.onchange = ()=> {
+  try { setActiveRepoById(repoSelect.value); } catch(e){}
+  try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
+  const prevOpen = currentModPath;
+  // recarrega raiz e tenta reabrir o mod (se existir)
+  loadFolder("").then(()=>{
+    try {
+      if (prevOpen && prevOpen === "__favorites__") {
+        openMod("__favorites__");
+      } else if (prevOpen) {
+        const found = modsList.find(m => m.path === prevOpen);
+        if (found) openMod(prevOpen);
+      }
+    } catch(e){}
+  }).catch(()=>{});
+};
+
+  // SEARCH: agora impacta ambas as listas
   searchInput.addEventListener("input", ()=> {
     const q = searchInput.value.trim().toLowerCase();
-    if (!q) { renderModsList(modsList); setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`); setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10); return; }
-    const filtered = modsList.filter(it => it.name.toLowerCase().includes(q));
-    renderModsList(filtered);
-    setStatus(`Resultado: ${filtered.length} / ${modsList.length}`);
-    setTimeout(()=> startBackgroundCheckOnSongs(filtered), 10);
+    if (!q) {
+      renderModsList(modsList);
+      setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`);
+      // if a mod is open, re-open it to show all songs
+      if (currentModPath) {
+        if (currentModPath === "__favorites__") openMod("__favorites__");
+        else openMod(currentModPath);
+      } else {
+        renderSongsList([]);
+      }
+      setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10);
+      return;
+    }
+    // filter mods by name
+    const filteredMods = modsList.filter(it => (it.name || "").toLowerCase().includes(q));
+    renderModsList(filteredMods);
+    // also filter songs: if a mod is selected, filter its songs; if favorites selected, filter favorites
+    if (currentModPath === "__favorites__") {
+      const favItems = (favorites || []).map(f => ({ name: f.name || basenameNoExt(f.path.split("/").pop()||f.path), path: f.path }));
+      const filteredSongs = favItems.filter(s => (s.name || "").toLowerCase().includes(q));
+      renderSongsList(filteredSongs);
+      setStatus(`Resultado: ${filteredSongs.length} / ${favItems.length} (favorites)`);
+    } else if (currentModPath) {
+      // filter songsList (if current open)
+      const filteredSongs = (songsList || []).filter(s => (s.name || "").toLowerCase().includes(q));
+      renderSongsList(filteredSongs);
+      setStatus(`Resultado: ${filteredSongs.length} / ${songsList.length}`);
+      setTimeout(()=> startBackgroundCheckOnSongs(filteredSongs), 10);
+    } else {
+      // no mod open: just inform mods results
+      setStatus(`Resultado: ${filteredMods.length} / ${modsList.length} pastas`);
+    }
   });
 
   (function init() {
@@ -1554,23 +1709,26 @@ if (true) {
     if (!list || list.length === 0) { saveRepoList([defaultRepoEntry()]); }
     renderRepoSelect();
     loadFolder("");
+    // expose runtimeScene if exists
+    try { if (typeof runtimeScene !== "undefined") window.runtimeScene = runtimeScene; } catch(e){}
+    // push favorites to runtime variable on init
+    try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || [])); } catch(e){}
   })();
 
-  try { if (typeof runtimeScene !== "undefined") window.runtimeScene = runtimeScene; } catch(e){}
 })();
+
 };
 gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0x1b2f138(runtimeScene);
+gdjs.InicioCode.userFunc0x1684c68(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDHardObjects1Objects = Hashtable.newFrom({"Hard": gdjs.InicioCode.GDHardObjects1});
-gdjs.InicioCode.userFunc0x1a02c58 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xd39030 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão responsiva + touch-scroll para lista de skins + botão RESET)
 (async function(runtimeScene) {
@@ -2110,7 +2268,7 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1a02c58(runtimeScene);
+gdjs.InicioCode.userFunc0xd39030(runtimeScene);
 
 }
 
@@ -2148,7 +2306,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.asyncCallback33889684 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33902820 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(63), null);
 }
@@ -2162,7 +2320,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33889684, gdjs.InicioCode.asyncCallback33889684);
+gdjs.InicioCode.idToCallbackMap.set(33902820, gdjs.InicioCode.asyncCallback33902820);
 gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 
 {
@@ -2172,7 +2330,7 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback33889684(runtimeScene, asyncObjectsList)), 33889684, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback33902820(runtimeScene, asyncObjectsList)), 33902820, asyncObjectsList);
 }
 }
 
@@ -2337,14 +2495,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback33918420 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33931172 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
 gdjs.InicioCode.eventsList14(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33918420, gdjs.InicioCode.asyncCallback33918420);
+gdjs.InicioCode.idToCallbackMap.set(33931172, gdjs.InicioCode.asyncCallback33931172);
 gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 
 {
@@ -2354,20 +2512,20 @@ gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33918420(runtimeScene, asyncObjectsList)), 33918420, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33931172(runtimeScene, asyncObjectsList)), 33931172, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback33927508 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33940404 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33927508, gdjs.InicioCode.asyncCallback33927508);
+gdjs.InicioCode.idToCallbackMap.set(33940404, gdjs.InicioCode.asyncCallback33940404);
 gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 
 {
@@ -2377,14 +2535,14 @@ gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback33927508(runtimeScene, asyncObjectsList)), 33927508, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback33940404(runtimeScene, asyncObjectsList)), 33940404, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback33933052 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback33945948 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 
@@ -2394,7 +2552,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPoin
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33933052, gdjs.InicioCode.asyncCallback33933052);
+gdjs.InicioCode.idToCallbackMap.set(33945948, gdjs.InicioCode.asyncCallback33945948);
 gdjs.InicioCode.eventsList17 = function(runtimeScene) {
 
 {
@@ -2405,7 +2563,7 @@ gdjs.InicioCode.eventsList17 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33933052(runtimeScene, asyncObjectsList)), 33933052, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33945948(runtimeScene, asyncObjectsList)), 33945948, asyncObjectsList);
 }
 }
 
@@ -2423,7 +2581,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33930532);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33943428);
 }
 }
 if (isConditionTrue_0) {
@@ -2459,7 +2617,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33933132);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33946028);
 }
 }
 if (isConditionTrue_0) {
@@ -2472,166 +2630,6 @@ gdjs.InicioCode.eventsList17(runtimeScene);} //End of subevents
 
 
 };gdjs.InicioCode.eventsList19 = function(runtimeScene) {
-
-{
-
-gdjs.copyArray(runtimeScene.getObjects("Hard"), gdjs.InicioCode.GDHardObjects2);
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(46).getAsString() == "Hard");
-}
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects2.length;i<l;++i) {
-    if ( gdjs.InicioCode.GDHardObjects2[i].getBehavior("Opacity").getOpacity() != 155 ) {
-        isConditionTrue_0 = true;
-        gdjs.InicioCode.GDHardObjects2[k] = gdjs.InicioCode.GDHardObjects2[i];
-        ++k;
-    }
-}
-gdjs.InicioCode.GDHardObjects2.length = k;
-}
-if (isConditionTrue_0) {
-/* Reuse gdjs.InicioCode.GDHardObjects2 */
-{for(var i = 0, len = gdjs.InicioCode.GDHardObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDHardObjects2[i].getBehavior("Opacity").setOpacity(155);
-}
-}
-{/* Unknown object - skipped. */}
-{/* Unknown object - skipped. */}
-}
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(46).getAsString() == "Erect");
-}
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-/* Unknown object - skipped. */}
-if (isConditionTrue_0) {
-gdjs.copyArray(runtimeScene.getObjects("Hard"), gdjs.InicioCode.GDHardObjects2);
-{for(var i = 0, len = gdjs.InicioCode.GDHardObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDHardObjects2[i].getBehavior("Opacity").setOpacity(255);
-}
-}
-{/* Unknown object - skipped. */}
-{/* Unknown object - skipped. */}
-}
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(46).getAsString() == "Pico");
-}
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-/* Unknown object - skipped. */}
-if (isConditionTrue_0) {
-gdjs.copyArray(runtimeScene.getObjects("Hard"), gdjs.InicioCode.GDHardObjects2);
-{for(var i = 0, len = gdjs.InicioCode.GDHardObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDHardObjects2[i].getBehavior("Opacity").setOpacity(255);
-}
-}
-{/* Unknown object - skipped. */}
-{/* Unknown object - skipped. */}
-}
-
-}
-
-
-{
-
-gdjs.copyArray(runtimeScene.getObjects("Hard"), gdjs.InicioCode.GDHardObjects2);
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects2.length;i<l;++i) {
-    if ( gdjs.InicioCode.GDHardObjects2[i].getBehavior("MultitouchButton").IsPressed(null) ) {
-        isConditionTrue_0 = true;
-        gdjs.InicioCode.GDHardObjects2[k] = gdjs.InicioCode.GDHardObjects2[i];
-        ++k;
-    }
-}
-gdjs.InicioCode.GDHardObjects2.length = k;
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects2.length;i<l;++i) {
-    if ( gdjs.InicioCode.GDHardObjects2[i].isVisible() ) {
-        isConditionTrue_0 = true;
-        gdjs.InicioCode.GDHardObjects2[k] = gdjs.InicioCode.GDHardObjects2[i];
-        ++k;
-    }
-}
-gdjs.InicioCode.GDHardObjects2.length = k;
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33953204);
-}
-}
-}
-if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(46).setString("Hard");
-}
-}
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-/* Unknown object - skipped. */if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-/* Unknown object - skipped. */if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33954660);
-}
-}
-}
-if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(46).setString("Erect");
-}
-}
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-/* Unknown object - skipped. */if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-/* Unknown object - skipped. */if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33956060);
-}
-}
-}
-if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(46).setString("Pico");
-}
-}
-
-}
-
-
-};gdjs.InicioCode.eventsList20 = function(runtimeScene) {
 
 {
 
@@ -2697,7 +2695,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33886332);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33899236);
 }
 }
 if (isConditionTrue_0) {
@@ -2715,10 +2713,17 @@ gdjs.copyArray(runtimeScene.getObjects("Hard"), gdjs.InicioCode.GDHardObjects1);
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.evtTools.input.cursorOnObject(gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDHardObjects1Objects, runtimeScene, true, false);
+for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects1.length;i<l;++i) {
+    if ( gdjs.InicioCode.GDHardObjects1[i].getBehavior("MultitouchButton").IsJustPressed(null) ) {
+        isConditionTrue_0 = true;
+        gdjs.InicioCode.GDHardObjects1[k] = gdjs.InicioCode.GDHardObjects1[i];
+        ++k;
+    }
+}
+gdjs.InicioCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33872500);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33888020);
 }
 }
 if (isConditionTrue_0) {
@@ -2787,7 +2792,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33879348);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33902700);
 }
 }
 if (isConditionTrue_0) {
@@ -2930,10 +2935,6 @@ if (isConditionTrue_0) {
 }
 {for(var i = 0, len = gdjs.InicioCode.GDOppIconObjects2.length ;i < len;++i) {
     gdjs.InicioCode.GDOppIconObjects2[i].getBehavior("Animation").setAnimationName(((gdjs.InicioCode.GDbegfontObjects2.length === 0 ) ? gdjs.VariablesContainer.badVariablesContainer : gdjs.InicioCode.GDbegfontObjects2[0].getVariables()).getFromIndex(2).getAsString());
-}
-}
-{for(var i = 0, len = gdjs.InicioCode.GDOppIconObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDOppIconObjects2[i].returnVariable(gdjs.InicioCode.GDOppIconObjects2[i].getVariables().get("Name")).setString(((gdjs.InicioCode.GDbegfontObjects2.length === 0 ) ? gdjs.VariablesContainer.badVariablesContainer : gdjs.InicioCode.GDbegfontObjects2[0].getVariables()).getFromIndex(2).getAsString());
 }
 }
 
@@ -3099,7 +3100,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33916708);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33929460);
 }
 }
 }
@@ -3161,7 +3162,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33923868);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33936764);
 }
 }
 if (isConditionTrue_0) {
@@ -3232,7 +3233,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33928884);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33941780);
 }
 }
 if (isConditionTrue_0) {
@@ -3262,7 +3263,7 @@ gdjs.InicioCode.eventsList18(runtimeScene);
 {
 
 
-gdjs.InicioCode.eventsList19(runtimeScene);
+
 }
 
 
@@ -3309,7 +3310,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33958868);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33971764);
 }
 }
 if (isConditionTrue_0) {
@@ -3616,7 +3617,7 @@ gdjs.InicioCode.GDStatistics2Objects3.length = 0;
 gdjs.InicioCode.GDStatistics2Objects4.length = 0;
 gdjs.InicioCode.GDStatistics2Objects5.length = 0;
 
-gdjs.InicioCode.eventsList20(runtimeScene);
+gdjs.InicioCode.eventsList19(runtimeScene);
 gdjs.InicioCode.GDBackObjects1.length = 0;
 gdjs.InicioCode.GDBackObjects2.length = 0;
 gdjs.InicioCode.GDBackObjects3.length = 0;
