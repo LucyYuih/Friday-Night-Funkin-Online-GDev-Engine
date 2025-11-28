@@ -9,7 +9,7 @@ gdjs.evtsExt__AudioByName__PreloadSoundByName = {};
 gdjs.evtsExt__AudioByName__PreloadSoundByName.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__AudioByName__PreloadSoundByName.userFunc0x1b759b0 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__AudioByName__PreloadSoundByName.userFunc0x11f1350 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 const soundManager = runtimeScene.getGame().getSoundManager();
 soundManager.loadAudio(
@@ -21,7 +21,7 @@ gdjs.evtsExt__AudioByName__PreloadSoundByName.eventsList0 = function(runtimeScen
 {
 
 
-gdjs.evtsExt__AudioByName__PreloadSoundByName.userFunc0x1b759b0(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__AudioByName__PreloadSoundByName.userFunc0x11f1350(runtimeScene, eventsFunctionContext);
 
 }
 
