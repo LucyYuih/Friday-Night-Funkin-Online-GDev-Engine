@@ -384,6 +384,8 @@ isConditionTrue_0 = !(gdjs.evtTools.sound.isSoundOnChannelPlaying(runtimeScene, 
 if (isConditionTrue_0) {
 {gdjs.evtTools.sound.playSoundOnChannel(runtimeScene, "freakyMenu.aac", 1, true, 80, 1);
 }
+{gdjs.evtTools.sound.setGlobalVolume(runtimeScene, 100);
+}
 }
 
 }
@@ -411,7 +413,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0xfa73c0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1a8f048 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -1723,17 +1725,18 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
+gdjs.InicioCode.userFunc0x1a8f048(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xfa68f8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x179c470 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_loader.js (versão responsiva + touch-scroll para lista de skins + botão RESET)
+// skin_loader.js (versão com suporte BF/Opponent + loading modal)
 (async function(runtimeScene) {
   const MANIFEST_NAME = "manifestskins.json";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
+  
   function log(...s){ console.log("[skin-loader]", ...s); }
   function warn(...s){ console.warn("[skin-loader]", ...s); }
 
@@ -1774,8 +1777,53 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
     throw new Error("All loader fetch attempts failed: " + (lastErr ? lastErr.message : "unknown"));
   }
 
+  function createLoadingModal() {
+    const modal = document.createElement("div");
+    modal.id = "skin-download-loading";
+    modal.style.cssText = `
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85); 
+      display: flex; align-items: center; justify-content: center; 
+      z-index: 100000; color: white; font-family: Arial, sans-serif;
+      flex-direction: column; gap: 16px;
+    `;
+    
+    const spinner = document.createElement("div");
+    spinner.style.cssText = `
+      width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3);
+      border-radius: 50%; border-top-color: #1976d2; animation: spin 1s linear infinite;
+    `;
+    
+    const text = document.createElement("div");
+    text.textContent = "Baixando skin...";
+    text.style.fontSize = "16px";
+    
+    modal.appendChild(spinner);
+    modal.appendChild(text);
+    
+    const style = document.createElement("style");
+    style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
+    document.head.appendChild(style);
+    
+    return modal;
+  }
+
+  function showLoadingModal() {
+    const existing = document.getElementById("skin-download-loading");
+    if (existing) return existing;
+    
+    const modal = createLoadingModal();
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function hideLoadingModal() {
+    const modal = document.getElementById("skin-download-loading");
+    if (modal && modal.parentNode) {
+      modal.parentNode.removeChild(modal);
+    }
+  }
+
   function createModal(defaultOwner="LucyYuih", defaultRepo="gdev-custom-skins", defaultBranch="main") {
-    // CSS responsivo: usa grid, unidades relativas, media queries e touch-scrolling.
     const css = `
       :root {
         --modal-gap: 12px;
@@ -1800,7 +1848,6 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
         box-shadow: 0 12px 32px rgba(0,0,0,0.6);
       }
 
-      /* small screens: left column collapses on top */
       @media (max-width: 720px) {
         .skin-panel { grid-template-columns: 1fr; height: calc(100vh - 36px); width: 100%; border-radius: 8px; }
         .skin-left { order: 0; height: auto; max-height: 160px; overflow:auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.04); padding:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
@@ -1822,6 +1869,8 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
       .skin-controls { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
       .skin-btn { padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px; }
       .skin-btn:disabled { opacity:0.45; cursor:default; }
+      .skin-btn.opponent { background: #d32f2f; }
+      .skin-btn.bf { background: #1976d2; }
 
       .cdn-inputs { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
       .cdn-inputs input { background: #0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px; border-radius:6px; min-width:100px; box-sizing:border-box; font-size:13px; }
@@ -1834,14 +1883,12 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
       .skin-card { width: clamp(110px, 22%, 160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; -webkit-user-select: none; user-select: none; }
       .skin-card img { width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none; }
       .skin-card .label { font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-      .skin-card .card-footer { display:flex; gap:6px; justify-content:center; align-items:center; }
-      .skin-card button.skin-btn { padding:6px 8px; font-size:12px; border-radius:6px; }
+      .skin-card .card-footer { display:flex; gap:6px; justify-content:center; align-items:center; flex-direction: column; }
+      .skin-card button.skin-btn { padding:6px 8px; font-size:12px; border-radius:6px; width: 100%; }
 
-      /* scrollbars: subtle */
       .skin-left::-webkit-scrollbar, .skin-list::-webkit-scrollbar, .skin-right::-webkit-scrollbar { height:8px; width:8px; }
       .skin-left::-webkit-scrollbar-thumb, .skin-list::-webkit-scrollbar-thumb, .skin-right::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.04); border-radius:8px; }
 
-      /* small tweaks */
       .note-small { color:#9aa; font-size:12px; }
       .skin-info-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     `;
@@ -1859,7 +1906,6 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
     const leftList = document.createElement("div"); leftList.className = "skin-left-list";
     const right = document.createElement("div"); right.className = "skin-right";
 
-    // left header (with toggle for small screens)
     const leftHeader = document.createElement("div"); leftHeader.className = "skin-left-header";
     const leftTitle = document.createElement("div"); leftTitle.textContent = "Mods"; leftTitle.style.fontWeight = "700";
     const toggleBtn = document.createElement("button"); toggleBtn.className = "skin-toggle-btn"; toggleBtn.textContent = "Toggle";
@@ -1867,7 +1913,6 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
     left.appendChild(leftHeader);
     left.appendChild(leftList);
 
-    // right top: title, cdn inputs, controls
     const top = document.createElement("div"); top.className = "skin-top";
     const titleRow = document.createElement("div"); titleRow.className = "skin-title-row";
     const title = document.createElement("div"); title.className = "skin-title"; title.textContent = "Skins";
@@ -1891,7 +1936,6 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
     right.appendChild(top); right.appendChild(info); right.appendChild(skinListWrap);
     panel.appendChild(left); panel.appendChild(right); modal.appendChild(panel); document.body.appendChild(modal);
 
-    // return elements for external use
     return {
       modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls
     };
@@ -1920,11 +1964,9 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
     const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl, controlsEl } = ui;
     let currentMod = null; let thumbsCache = {}; let downloading = false;
 
-    // prevent background scroll while modal open
     const prevOverflow = document.documentElement.style.overflow;
     try { document.documentElement.style.overflow = 'hidden'; } catch(e){}
 
-    // add passive touch listeners so touch scrolling isn't blocked by JS
     [leftList, skinListWrap, right, left].forEach(el => {
       try {
         if (!el) return;
@@ -1933,13 +1975,12 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
       } catch(e){}
     });
 
-    // Add "Reset Selected" button to controls
     const resetSelectedBtn = document.createElement("button");
     resetSelectedBtn.className = "skin-btn";
     resetSelectedBtn.textContent = "Reset Selected";
     resetSelectedBtn.title = "Remove SelectedSkin do cache/localStorage e rebaixa se possível";
     resetSelectedBtn.onclick = async () => {
-      if (downloading) { alert("Operação em progresso. Aguarde."); return; }
+      if (downloading) return;
       try {
         let selStr = null;
         try {
@@ -1947,19 +1988,16 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
           if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString();
         } catch(e){}
         if ((!selStr || selStr.trim()==="") && window.localStorage) selStr = localStorage.getItem("gd_selected_skin");
-        if (!selStr) { alert("Nenhum SelectedSkin encontrado."); return; }
+        if (!selStr) return;
         const parsed = JSON.parse(selStr);
-        if (!parsed || (!parsed.zip && !parsed.zip_cdn)) { alert("SelectedSkin não contém referência de zip para rebaixar."); return; }
-        // attempt reset
+        if (!parsed || (!parsed.zip && !parsed.zip_cdn)) return;
         await resetAndRedownload(parsed.mod || parsed.modName || "", { name: parsed.name || "", zip: parsed.zip || parsed.zip_cdn }, true);
       } catch(e){
         console.error("Reset Selected failed:", e);
-        alert("Falha ao resetar selected: " + (e && e.message ? e.message : e));
       }
     };
     controlsEl.insertBefore(resetSelectedBtn, controlsEl.firstChild);
 
-    // build left mod list
     const mods = manifest[""] || [];
     if (!Array.isArray(mods) || mods.length === 0) {
       const no = Object.assign(document.createElement("div"), { textContent: "No mods found", style: "color:#aaa; padding:8px;" });
@@ -1968,13 +2006,11 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
       for (const m of mods) {
         const el=document.createElement("div"); el.className="skin-mod"; el.textContent=m;
         el.onclick=()=>selectMod(m);
-        // make sure mod items don't capture dragging
         el.addEventListener('touchstart', ()=>{}, {passive:true});
         leftList.appendChild(el);
       }
     }
 
-    // toggle button for small screens: hide/show left column
     let leftHidden = false;
     function setLeftHidden(hide){
       leftHidden = !!hide;
@@ -1987,16 +2023,15 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
     toggleBtn.onclick = ()=> setLeftHidden(!leftHidden);
     window.addEventListener('resize', ()=> { if (window.innerWidth > 720) left.style.display = 'block'; else if (leftHidden) left.style.display='none'; });
 
-    closeBtn.onclick = () => { if (downloading) { alert("Download em progresso — aguarde."); return; } cleanupAndRemove(); };
+    closeBtn.onclick = () => { if (downloading) return; cleanupAndRemove(); };
 
-    // close on Esc
     function onKeyDown(e){ if (e.key === 'Escape') { closeBtn.click(); } }
     window.addEventListener('keydown', onKeyDown);
 
     function unloadModThumbs(modName){ const arr = thumbsCache[modName]; if (!arr) return; for (const it of arr) { if (it.blobUrl) try{URL.revokeObjectURL(it.blobUrl)}catch(e){} } delete thumbsCache[modName]; log("Unloaded thumbs for",modName); }
 
     async function selectMod(modName){
-      if (downloading) { alert("Operação em progresso. Aguarde."); return; }
+      if (downloading) return;
       if (currentMod === modName) return;
       if (currentMod) unloadModThumbs(currentMod);
       currentMod = modName; skinListWrap.innerHTML=""; info.textContent="Carregando skins...";
@@ -2008,28 +2043,37 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
       const cdnBase={ owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
       for (const sk of skins){
         const card=document.createElement("div"); card.className="skin-card";
-        const img=document.createElement("img"); img.alt=sk.name; img.src=""; img.draggable = false; // prevent image drag
+        const img=document.createElement("img"); img.alt=sk.name; img.src=""; img.draggable = false;
         const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=sk.name;
         const footer = document.createElement("div"); footer.className="card-footer";
-        const applyBtn = document.createElement("button"); applyBtn.className="skin-btn"; applyBtn.textContent="Aplicar agora";
-        applyBtn.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk); };
+        
+        const applyBtnBF = document.createElement("button"); 
+        applyBtnBF.className = "skin-btn bf"; 
+        applyBtnBF.textContent = "BF";
+        applyBtnBF.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "BF"); };
 
-        const resetBtn = document.createElement("button"); resetBtn.className="skin-btn"; resetBtn.textContent="Reset";
+        const applyBtnOpp = document.createElement("button"); 
+        applyBtnOpp.className = "skin-btn opponent"; 
+        applyBtnOpp.textContent = "Opponent";
+        applyBtnOpp.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "Opponent"); };
+
+        const resetBtn = document.createElement("button"); 
+        resetBtn.className = "skin-btn"; 
+        resetBtn.textContent = "Reset";
         resetBtn.title = "Apaga cache/localStorage relacionado e rebaixa o .zip";
         resetBtn.onclick = (ev)=> { ev.stopPropagation(); resetAndRedownload(modName, sk, false); };
 
-        footer.appendChild(applyBtn);
+        footer.appendChild(applyBtnBF);
+        footer.appendChild(applyBtnOpp);
         footer.appendChild(resetBtn);
         card.appendChild(img); card.appendChild(lbl); card.appendChild(footer);
-        // card click downloads and saves but don't block touch scroll
+        
         card.onclick = ()=> downloadAndSaveOnly(modName, sk, false);
-        // add passive touch listeners so scrolling is not blocked by card listeners
         card.addEventListener('touchstart', ()=>{}, {passive:true});
         list.appendChild(card);
-        thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card, applyBtn, resetBtn });
+        thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card, applyBtnBF, applyBtnOpp, resetBtn });
       }
 
-      // load thumbs
       for (const item of thumbsCache[modName]){
         const sk = item.skin; let thumb = sk.thumb || "";
         if (!thumb) { item.imgEl.style.background="#222"; continue; }
@@ -2042,124 +2086,128 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
       }
     }
 
-    // Download + salva SelectedSkin (não aplica). Use quando você só quer baixar em cena separada.
-    async function downloadAndSaveOnly(modName, skinObj, auto=false){
-      if (downloading) { if (!auto) alert("Já há um download em progresso."); return; }
+    async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
+      if (downloading) return;
       let zipPath = skinObj.zip || "";
       if (!zipPath) {
         const found = findSkinInManifest(manifest, modName, skinObj.name);
         if (found && found.zip) zipPath = found.zip;
       }
-      if (!zipPath) { if (!auto) alert("Skin não possui arquivo .zip configurado."); return; }
+      if (!zipPath) return;
 
       downloading = true;
+      const loadingModal = showLoadingModal();
       try {
         const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
         const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-        // apenas baixar para cache (arraybuffer) e liberar — sem aplicar
+        
         await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-        // salvar SelectedSkin com zip_cdn pra futura aplicação em outra cena
+        
         const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
         if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
         else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+        
+        const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
+        const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
+        
         const gv = runtimeScene.getGame().getVariables();
-        if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
-        else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(sel));
-        try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e){}
-        console.log("[skin-loader] Downloaded+Saved SelectedSkin:", JSON.stringify(sel));
-        if (!auto) alert("Download completo e salvo (SelectedSkin atualizado).");
+        if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
+        else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
+        try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
+        
+        console.log("[skin-loader] Downloaded+Saved " + varName + ":", JSON.stringify(sel));
       } catch(e){
         console.error("Download/save failed:", e);
-        if (!auto) alert("Falha ao baixar/salvar skin: " + (e && e.message ? e.message : e));
       } finally {
+        hideLoadingModal();
         downloading = false;
       }
     }
 
-    // Aplica agora (se o player estiver presente na cena atual). Isso baixa, aplica e salva zip_cdn
-    async function applyNow(modName, skinObj){
-      if (downloading) { alert("Operação em progresso."); return; }
+    async function applyNow(modName, skinObj, target){
+      if (downloading) return;
       let zipPath = skinObj.zip || "";
       if (!zipPath) {
         const found = findSkinInManifest(manifest, modName, skinObj.name);
         if (found && found.zip) zipPath = found.zip;
       }
-      if (!zipPath) { alert("Skin não possui arquivo .zip configurado."); return; }
+      if (!zipPath) return;
 
       downloading = true;
+      const loadingModal = showLoadingModal();
       try {
         const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
         const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
         const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
 
-        if (!window.GD_SKIN_PLAYER || typeof window.GD_SKIN_PLAYER.applyPackageToScene !== "function") {
-          alert("GD_SKIN_PLAYER não detectado na cena atual. Se quiser apenas baixar, clique no card (clique normal). Se quiser aplicar, abra a cena com o player e clique 'Aplicar agora'.");
-          // mesmo assim salva SelectedSkin para futura aplicação
-        }
-
-        // salvar SelectedSkin com zip_cdn
         const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
         if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
         else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+        
+        const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
+        const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
+        
         const gv = runtimeScene.getGame().getVariables();
-        if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
-        else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(sel));
-        try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e){}
-        console.log("[skin-loader] Saved SelectedSkin:", JSON.stringify(sel));
+        if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
+        else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
+        try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
+        
+        console.log("[skin-loader] Saved " + varName + ":", JSON.stringify(sel));
 
-        // if player present, load package and apply via player's API (player will capture center/feet at apply time)
         if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
           try {
-            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: "BF" });
-            await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: "BF" });
-            alert("Skin aplicada na cena atual.");
+            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel" });
+            await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { 
+              targetName: target === "BF" ? "BF" : "BFPixel",
+              targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim"
+            });
           } catch(e){
             warn("apply via player failed", e);
-            alert("Skin salva mas a aplicação local falhou: " + (e && e.message ? e.message : e));
           }
-        } else {
-          alert("Skin salva (SelectedSkin atualizado). Abra a cena com o skin_player para aplicar.");
         }
       } catch(e){
         console.error("applyNow failed:", e);
-        alert("Falha ao aplicar/baixar skin: " + (e && e.message ? e.message : e));
       } finally {
+        hideLoadingModal();
         downloading = false;
       }
     }
 
-    // NEW: reset and redownload a given skin (remove cached SelectedSkin, try to clear GD_SKIN_PLAYER caches, then re-download)
     async function resetAndRedownload(modName, skinObj, auto=false){
-      if (downloading) { if (!auto) alert("Já há uma operação em progresso."); return; }
+      if (downloading) return;
       let zipPath = skinObj.zip || "";
       if (!zipPath) {
         const found = findSkinInManifest(manifest, modName, skinObj.name);
         if (found && found.zip) zipPath = found.zip;
       }
-      if (!zipPath) { if (!auto) alert("Skin não possui arquivo .zip configurado."); return; }
+      if (!zipPath) return;
 
       downloading = true;
+      const loadingModal = showLoadingModal();
       try {
         const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
         const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
 
-        // 1) attempt to clear local references
         try {
-          // clear SelectedSkin variable in runtime (if matches)
           try {
             const gv = runtimeScene.getGame().getVariables();
             if (gv.has("SelectedSkin")) {
               const cur = gv.get("SelectedSkin").getAsString();
               if (cur && cur.includes(skinObj.name)) gv.get("SelectedSkin").setString("");
             }
+            if (gv.has("SelectedDadSkin")) {
+              const cur = gv.get("SelectedDadSkin").getAsString();
+              if (cur && cur.includes(skinObj.name)) gv.get("SelectedDadSkin").setString("");
+            }
           } catch(e2){}
-          // clear localStorage key if matches
+          
           try {
-            const ls = localStorage.getItem("gd_selected_skin");
-            if (ls && ls.includes(skinObj.name)) localStorage.removeItem("gd_selected_skin");
+            const ls1 = localStorage.getItem("gd_selected_skin");
+            if (ls1 && ls1.includes(skinObj.name)) localStorage.removeItem("gd_selected_skin");
+            const ls2 = localStorage.getItem("gd_selected_dad_skin");
+            if (ls2 && ls2.includes(skinObj.name)) localStorage.removeItem("gd_selected_dad_skin");
           } catch(e2){}
 
-          // attempt to call player cache removal APIs if available (best effort, wrapped)
           if (window.GD_SKIN_PLAYER) {
             try {
               if (typeof window.GD_SKIN_PLAYER.uninstallPackage === "function") {
@@ -2180,13 +2228,12 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
           warn("Reset: local cache removal failed", eClear);
         }
 
-        // 2) force re-download
         const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
 
-        // 3) save SelectedSkin again (with cdn link)
         const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
         if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
         else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+        
         try {
           const gv = runtimeScene.getGame().getVariables();
           if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
@@ -2195,29 +2242,22 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
         try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e2){}
         log("Reset: saved SelectedSkin after redownload", sel);
 
-        // 4) if player present, load & apply (like applyNow)
         if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
           try {
             const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: "BF" });
             await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: "BF" });
-            if (!auto) alert("Reset completo: pacote rebaixado e aplicado.");
           } catch(e){
             warn("Reset apply via player failed", e);
-            if (!auto) alert("Reset completo: rebaixado mas aplicação falhou: " + (e && e.message ? e.message : e));
           }
-        } else {
-          if (!auto) alert("Reset completo: .zip rebaixado e SelectedSkin atualizado. Abra a cena com skin_player para aplicar.");
         }
       } catch(e){
         console.error("resetAndRedownload failed:", e);
-        if (!auto) alert("Falha no reset/rebaixamento: " + (e && e.message ? e.message : e));
       } finally {
+        hideLoadingModal();
         downloading = false;
       }
     }
 
-    // Auto-apply loader: se manifest e SelectedSkin existirem, não aplique automaticamente em outra cena.
-    // Apenas pre-fill ou chamar downloadAndSaveOnly quando loader for usado especificamente.
     try {
       const gv = runtimeScene.getGame().getVariables();
       let selStr = null;
@@ -2234,14 +2274,12 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
     function cleanupAndRemove(){
       try {
         for (const k in thumbsCache) unloadModThumbs(k);
-        // remove modal and style
         const m = document.querySelector(".skin-modal");
         if (m) document.body.removeChild(m);
         try { document.head.removeChild(styleEl); } catch(e){}
+        hideLoadingModal();
       } catch(e){ console.error("cleanup failed", e); }
-      // restore scroll
       try { document.documentElement.style.overflow = prevOverflow || ""; } catch(e){}
-      // cleanup listeners
       window.removeEventListener('keydown', onKeyDown);
       try { window.removeEventListener('resize', ()=>{}); } catch(e){}
     }
@@ -2257,18 +2295,16 @@ gdjs.InicioCode.userFunc0xfa73c0(runtimeScene);
     await openSkinSelector(manifest);
   } catch(e){
     console.error("Skin loader startup failed:", e);
-    alert("Falha ao iniciar o Skin Loader: " + (e && e.message ? e.message : e));
   }
 
 })(runtimeScene);
-
 };
 gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0xfa68f8(runtimeScene);
+gdjs.InicioCode.userFunc0x179c470(runtimeScene);
 
 }
 
@@ -2281,7 +2317,7 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(64).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(62)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(66)));
 }
 if (isConditionTrue_0) {
 {runtimeScene.getScene().getVariables().getFromIndex(6).setBoolean(true);
@@ -2296,21 +2332,21 @@ if (isConditionTrue_0) {
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(64).getAsNumber() >= gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(62)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() >= gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(66)));
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(64).setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(68).setNumber(0);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback33941956 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback34250228 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
-{gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(63), null);
+{gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(67), null);
 }
-{gdjs.evtsExt__ArrayTools__GlobalSplitString.func(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(63).getAsString(), "/", runtimeScene.getGame().getVariables().getFromIndex(62), null);
+{gdjs.evtsExt__ArrayTools__GlobalSplitString.func(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(67).getAsString(), "/", runtimeScene.getGame().getVariables().getFromIndex(66), null);
 }
 {runtimeScene.getScene().getVariables().getFromIndex(6).setBoolean(true);
 }
@@ -2320,7 +2356,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33941956, gdjs.InicioCode.asyncCallback33941956);
+gdjs.InicioCode.idToCallbackMap.set(34250228, gdjs.InicioCode.asyncCallback34250228);
 gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 
 {
@@ -2330,7 +2366,7 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback33941956(runtimeScene, asyncObjectsList)), 33941956, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback34250228(runtimeScene, asyncObjectsList)), 34250228, asyncObjectsList);
 }
 }
 
@@ -2359,7 +2395,7 @@ if (true) {
     gdjs.InicioCode.GDbegfontObjects3[i].deleteFromScene(runtimeScene);
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(64).setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(68).setNumber(0);
 }
 }
 }
@@ -2495,14 +2531,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback33971300 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback34278140 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
 gdjs.InicioCode.eventsList14(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33971300, gdjs.InicioCode.asyncCallback33971300);
+gdjs.InicioCode.idToCallbackMap.set(34278140, gdjs.InicioCode.asyncCallback34278140);
 gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 
 {
@@ -2512,20 +2548,20 @@ gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33971300(runtimeScene, asyncObjectsList)), 33971300, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34278140(runtimeScene, asyncObjectsList)), 34278140, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback33980532 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback34287372 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33980532, gdjs.InicioCode.asyncCallback33980532);
+gdjs.InicioCode.idToCallbackMap.set(34287372, gdjs.InicioCode.asyncCallback34287372);
 gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 
 {
@@ -2535,14 +2571,14 @@ gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback33980532(runtimeScene, asyncObjectsList)), 33980532, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback34287372(runtimeScene, asyncObjectsList)), 34287372, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback33986076 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback34292916 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 
@@ -2552,7 +2588,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPoin
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(33986076, gdjs.InicioCode.asyncCallback33986076);
+gdjs.InicioCode.idToCallbackMap.set(34292916, gdjs.InicioCode.asyncCallback34292916);
 gdjs.InicioCode.eventsList17 = function(runtimeScene) {
 
 {
@@ -2563,7 +2599,7 @@ gdjs.InicioCode.eventsList17 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback33986076(runtimeScene, asyncObjectsList)), 33986076, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34292916(runtimeScene, asyncObjectsList)), 34292916, asyncObjectsList);
 }
 }
 
@@ -2577,20 +2613,20 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), 
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(84).getChild("PointsMessage").getAsNumber() > 0);
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(88).getChild("PointsMessage").getAsNumber() > 0);
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33983556);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34290396);
 }
 }
 if (isConditionTrue_0) {
 gdjs.copyArray(runtimeScene.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 {for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Text").setText("+" + runtimeScene.getGame().getVariables().getFromIndex(84).getChild("PointsMessage").getAsString() + " points");
+    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Text").setText("+" + runtimeScene.getGame().getVariables().getFromIndex(88).getChild("PointsMessage").getAsString() + " points");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(84).getChild("PointsMessage").setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(88).getChild("PointsMessage").setNumber(0);
 }
 {for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
     gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Tween").addObjectOpacityTween2("OpaInPT", 255, "easeInQuad", 0.5, false);
@@ -2617,7 +2653,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33986156);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34292996);
 }
 }
 if (isConditionTrue_0) {
@@ -2659,15 +2695,15 @@ gdjs.InicioCode.GDbegfontObjects1.length = 0;
     gdjs.InicioCode.GDbegfontObjects1[i].getBehavior("Text").setText("no");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(76).setBoolean(false);
+{runtimeScene.getGame().getVariables().getFromIndex(80).setBoolean(false);
 }
 {gdjs.evtTools.sound.setGlobalVolume(runtimeScene, 100);
 }
-{runtimeScene.getGame().getVariables().getFromIndex(6).setNumber(1);
+{runtimeScene.getGame().getVariables().getFromIndex(9).setNumber(1);
 }
-{runtimeScene.getGame().getVariables().getFromIndex(10).setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(14).setNumber(0);
 }
-{runtimeScene.getGame().getVariables().getFromIndex(9).setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(13).setNumber(0);
 }
 {gdjs.multiplayer.endLobbyGame();
 }
@@ -2695,7 +2731,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33926572);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34232068);
 }
 }
 if (isConditionTrue_0) {
@@ -2723,7 +2759,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33924020);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34233892);
 }
 }
 if (isConditionTrue_0) {
@@ -2744,11 +2780,11 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(64).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(62)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(66)));
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(65).getAsNumber() == runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() == runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
 }
 }
 }
@@ -2760,20 +2796,20 @@ gdjs.InicioCode.GDbegfontObjects1.length = 0;
 {gdjs.evtTools.object.createObjectOnScene(runtimeScene, gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects, 20, runtimeScene.getScene().getVariables().getFromIndex(7).getAsNumber(), "");
 }
 {for(var i = 0, len = gdjs.InicioCode.GDbegfontObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(0)).setString(runtimeScene.getGame().getVariables().getFromIndex(62).getChild(runtimeScene.getGame().getVariables().getFromIndex(64).getAsNumber()).getAsString());
+    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(0)).setString(runtimeScene.getGame().getVariables().getFromIndex(66).getChild(runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber()).getAsString());
 }
 }
 {for(var i = 0, len = gdjs.InicioCode.GDbegfontObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(1)).setString(runtimeScene.getGame().getVariables().getFromIndex(62).getChild(runtimeScene.getGame().getVariables().getFromIndex(64).getAsNumber() + 1).getAsString());
+    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(1)).setString(runtimeScene.getGame().getVariables().getFromIndex(66).getChild(runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() + 1).getAsString());
 }
 }
 {for(var i = 0, len = gdjs.InicioCode.GDbegfontObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(2)).setString(runtimeScene.getGame().getVariables().getFromIndex(62).getChild(runtimeScene.getGame().getVariables().getFromIndex(64).getAsNumber() + 2).getAsString());
+    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(2)).setString(runtimeScene.getGame().getVariables().getFromIndex(66).getChild(runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() + 2).getAsString());
 }
 }
 {runtimeScene.getScene().getVariables().getFromIndex(7).add(180);
 }
-{runtimeScene.getGame().getVariables().getFromIndex(64).add(3);
+{runtimeScene.getGame().getVariables().getFromIndex(68).add(3);
 }
 
 { //Subevents
@@ -2788,11 +2824,11 @@ gdjs.InicioCode.eventsList5(runtimeScene);} //End of subevents
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(65).getAsNumber() == 0);
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() == 0);
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33941668);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34250020);
 }
 }
 if (isConditionTrue_0) {
@@ -2809,10 +2845,10 @@ gdjs.InicioCode.eventsList6(runtimeScene);} //End of subevents
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(65).getAsNumber() != runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() != runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(65).setNumber(runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+{runtimeScene.getGame().getVariables().getFromIndex(69).setNumber(runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
 }
 {runtimeScene.getScene().getVariables().getFromIndex(7).setNumber(200);
 }
@@ -2996,15 +3032,15 @@ gdjs.copyArray(runtimeScene.getObjects("SwipeText"), gdjs.InicioCode.GDSwipeText
     gdjs.InicioCode.GDSwipeTextObjects1[i].getBehavior("Opacity").setOpacity(100);
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(47).getChild(0).setString("BF");
+{runtimeScene.getGame().getVariables().getFromIndex(51).getChild(0).setString("BF");
 }
-{runtimeScene.getGame().getVariables().getFromIndex(47).getChild(1).setString("Dad");
+{runtimeScene.getGame().getVariables().getFromIndex(51).getChild(1).setString("Dad");
 }
-{gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(43));
+{gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(47));
 }
-{gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(44));
+{gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(48));
 }
-{gdjs.evtTools.storage.readNumberFromJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(53));
+{gdjs.evtTools.storage.readNumberFromJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(57));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDPauseButtonObjects1.length ;i < len;++i) {
     gdjs.InicioCode.GDPauseButtonObjects1[i].getBehavior("Opacity").setOpacity(155);
@@ -3100,7 +3136,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33969588);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34276428);
 }
 }
 }
@@ -3162,7 +3198,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33976892);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34283732);
 }
 }
 if (isConditionTrue_0) {
@@ -3171,32 +3207,32 @@ gdjs.copyArray(runtimeScene.getObjects("DownKeybind"), gdjs.InicioCode.GDDownKey
 gdjs.copyArray(runtimeScene.getObjects("LeftKeybind"), gdjs.InicioCode.GDLeftKeybindObjects1);
 gdjs.copyArray(runtimeScene.getObjects("RightKeybind"), gdjs.InicioCode.GDRightKeybindObjects1);
 gdjs.copyArray(runtimeScene.getObjects("UpKeybind"), gdjs.InicioCode.GDUpKeybindObjects1);
-{gdjs.evtTools.storage.readStringFromJSONFile("Left", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(23));
+{gdjs.evtTools.storage.readStringFromJSONFile("Left", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(27));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDLeftKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDLeftKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(23).getAsString());
+    gdjs.InicioCode.GDLeftKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(27).getAsString());
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Down", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(25));
+{gdjs.evtTools.storage.readStringFromJSONFile("Down", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(29));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDDownKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDDownKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(25).getAsString());
+    gdjs.InicioCode.GDDownKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(29).getAsString());
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Up", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(27));
+{gdjs.evtTools.storage.readStringFromJSONFile("Up", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(31));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDUpKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDUpKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(27).getAsString());
+    gdjs.InicioCode.GDUpKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(31).getAsString());
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Right", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(29));
+{gdjs.evtTools.storage.readStringFromJSONFile("Right", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(33));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDRightKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDRightKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(29).getAsString());
+    gdjs.InicioCode.GDRightKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(33).getAsString());
 }
 }
 {for(var i = 0, len = gdjs.InicioCode.GDChartDelayInputObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDChartDelayInputObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(31).getAsString());
+    gdjs.InicioCode.GDChartDelayInputObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(35).getAsString());
 }
 }
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(false);
@@ -3233,7 +3269,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33981908);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34288748);
 }
 }
 if (isConditionTrue_0) {
@@ -3310,7 +3346,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(33969788);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34297188);
 }
 }
 if (isConditionTrue_0) {

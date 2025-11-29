@@ -96,7 +96,7 @@ isConditionTrue_0 = gdjs.evtTools.runtimeScene.sceneJustBegins(runtimeScene);
 if (isConditionTrue_0) {
 {gdjs.evtTools.input.showCursor(runtimeScene);
 }
-{runtimeScene.getGame().getVariables().getFromIndex(6).setNumber(1);
+{runtimeScene.getGame().getVariables().getFromIndex(9).setNumber(1);
 }
 }
 
@@ -119,7 +119,7 @@ for (var i = 0, k = 0, l = gdjs.All_32songs_32Death_32SceneCode.GDNoObjects1.len
 gdjs.All_32songs_32Death_32SceneCode.GDNoObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34987180);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35307988);
 }
 }
 if (isConditionTrue_0) {
@@ -148,11 +148,11 @@ for (var i = 0, k = 0, l = gdjs.All_32songs_32Death_32SceneCode.GDYesObjects1.le
 gdjs.All_32songs_32Death_32SceneCode.GDYesObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34988436);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35309244);
 }
 }
 if (isConditionTrue_0) {
-{gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(50).getAsString(), false);
+{gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(54).getAsString(), false);
 }
 }
 

@@ -287,7 +287,7 @@ gdjs.Gameplay_32ModifiersCode.GDStatistics2Objects5= [];
 gdjs.Gameplay_32ModifiersCode.GDStatistics2Objects6= [];
 
 
-gdjs.Gameplay_32ModifiersCode.asyncCallback34960316 = function (runtimeScene, asyncObjectsList) {
+gdjs.Gameplay_32ModifiersCode.asyncCallback35275924 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("ScrollTypeText"), gdjs.Gameplay_32ModifiersCode.GDScrollTypeTextObjects2);
 
@@ -297,7 +297,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("ScrollTypeText"), gdjs.Gameplay_32Mo
 }
 gdjs.Gameplay_32ModifiersCode.localVariables.length = 0;
 }
-gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(34960316, gdjs.Gameplay_32ModifiersCode.asyncCallback34960316);
+gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(35275924, gdjs.Gameplay_32ModifiersCode.asyncCallback35275924);
 gdjs.Gameplay_32ModifiersCode.eventsList0 = function(runtimeScene) {
 
 {
@@ -308,14 +308,14 @@ gdjs.Gameplay_32ModifiersCode.eventsList0 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 for (const obj of gdjs.Gameplay_32ModifiersCode.GDScrollTypeTextObjects1) asyncObjectsList.addObject("ScrollTypeText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback34960316(runtimeScene, asyncObjectsList)), 34960316, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback35275924(runtimeScene, asyncObjectsList)), 35275924, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.Gameplay_32ModifiersCode.asyncCallback34960428 = function (runtimeScene, asyncObjectsList) {
+};gdjs.Gameplay_32ModifiersCode.asyncCallback35274868 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("ScrollTypeText"), gdjs.Gameplay_32ModifiersCode.GDScrollTypeTextObjects2);
 
@@ -325,7 +325,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("ScrollTypeText"), gdjs.Gameplay_32Mo
 }
 gdjs.Gameplay_32ModifiersCode.localVariables.length = 0;
 }
-gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(34960428, gdjs.Gameplay_32ModifiersCode.asyncCallback34960428);
+gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(35274868, gdjs.Gameplay_32ModifiersCode.asyncCallback35274868);
 gdjs.Gameplay_32ModifiersCode.eventsList1 = function(runtimeScene) {
 
 {
@@ -336,7 +336,7 @@ gdjs.Gameplay_32ModifiersCode.eventsList1 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 for (const obj of gdjs.Gameplay_32ModifiersCode.GDScrollTypeTextObjects1) asyncObjectsList.addObject("ScrollTypeText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback34960428(runtimeScene, asyncObjectsList)), 34960428, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback35274868(runtimeScene, asyncObjectsList)), 35274868, asyncObjectsList);
 }
 }
 
@@ -352,27 +352,27 @@ gdjs.copyArray(asyncObjectsList.getObjects("ScrollSlider"), gdjs.Gameplay_32Modi
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(53).getAsNumber() != (( gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects2.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects2[0].Value(null)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(57).getAsNumber() != (( gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects2.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects2[0].Value(null)));
 }
 if (isConditionTrue_0) {
 /* Reuse gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects2 */
-{runtimeScene.getGame().getVariables().getFromIndex(53).setNumber((( gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects2.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects2[0].Value(null)));
+{runtimeScene.getGame().getVariables().getFromIndex(57).setNumber((( gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects2.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects2[0].Value(null)));
 }
-{gdjs.evtTools.storage.writeNumberInJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene.getGame().getVariables().getFromIndex(53).getAsNumber());
+{gdjs.evtTools.storage.writeNumberInJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene.getGame().getVariables().getFromIndex(57).getAsNumber());
 }
-}
-
 }
 
+}
 
-};gdjs.Gameplay_32ModifiersCode.asyncCallback34962860 = function (runtimeScene, asyncObjectsList) {
+
+};gdjs.Gameplay_32ModifiersCode.asyncCallback35292676 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 
 { //Subevents
 gdjs.Gameplay_32ModifiersCode.eventsList2(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.Gameplay_32ModifiersCode.localVariables.length = 0;
 }
-gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(34962860, gdjs.Gameplay_32ModifiersCode.asyncCallback34962860);
+gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(35292676, gdjs.Gameplay_32ModifiersCode.asyncCallback35292676);
 gdjs.Gameplay_32ModifiersCode.eventsList3 = function(runtimeScene) {
 
 {
@@ -383,7 +383,7 @@ gdjs.Gameplay_32ModifiersCode.eventsList3 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 for (const obj of gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects1) asyncObjectsList.addObject("ScrollSlider", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback34962860(runtimeScene, asyncObjectsList)), 34962860, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback35292676(runtimeScene, asyncObjectsList)), 35292676, asyncObjectsList);
 }
 }
 
@@ -428,11 +428,11 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects5.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects5.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(0).getAsString() == "Instakill");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(0).getAsString() == "Instakill");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34949940);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35299812);
 }
 }
 }
@@ -480,11 +480,11 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(0).getAsString() == "NoInstakill");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(0).getAsString() == "NoInstakill");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34954108);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35290332);
 }
 }
 }
@@ -538,11 +538,11 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects5.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects5.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(1).getAsString() == "Practice");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(1).getAsString() == "Practice");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34949420);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35291996);
 }
 }
 }
@@ -590,11 +590,11 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(1).getAsString() == "NoPractice");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(1).getAsString() == "NoPractice");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35079716);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35296548);
 }
 }
 }
@@ -648,11 +648,11 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects5.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects5.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(2).getAsString() == "Botplay");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(2).getAsString() == "Botplay");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35081532);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35295412);
 }
 }
 }
@@ -700,11 +700,11 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(2).getAsString() == "NoBotplay");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(2).getAsString() == "NoBotplay");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35082668);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35473060);
 }
 }
 }
@@ -758,11 +758,11 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects5.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects5.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(3).getAsString() == "MissChallenge");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(3).getAsString() == "MissChallenge");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35084364);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35474724);
 }
 }
 }
@@ -810,11 +810,11 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(3).getAsString() == "NoMissChallenge");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(3).getAsString() == "NoMissChallenge");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35085772);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35476100);
 }
 }
 }
@@ -830,7 +830,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.Gameplay_32ModifiersCode.asyncCallback35086836 = function (runtimeScene, asyncObjectsList) {
+};gdjs.Gameplay_32ModifiersCode.asyncCallback35477300 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("CheckBoxes"), gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects6);
 
@@ -840,7 +840,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("CheckBoxes"), gdjs.Gameplay_32Modifi
 }
 gdjs.Gameplay_32ModifiersCode.localVariables.length = 0;
 }
-gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(35086836, gdjs.Gameplay_32ModifiersCode.asyncCallback35086836);
+gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(35477300, gdjs.Gameplay_32ModifiersCode.asyncCallback35477300);
 gdjs.Gameplay_32ModifiersCode.eventsList16 = function(runtimeScene) {
 
 {
@@ -851,14 +851,14 @@ gdjs.Gameplay_32ModifiersCode.eventsList16 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 for (const obj of gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4) asyncObjectsList.addObject("CheckBoxes", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.2), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback35086836(runtimeScene, asyncObjectsList)), 35086836, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.2), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback35477300(runtimeScene, asyncObjectsList)), 35477300, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.Gameplay_32ModifiersCode.asyncCallback35087932 = function (runtimeScene, asyncObjectsList) {
+};gdjs.Gameplay_32ModifiersCode.asyncCallback35478052 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("CheckBoxes"), gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects5);
 
@@ -868,7 +868,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("CheckBoxes"), gdjs.Gameplay_32Modifi
 }
 gdjs.Gameplay_32ModifiersCode.localVariables.length = 0;
 }
-gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(35087932, gdjs.Gameplay_32ModifiersCode.asyncCallback35087932);
+gdjs.Gameplay_32ModifiersCode.idToCallbackMap.set(35478052, gdjs.Gameplay_32ModifiersCode.asyncCallback35478052);
 gdjs.Gameplay_32ModifiersCode.eventsList17 = function(runtimeScene) {
 
 {
@@ -879,7 +879,7 @@ gdjs.Gameplay_32ModifiersCode.eventsList17 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.Gameplay_32ModifiersCode.localVariables);
 for (const obj of gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3) asyncObjectsList.addObject("CheckBoxes", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.2), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback35087932(runtimeScene, asyncObjectsList)), 35087932, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.2), (runtimeScene) => (gdjs.Gameplay_32ModifiersCode.asyncCallback35478052(runtimeScene, asyncObjectsList)), 35478052, asyncObjectsList);
 }
 }
 
@@ -938,7 +938,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects4.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35085076);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35477228);
 }
 }
 if (isConditionTrue_0) {
@@ -973,7 +973,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35087860);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35478276);
 }
 }
 if (isConditionTrue_0) {
@@ -1005,7 +1005,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(0).getAsString() == "Instakill");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(0).getAsString() == "Instakill");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1025,7 +1025,7 @@ if (isConditionTrue_0) {
     gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3[i].getBehavior("Animation").setAnimationName("empty");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(58).getChild(0).setString("NoInstakill");
+{runtimeScene.getGame().getVariables().getFromIndex(62).getChild(0).setString("NoInstakill");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "Instakill", "NoInstakill");
 }
@@ -1051,7 +1051,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(0).getAsString() == "NoInstakill");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(0).getAsString() == "NoInstakill");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1071,7 +1071,7 @@ if (isConditionTrue_0) {
     gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3[i].getBehavior("Animation").setAnimationName("check");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(58).getChild(0).setString("Instakill");
+{runtimeScene.getGame().getVariables().getFromIndex(62).getChild(0).setString("Instakill");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "Instakill", "Instakill");
 }
@@ -1097,7 +1097,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(1).getAsString() == "Practice");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(1).getAsString() == "Practice");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1117,7 +1117,7 @@ if (isConditionTrue_0) {
     gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3[i].getBehavior("Animation").setAnimationName("empty");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(58).getChild(1).setString("NoPractice");
+{runtimeScene.getGame().getVariables().getFromIndex(62).getChild(1).setString("NoPractice");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "Practice", "NoPractice");
 }
@@ -1143,7 +1143,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(1).getAsString() == "NoPractice");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(1).getAsString() == "NoPractice");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1163,7 +1163,7 @@ if (isConditionTrue_0) {
     gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3[i].getBehavior("Animation").setAnimationName("check");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(58).getChild(1).setString("Practice");
+{runtimeScene.getGame().getVariables().getFromIndex(62).getChild(1).setString("Practice");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "Practice", "Practice");
 }
@@ -1189,7 +1189,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(2).getAsString() == "Botplay");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(2).getAsString() == "Botplay");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1209,7 +1209,7 @@ if (isConditionTrue_0) {
     gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3[i].getBehavior("Animation").setAnimationName("empty");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(58).getChild(2).setString("NoBotplay");
+{runtimeScene.getGame().getVariables().getFromIndex(62).getChild(2).setString("NoBotplay");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "Botplay", "NoBotplay");
 }
@@ -1235,7 +1235,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(2).getAsString() == "NoBotplay");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(2).getAsString() == "NoBotplay");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1255,7 +1255,7 @@ if (isConditionTrue_0) {
     gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3[i].getBehavior("Animation").setAnimationName("check");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(58).getChild(2).setString("Botplay");
+{runtimeScene.getGame().getVariables().getFromIndex(62).getChild(2).setString("Botplay");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "Botplay", "Botplay");
 }
@@ -1281,7 +1281,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(3).getAsString() == "MissChallenge");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(3).getAsString() == "MissChallenge");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1301,7 +1301,7 @@ if (isConditionTrue_0) {
     gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3[i].getBehavior("Animation").setAnimationName("empty");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(58).getChild(3).setString("NoMissChallenge");
+{runtimeScene.getGame().getVariables().getFromIndex(62).getChild(3).setString("NoMissChallenge");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "MissChallenge", "NoMissChallenge");
 }
@@ -1327,7 +1327,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getChild(3).getAsString() == "NoMissChallenge");
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(62).getChild(3).getAsString() == "NoMissChallenge");
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
@@ -1347,7 +1347,7 @@ if (isConditionTrue_0) {
     gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects3[i].getBehavior("Animation").setAnimationName("check");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(58).getChild(3).setString("MissChallenge");
+{runtimeScene.getGame().getVariables().getFromIndex(62).getChild(3).setString("MissChallenge");
 }
 {gdjs.evtTools.storage.writeStringInJSONFile("Modifiers", "MissChallenge", "MissChallenge");
 }
@@ -1387,7 +1387,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects2.le
 gdjs.Gameplay_32ModifiersCode.GDCheckBoxesObjects2.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35088604);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35477964);
 }
 }
 if (isConditionTrue_0) {
@@ -1411,25 +1411,25 @@ isConditionTrue_0 = gdjs.evtTools.runtimeScene.sceneJustBegins(runtimeScene);
 if (isConditionTrue_0) {
 gdjs.copyArray(runtimeScene.getObjects("MusicPitch"), gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1);
 gdjs.copyArray(runtimeScene.getObjects("ScrollSlider"), gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects1);
-{gdjs.evtTools.storage.readNumberFromJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(53));
+{gdjs.evtTools.storage.readNumberFromJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(57));
 }
 {for(var i = 0, len = gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects1.length ;i < len;++i) {
-    gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects1[i].SetValue(runtimeScene.getGame().getVariables().getFromIndex(53).getAsNumber(), null);
+    gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects1[i].SetValue(runtimeScene.getGame().getVariables().getFromIndex(57).getAsNumber(), null);
 }
 }
-{gdjs.evtTools.storage.readNumberFromJSONFile("CustomPitch", "CustomPitch", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(54));
+{gdjs.evtTools.storage.readNumberFromJSONFile("CustomPitch", "CustomPitch", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(58));
 }
 {for(var i = 0, len = gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1.length ;i < len;++i) {
-    gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1[i].SetValue(runtimeScene.getGame().getVariables().getFromIndex(54).getAsNumber(), null);
+    gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1[i].SetValue(runtimeScene.getGame().getVariables().getFromIndex(58).getAsNumber(), null);
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Modifiers", "Instakill", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(58).getChild(0));
+{gdjs.evtTools.storage.readStringFromJSONFile("Modifiers", "Instakill", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(62).getChild(0));
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Modifiers", "Practice", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(58).getChild(1));
+{gdjs.evtTools.storage.readStringFromJSONFile("Modifiers", "Practice", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(62).getChild(1));
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Modifiers", "Botplay", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(58).getChild(2));
+{gdjs.evtTools.storage.readStringFromJSONFile("Modifiers", "Botplay", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(62).getChild(2));
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Modifiers", "MissChallenge", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(58).getChild(3));
+{gdjs.evtTools.storage.readStringFromJSONFile("Modifiers", "MissChallenge", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(62).getChild(3));
 }
 }
 
@@ -1462,7 +1462,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDScrollTypeTextObjects
 gdjs.Gameplay_32ModifiersCode.GDScrollTypeTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34966708);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35275724);
 }
 }
 }
@@ -1501,7 +1501,7 @@ for (var i = 0, k = 0, l = gdjs.Gameplay_32ModifiersCode.GDScrollTypeTextObjects
 gdjs.Gameplay_32ModifiersCode.GDScrollTypeTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34983516);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35274796);
 }
 }
 }
@@ -1520,13 +1520,13 @@ gdjs.copyArray(runtimeScene.getObjects("MusicPitch"), gdjs.Gameplay_32ModifiersC
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(54).getAsNumber() != (( gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1[0].Value(null)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(58).getAsNumber() != (( gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1[0].Value(null)));
 }
 if (isConditionTrue_0) {
 /* Reuse gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1 */
-{runtimeScene.getGame().getVariables().getFromIndex(54).setNumber((( gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1[0].Value(null)));
+{runtimeScene.getGame().getVariables().getFromIndex(58).setNumber((( gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDMusicPitchObjects1[0].Value(null)));
 }
-{gdjs.evtTools.storage.writeNumberInJSONFile("CustomPitch", "CustomPitch", runtimeScene.getGame().getVariables().getFromIndex(54).getAsNumber());
+{gdjs.evtTools.storage.writeNumberInJSONFile("CustomPitch", "CustomPitch", runtimeScene.getGame().getVariables().getFromIndex(58).getAsNumber());
 }
 }
 
@@ -1539,7 +1539,7 @@ gdjs.copyArray(runtimeScene.getObjects("ScrollSlider"), gdjs.Gameplay_32Modifier
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(53).getAsNumber() != (( gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects1.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects1[0].Value(null)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(57).getAsNumber() != (( gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects1.length === 0 ) ? 0 :gdjs.Gameplay_32ModifiersCode.GDScrollSliderObjects1[0].Value(null)));
 }
 if (isConditionTrue_0) {
 
