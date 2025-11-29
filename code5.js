@@ -3916,7 +3916,7 @@ const parentAsyncObjectsList = asyncObjectsList;
 const asyncObjectsList = gdjs.LongLivedObjectsList.from(parentAsyncObjectsList);
 asyncObjectsList.backupLocalVariablesContainers(gdjs.PlayCode.localVariables);
 /* Don't save BlackScreen as it will be provided by the parent asyncObjectsList. */
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(1), (runtimeScene) => (gdjs.PlayCode.asyncCallback35663924(runtimeScene, asyncObjectsList)), 35663924, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), (runtimeScene) => (gdjs.PlayCode.asyncCallback35663924(runtimeScene, asyncObjectsList)), 35663924, asyncObjectsList);
 }
 }
 
@@ -4366,7 +4366,7 @@ isConditionTrue_0 = false;
 }
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(71).setNumber(-(1) - runtimeScene.getScene().getVariables().getFromIndex(41).getAsNumber());
+{runtimeScene.getGame().getVariables().getFromIndex(71).setNumber(-(2) - runtimeScene.getScene().getVariables().getFromIndex(41).getAsNumber());
 }
 {runtimeScene.getGame().getVariables().getFromIndex(70).getChild(0).setBoolean(true);
 }
@@ -17915,7 +17915,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x17ae000 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1b138f8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18105,7 +18105,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x17ae000(runtimeScene);
+gdjs.PlayCode.userFunc0x1b138f8(runtimeScene);
 
 }
 
@@ -18285,7 +18285,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1b59c08 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1864dc0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18475,7 +18475,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1b59c08(runtimeScene);
+gdjs.PlayCode.userFunc0x1864dc0(runtimeScene);
 
 }
 
@@ -22218,7 +22218,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x1ab21e0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2b489c0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22237,7 +22237,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x1ab2888 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x1b4a118 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22502,7 +22502,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x1ab21e0(runtimeScene);
+gdjs.PlayCode.userFunc0x2b489c0(runtimeScene);
 
 }
 
@@ -22510,7 +22510,7 @@ gdjs.PlayCode.userFunc0x1ab21e0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x1ab2888(runtimeScene);
+gdjs.PlayCode.userFunc0x1b4a118(runtimeScene);
 
 }
 
@@ -22542,10 +22542,6 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isLobbyGameRunning();
 if (isConditionTrue_0) {
 {gdjs.evtTools.window.setWindowTitle(runtimeScene, "GDev Online");
-}
-{runtimeScene.getGame().getVariables().getFromIndex(7).setString(runtimeScene.getGame().getVariables().getFromIndex(8).getAsString());
-}
-{runtimeScene.getGame().getVariables().getFromIndex(5).setString(runtimeScene.getGame().getVariables().getFromIndex(6).getAsString());
 }
 
 { //Subevents
@@ -22636,7 +22632,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x12d3e50 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x12ab5f0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada
 (function(){
@@ -23434,7 +23430,7 @@ gdjs.PlayCode.eventsList272 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x12d3e50(runtimeScene);
+gdjs.PlayCode.userFunc0x12ab5f0(runtimeScene);
 
 }
 
@@ -23514,7 +23510,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0xf1c818 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x12a0b78 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -24395,7 +24391,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0xf1c818(runtimeScene);
+gdjs.PlayCode.userFunc0x12a0b78(runtimeScene);
 
 }
 

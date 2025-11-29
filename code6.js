@@ -141,7 +141,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0xef6088 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x11fff00 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
@@ -735,12 +735,322 @@ gdjs.PlayonlineCode.userFunc0xef6088 = function GDJSInlineCode(runtimeScene) {
 })(runtimeScene);
 
 };
+gdjs.PlayonlineCode.userFunc0xfd2758 = function GDJSInlineCode(runtimeScene) {
+"use strict";
+// skin_watcher_online.js
+// Watcher separado: observa SelectedSkin / SelectedDadSkin e aplica apenas quando mudarem.
+// Mostra modal preta de baixa opacidade (z-index:1) durante download para bloquear inputs sob ela,
+// mas deixa possível que janelas com z-index > 1 continuem sobre ela.
+
+(function(){
+  const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
+  const DEFAULT_CDN_OWNER = "LucyYuih";
+  const DEFAULT_CDN_REPO = "gdev-custom-skins";
+  const DEFAULT_CDN_BRANCH = "main";
+
+  function log(...s){ try { console.log("[skin-watcher]", ...s); } catch(e){} }
+  function warn(...s){ try { console.warn("[skin-watcher]", ...s); } catch(e){} }
+  function safeParseJson(s){ try { return JSON.parse(s); } catch(e){ return null; } }
+
+  function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
+  function buildCdnUrl(owner, repo, branch, path){ if (!owner || !repo) return null; const br = branch || "main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
+
+  async function fetchCdnFirst(pathOrUrl, as="arraybuffer", cdnBase=null){
+    const isAbs = typeof pathOrUrl === "string" && (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://"));
+    const tries = [];
+    if (isAbs) tries.push(pathOrUrl);
+    if (!isAbs && cdnBase && cdnBase.owner && cdnBase.repo){
+      const c = buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, pathOrUrl);
+      if (c) tries.push(c);
+    }
+    tries.push(pathOrUrl);
+    tries.push("resources/" + pathOrUrl);
+    tries.push("./" + pathOrUrl);
+    if (typeof pathOrUrl === "string"){
+      const enc = pathOrUrl.replace(/ /g,"%20");
+      tries.push(enc); tries.push("resources/" + enc); tries.push("./" + enc);
+    }
+
+    let lastErr = null;
+    for (const u of tries){
+      if (!u) continue;
+      try {
+        log("fetch try ->", u);
+        const r = await fetch(u);
+        if (!r.ok) throw new Error("Fetch failed " + r.status + " for " + u);
+        if (as === "json") return await r.json();
+        if (as === "blob") return await r.blob();
+        return await r.arrayBuffer();
+      } catch(e){
+        lastErr = e;
+        warn("fetch failed for", u, e && e.message ? e.message : e);
+      }
+    }
+    throw lastErr || new Error("All fetch attempts failed");
+  }
+
+  // Helpers multiplayer (copiados/adaptados)
+  function getPlayerOnlineValue(runtimeScene){
+    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("PlayerOnline")) { const n = gv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n)) return n; } } catch(e){}
+    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("PlayerOnline")) { const n = sv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n)) return n; } } catch(e){}
+    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.getCurrentPlayerNumber === 'function'){ const pn = gdjs.multiplayer.getCurrentPlayerNumber(); if (typeof pn === 'number') return pn === 1 ? 1 : 2; } } catch(e){}
+    return 0;
+  }
+  function isLobbyRunning(runtimeScene){
+    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.isLobbyGameRunning === 'function') return !!gdjs.multiplayer.isLobbyGameRunning(runtimeScene); } catch(e){}
+    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("IsLobbyGameRunning")) return !!gv.get("IsLobbyGameRunning").getAsNumber(); if (gv && gv.has("LobbyGameIsRunning")) return !!gv.get("LobbyGameIsRunning").getAsNumber(); } catch(e){}
+    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("IsLobbyGameRunning")) return !!sv.get("IsLobbyGameRunning").getAsNumber(); } catch(e){}
+    return false;
+  }
+
+  // Modal UI: baixa opacidade, bloqueia clique, z-index baixo (1)
+  function createBlockingModal(){
+    // evita duplicados
+    if (document.getElementById("skin-watcher-modal")) return document.getElementById("skin-watcher-modal");
+
+    const modal = document.createElement("div");
+    modal.id = "skin-watcher-modal";
+    modal.style.position = "fixed";
+    modal.style.inset = "0";
+    modal.style.background = "rgba(0,0,0,0.65)"; // baixa opacidade preta
+    modal.style.display = "flex";
+    modal.style.alignItems = "center";
+    modal.style.justifyContent = "center";
+    modal.style.zIndex = "1"; // INTENCIONAL: muito baixo para não sobrescrever outras janelas com z-index maior
+    modal.style.pointerEvents = "auto"; // bloqueia toques abaixo
+    modal.style.userSelect = "none";
+
+    const panel = document.createElement("div");
+    panel.style.padding = "14px 18px";
+    panel.style.borderRadius = "8px";
+    panel.style.background = "rgba(0,0,0,0.4)";
+    panel.style.color = "#fff";
+    panel.style.fontFamily = "Arial, sans-serif";
+    panel.style.fontSize = "14px";
+    panel.style.boxShadow = "0 6px 18px rgba(0,0,0,0.6)";
+    panel.textContent = "Baixando skin...";
+
+    const spinner = document.createElement("div");
+    spinner.style.width = "36px";
+    spinner.style.height = "36px";
+    spinner.style.border = "4px solid rgba(255,255,255,0.2)";
+    spinner.style.borderTopColor = "#fff";
+    spinner.style.borderRadius = "50%";
+    spinner.style.marginTop = "8px";
+    spinner.style.animation = "skinWatcherSpin 1s linear infinite";
+
+    const style = document.createElement("style");
+    style.textContent = "@keyframes skinWatcherSpin { to { transform: rotate(360deg); } }";
+    document.head.appendChild(style);
+
+    panel.appendChild(spinner);
+    modal.appendChild(panel);
+    return modal;
+  }
+  function showBlockingModal(){
+    const existing = document.getElementById("skin-watcher-modal");
+    if (existing) return existing;
+    const m = createBlockingModal();
+    // inserir primeiro no body para z-index ser baixo (ninguém deve sobrescrever body content order)
+    document.body.insertBefore(m, document.body.firstChild);
+    return m;
+  }
+  function hideBlockingModal(){
+    const m = document.getElementById("skin-watcher-modal");
+    if (m && m.parentNode) m.parentNode.removeChild(m);
+  }
+
+  // Faz o download do zip (a partir de zip_cdn/zip) e aplica via GD_SKIN_PLAYER
+  async function fetchAndApplySelection(runtimeScene, selStr, applyOpts){
+    if (!selStr) return null;
+    const parsed = safeParseJson(selStr);
+    if (!parsed) return null;
+
+    const candidates = [];
+    if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
+    if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); candidates.push(parsed.zip.replace(/ /g,"%20")); candidates.push("resources/" + parsed.zip.replace(/ /g,"%20")); }
+
+    // tenter base via manifest se disponível
+    try {
+      let manifest = null;
+      try { const r = await fetch("resources/manifestskins.json"); if (r.ok) manifest = await r.json(); } catch(e){}
+      if (!manifest){
+        const cdnTry = buildCdnUrl(DEFAULT_CDN_OWNER, DEFAULT_CDN_REPO, DEFAULT_CDN_BRANCH, "manifestskins.json");
+        try { const r2 = await fetch(cdnTry); if (r2.ok) manifest = await r2.json(); } catch(e){}
+      }
+      if (manifest && manifest._base && parsed.zip){
+        try {
+          const [ownerRepo, branch] = manifest._base.split("@");
+          const [owner, repo] = ownerRepo.split("/");
+          const cdnBuilt = buildCdnUrl(owner, repo, branch || "main", parsed.zip);
+          if (cdnBuilt) candidates.unshift(cdnBuilt);
+        } catch(e){}
+      }
+    } catch(e){ warn("manifest detection failed:", e); }
+
+    // cdn base fallback
+    const cdnBase = { owner: DEFAULT_CDN_OWNER, repo: DEFAULT_CDN_REPO, branch: DEFAULT_CDN_BRANCH };
+
+    let lastErr = null;
+    for (const c of candidates){
+      try {
+        log("watcher fetching candidate ->", c);
+        const arr = await fetchCdnFirst(c, "arraybuffer", cdnBase);
+        if (!arr) throw new Error("Empty arrayBuffer");
+        // show modal while applying
+        showBlockingModal();
+        try {
+          if (!window.GD_SKIN_PLAYER || typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer !== "function" || typeof window.GD_SKIN_PLAYER.applyPackageToScene !== "function"){
+            throw new Error("GD_SKIN_PLAYER missing required functions");
+          }
+          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arr);
+          const inst = await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, applyOpts || {});
+          log("watcher applied package from", c);
+          return inst;
+        } finally {
+          // always hide modal depois do attempt (se erro ou sucesso)
+          hideBlockingModal();
+        }
+      } catch(e){
+        lastErr = e;
+        warn("watcher candidate failed", e && e.message ? e.message : e);
+      }
+    }
+    warn("watcher: all candidates failed", lastErr);
+    return null;
+  }
+
+  // Watcher principal (só executa ações quando variáveis mudarem)
+  function createSkinWatcher(runtimeScene, opts){
+    opts = opts || {};
+    const pollInterval = (typeof opts.interval === "number") ? Math.max(150, opts.interval) : 600; // ms
+    let last = { SelectedSkin: null, SelectedDadSkin: null };
+
+    let intervalHandle = null;
+    let running = false;
+
+    async function tick(){
+      try {
+        const gv = runtimeScene.getGame().getVariables();
+        if (!gv) return;
+
+        // garante variáveis existam
+        if (!gv.has('SelectedSkin')) gv.pushNew('SelectedSkin').setString('');
+        if (!gv.has('SelectedDadSkin')) gv.pushNew('SelectedDadSkin').setString('');
+
+        const cur = {
+          SelectedSkin: gv.get('SelectedSkin').getAsString(),
+          SelectedDadSkin: gv.get('SelectedDadSkin').getAsString()
+        };
+
+        const playerOnline = getPlayerOnlineValue(runtimeScene);
+        const lobbyRunning = isLobbyRunning(runtimeScene);
+
+        // SelectedSkin => BF (host); se local não for owner (playerOnline !== 1) então aplica a skin detectada do host
+        if ((cur.SelectedSkin || '') !== (last.SelectedSkin || '')){
+          log("Detected SelectedSkin change.");
+          // Se local for host (playerOnline===1) normalmente não precisa rebaixar; mas se for player 2, deve baixar host's BF.
+          if (playerOnline !== 1){
+            // aplica BF localmente
+            try {
+              await fetchAndApplySelection(runtimeScene, cur.SelectedSkin, { targetName: "BF", targetAnimVar: "BFAnim" });
+            } catch(e){ warn("Failed applying SelectedSkin via watcher", e); }
+          } else {
+            log("Local is player 1 -> SelectedSkin changed locally (no download needed).");
+          }
+          last.SelectedSkin = cur.SelectedSkin;
+        }
+
+        // SelectedDadSkin => Opponent (player2). If local is NOT player2, apply the opponent skin.
+        if ((cur.SelectedDadSkin || '') !== (last.SelectedDadSkin || '')){
+          log("Detected SelectedDadSkin change.");
+          // If lobby is running and local is host (playerOnline === 1) skip applying opponent because in lobby host controls BF only.
+          if (playerOnline === 1 && lobbyRunning){
+            log("Lobby running + local host -> skipping SelectedDadSkin apply to avoid conflict.");
+          } else {
+            if (playerOnline !== 2){
+              try {
+                await fetchAndApplySelection(runtimeScene, cur.SelectedDadSkin, { targetName: "BFPixel", targetAnimVar: "OPPAnim" });
+              } catch(e){ warn("Failed applying SelectedDadSkin via watcher", e); }
+            } else {
+              log("Local is player 2 -> SelectedDadSkin changed locally (no download needed).");
+            }
+          }
+          last.SelectedDadSkin = cur.SelectedDadSkin;
+        }
+      } catch(e){
+        warn("skinWatcher tick error:", e);
+      }
+    }
+
+    function start(){
+      if (running) return;
+      // snapshot initial values to avoid immediate re-apply
+      try {
+        const gv = runtimeScene.getGame().getVariables();
+        if (gv) {
+          last.SelectedSkin = gv.has('SelectedSkin') ? gv.get('SelectedSkin').getAsString() : '';
+          last.SelectedDadSkin = gv.has('SelectedDadSkin') ? gv.get('SelectedDadSkin').getAsString() : '';
+        }
+      } catch(e){}
+      intervalHandle = setInterval(() => { tick().catch(e=>warn("tick outer:", e)); }, pollInterval);
+      running = true;
+      log("skin watcher started (pollInterval:", pollInterval, "ms)");
+    }
+
+    function stop(){
+      if (!running) return;
+      if (intervalHandle) clearInterval(intervalHandle);
+      intervalHandle = null;
+      running = false;
+      log("skin watcher stopped");
+    }
+
+    return { start, stop, tickOnce: tick };
+  }
+
+  // Auto-start when runtimeScene fornecido (integração simples)
+  // Para uso: inclua este arquivo e chame runtimeScene na inicialização da cena.
+  window.__gd_skin_watcher = window.__gd_skin_watcher || {};
+  window.__gd_skin_watcher._created = true;
+  window.__gd_skin_watcher.createForScene = function(runtimeScene, options){
+    if (!runtimeScene) throw new Error("runtimeScene required");
+    // evita criar múltiplos watchers para a mesma cena
+    if (window.__gd_skin_watcher._instance && window.__gd_skin_watcher._instance.running) return window.__gd_skin_watcher._instance;
+    const w = createSkinWatcher(runtimeScene, options || {});
+    w.start();
+    window.__gd_skin_watcher._instance = w;
+    return w;
+  };
+
+  // auto-boot if runtimeScene global pointer exists (convenience)
+  try {
+    if (typeof runtimeScene !== "undefined" && runtimeScene) {
+      try { window.__gd_skin_watcher.createForScene(runtimeScene, { interval: 600 }); } catch(e){ warn("auto-create watcher failed", e); }
+    } else if (window.__gd_runtimeScene_for_skin) {
+      try { window.__gd_skin_watcher.createForScene(window.__gd_runtimeScene_for_skin, { interval: 600 }); } catch(e){ warn("auto-create watcher failed", e); }
+    } else {
+      log("skin-watcher loaded but no runtimeScene found. Call window.__gd_skin_watcher.createForScene(runtimeScene) to start.");
+    }
+  } catch(e){ warn("startup error", e); }
+
+})();
+
+};
 gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0xef6088(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x11fff00(runtimeScene);
+
+}
+
+
+{
+
+
+gdjs.PlayonlineCode.userFunc0xfd2758(runtimeScene);
 
 }
 
@@ -852,9 +1162,9 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x1ab21e0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1b4a008 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_player.js (correção do flip do Opponent) - versão modificada com suporte multiplayer avançado
+// skin_player.js (correção do flip do Opponent) - versão modificada
 (function(){
   const JSZIP_CDN = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
@@ -897,23 +1207,40 @@ let isConditionTrue_0 = false;
       return { w: 0, h: 0 };
     } catch(e){ return {w:0,h:0}; }
   }
-
+  
   function getTexturePixelSize(tex){
     try {
       if (!tex) return {w:0,h:0};
+      
       if (tex.frame) {
         const frame = tex.frame;
-        if (frame.width && frame.height) return { w: frame.width, h: frame.height };
-        if (frame.realWidth && frame.realHeight) return { w: frame.realWidth, h: frame.realHeight };
+        if (frame.width && frame.height) {
+          return { w: frame.width, h: frame.height };
+        }
+        if (frame.realWidth && frame.realHeight) {
+          return { w: frame.realWidth, h: frame.realHeight };
+        }
       }
+      
       if (tex.baseTexture) {
         const bt = tex.baseTexture;
-        if (bt.realWidth && bt.realHeight) return { w: bt.realWidth, h: bt.realHeight };
-        if (bt.width && bt.height) return { w: bt.width, h: bt.height };
+        if (bt.realWidth && bt.realHeight) {
+          return { w: bt.realWidth, h: bt.realHeight };
+        }
+        if (bt.width && bt.height) {
+          return { w: bt.width, h: bt.height };
+        }
       }
-      if (typeof tex.width === "number" && typeof tex.height === "number") return { w: tex.width, h: tex.height };
+      
+      if (typeof tex.width === "number" && typeof tex.height === "number") {
+        return { w: tex.width, h: tex.height };
+      }
+      
       return {w:0,h:0};
-    } catch(e){ console.warn("getTexturePixelSize failed:", e); return {w:0,h:0}; }
+    } catch(e){ 
+      console.warn("getTexturePixelSize failed:", e);
+      return {w:0,h:0}; 
+    }
   }
 
   function findJsonAndBasePath(zip){
@@ -934,8 +1261,13 @@ let isConditionTrue_0 = false;
     });
 
     let chosen;
-    if (metaMatches.length) { metaMatches.sort((a,b) => b.ts - a.ts); chosen = metaMatches[0]; }
-    else { candidates.sort((a,b) => b.ts - a.ts); chosen = candidates[0]; }
+    if (metaMatches.length) {
+      metaMatches.sort((a,b) => b.ts - a.ts);
+      chosen = metaMatches[0];
+    } else {
+      candidates.sort((a,b) => b.ts - a.ts);
+      chosen = candidates[0];
+    }
 
     const parts = chosen.name.split("/");
     const baseFolderPrefix = parts.slice(0, parts.length - 1).join("/");
@@ -955,9 +1287,13 @@ let isConditionTrue_0 = false;
         const folderCheck2 = metadata && metadata.image && rel.startsWith(metadata.image + "/" + anim + "/");
         const filename = rel.split("/").pop();
         const nameCheck = filename.toLowerCase().startsWith(anim.toLowerCase() + "_");
-        if ((folderCheck1 || folderCheck2 || nameCheck) && /\.(png|jpg|jpeg|gif)$/i.test(filename)) groups[anim].push(e);
+        if ((folderCheck1 || folderCheck2 || nameCheck) && /\.(png|jpg|jpeg|gif)$/i.test(filename)){
+          groups[anim].push(e);
+        }
       }
-      if (animNames.length === 0 && /\.(png|jpg|jpeg|gif)$/i.test(e.split("/").pop())) groups["idle"].push(e);
+      if (animNames.length === 0 && /\.(png|jpg|jpeg|gif)$/i.test(e.split("/").pop())){
+        groups["idle"].push(e);
+      }
     }
     for (const k of Object.keys(groups)) groups[k].sort((a,b)=>a.localeCompare(b, undefined, { numeric: true }));
     return groups;
@@ -967,16 +1303,40 @@ let isConditionTrue_0 = false;
     const textures = [];
     for (const n of entryNames){
       try {
-        const file = zip.file(n); if (!file) continue;
-        const blob = await file.async("blob"); const url = URL.createObjectURL(blob); const tex = PIXI.Texture.from(url);
+        const file = zip.file(n);
+        if (!file) continue;
+        const blob = await file.async("blob");
+        const url = URL.createObjectURL(blob);
+        const tex = PIXI.Texture.from(url);
+        
         await new Promise((resolve, reject) => {
-          if (tex.baseTexture && tex.baseTexture.valid) return resolve();
-          const checkValid = () => { if (tex.baseTexture && tex.baseTexture.valid) resolve(); else setTimeout(checkValid, 10); };
-          setTimeout(() => { if (tex.baseTexture && tex.baseTexture.valid) resolve(); else reject(new Error("Texture loading timeout")); }, 2000);
+          if (tex.baseTexture && tex.baseTexture.valid) {
+            return resolve();
+          }
+          
+          const checkValid = () => {
+            if (tex.baseTexture && tex.baseTexture.valid) {
+              resolve();
+            } else {
+              setTimeout(checkValid, 10);
+            }
+          };
+          
+          setTimeout(() => {
+            if (tex.baseTexture && tex.baseTexture.valid) {
+              resolve();
+            } else {
+              reject(new Error("Texture loading timeout"));
+            }
+          }, 2000);
+          
           checkValid();
         });
+        
         textures.push({ tex, blobUrl: url, entryName: n });
-      } catch(e){ warn("Failed load entry", n, e); }
+      } catch(e){
+        warn("Failed load entry", n, e);
+      }
     }
     return textures;
   }
@@ -984,18 +1344,32 @@ let isConditionTrue_0 = false;
   async function loadFromArrayBuffer(runtimeScene, arrayBuffer, opts = {}) {
     await ensureJSZip();
     const zip = await window.JSZip().loadAsync(arrayBuffer);
+
     let jsonEntryName, baseFolderPrefix;
     try { const found = findJsonAndBasePath(zip); jsonEntryName = found.jsonEntryName; baseFolderPrefix = found.baseFolderPrefix; }
     catch(e){ throw new Error("Metadata JSON not found in zip: " + (e && e.message)); }
 
     let metadata;
-    try { const txt = await zip.file(jsonEntryName).async("string"); metadata = JSON.parse(txt); } catch(e){ throw new Error("Failed reading metadata: " + (e && e.message)); }
+    try {
+      const txt = await zip.file(jsonEntryName).async("string");
+      metadata = JSON.parse(txt);
+    } catch(e){ throw new Error("Failed reading metadata: " + (e && e.message)); }
 
-    try { if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {}; window.GD_SKIN_PLAYER.lastDownloadedMetadata = metadata; window.GD_SKIN_PLAYER.lastDownloadedJsonEntry = jsonEntryName; window.GD_SKIN_PLAYER.lastDownloadedBaseFolder = baseFolderPrefix; window.GD_SKIN_PLAYER.lastDownloadedAt = (new Date()).toISOString(); } catch(e){}
+    try {
+      if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
+      window.GD_SKIN_PLAYER.lastDownloadedMetadata = metadata;
+      window.GD_SKIN_PLAYER.lastDownloadedJsonEntry = jsonEntryName;
+      window.GD_SKIN_PLAYER.lastDownloadedBaseFolder = baseFolderPrefix;
+      window.GD_SKIN_PLAYER.lastDownloadedAt = (new Date()).toISOString();
+    } catch(e){ }
 
-    const allEntries = Object.keys(zip.files); const groups = groupImageEntries(allEntries, baseFolderPrefix, metadata);
+    const allEntries = Object.keys(zip.files);
+    const groups = groupImageEntries(allEntries, baseFolderPrefix, metadata);
+
     const animations = {};
-    for (const am of (metadata.animations || [])) animations[am.anim] = { name: am.anim, fps: am.fps||24, frames: [], loaded: false, loop: am.anim === "idle" };
+    for (const am of (metadata.animations || [])){
+      animations[am.anim] = { name: am.anim, fps: am.fps||24, frames: [], loaded: false, loop: am.anim === "idle" };
+    }
     if (Object.keys(animations).length === 0) animations["idle"] = { name:"idle", fps:24, frames:[], loaded:false, loop:true };
 
     for (const key of Object.keys(animations)){
@@ -1007,371 +1381,575 @@ let isConditionTrue_0 = false;
       animations[key]._blobUrls = loaded.map(o => o.blobUrl);
     }
 
-    return { animations, metadata, _createdBlobUrls: (function collect(){ const arr=[]; for(const k of Object.keys(animations)){ const a=animations[k]; if (a._blobUrls) arr.push(...a._blobUrls); } return arr; })() };
+    return { 
+      animations, 
+      metadata, 
+      _createdBlobUrls: (function collect(){ 
+        const arr=[]; 
+        for(const k of Object.keys(animations)){ 
+          const a=animations[k]; 
+          if (a._blobUrls) arr.push(...a._blobUrls);
+        } 
+        return arr; 
+      })() 
+    };
   }
 
   function computeCenterAndFeetForObject(obj){
-    const size = getObjectSize(obj); const ro = (obj.getRendererObject && obj.getRendererObject()) || null; let anchorX = 0.5, anchorY = 0;
-    try { if (ro) { if (ro.anchor && typeof ro.anchor.x === "number" && typeof ro.anchor.y === "number") { anchorX = ro.anchor.x; anchorY = ro.anchor.y; } else if (ro.pivot && typeof ro.pivot.x === "number" && typeof ro.pivot.y === "number" && typeof ro.width === "number" && typeof ro.height === "number" && ro.width>0 && ro.height>0) { anchorX = ro.pivot.x / (ro.width || 1); anchorY = ro.pivot.y / (ro.height || 1); } } } catch(e){}
-    const gx = (typeof obj.getX === "function") ? obj.getX() : 0; const gy = (typeof obj.getY === "function") ? obj.getY() : 0;
-    const centerX = gx + (0.5 - anchorX) * (size.w || 0); const feetY = gy + (1 - (typeof anchorY === "number" ? anchorY : 0)) * (size.h || 0);
+    const size = getObjectSize(obj);
+    const ro = (obj.getRendererObject && obj.getRendererObject()) || null;
+    let anchorX = 0.5, anchorY = 0;
+    try {
+      if (ro) {
+        if (ro.anchor && typeof ro.anchor.x === "number" && typeof ro.anchor.y === "number"){
+          anchorX = ro.anchor.x; anchorY = ro.anchor.y;
+        } else if (ro.pivot && typeof ro.pivot.x === "number" && typeof ro.pivot.y === "number" && typeof ro.width === "number" && typeof ro.height === "number" && ro.width>0 && ro.height>0) {
+          anchorX = ro.pivot.x / (ro.width || 1);
+          anchorY = ro.pivot.y / (ro.height || 1);
+        }
+      }
+    } catch(e){}
+    const gx = (typeof obj.getX === "function") ? obj.getX() : 0;
+    const gy = (typeof obj.getY === "function") ? obj.getY() : 0;
+    
+    const centerX = gx + (0.5 - anchorX) * (size.w || 0);
+    const feetY = gy + (1 - (typeof anchorY === "number" ? anchorY : 0)) * (size.h || 0);
+
     let pixelToSceneOriginal = 1;
-    try { const tex = ro && (ro.texture || (ro.sprite && ro.sprite.texture)); if (tex) { const texPx = getTexturePixelSize(tex); if (texPx && texPx.h > 0 && size.h > 0) pixelToSceneOriginal = size.h / texPx.h; } } catch(e){}
+    try {
+      const tex = ro && (ro.texture || (ro.sprite && ro.sprite.texture));
+      if (tex) {
+        const texPx = getTexturePixelSize(tex);
+        if (texPx && texPx.h > 0 && size.h > 0) {
+          pixelToSceneOriginal = size.h / texPx.h;
+        }
+      }
+    } catch(e){ }
+
     return { centerX, feetY, anchorX, anchorY, size, originalX: gx, originalY: gy, pixelToSceneOriginal };
   }
 
-  // multiplayer helpers (doc-backed)
-  function getPlayerOnlineValue(runtimeScene){
-    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("PlayerOnline")) { const n = gv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n) && n > 0) return n; } } catch(e){}
-    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("PlayerOnline")) { const n = sv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n) && n > 0) return n; } } catch(e){}
-    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.getCurrentPlayerNumber === 'function'){ const pn = gdjs.multiplayer.getCurrentPlayerNumber(); if (typeof pn === 'number' && pn > 0) return pn === 1 ? 1 : 2; } } catch(e){}
-    return 0;
-  }
-
-  function isLobbyRunning(runtimeScene){
-    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.isLobbyGameRunning === 'function') return !!gdjs.multiplayer.isLobbyGameRunning(runtimeScene); } catch(e){}
-    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("IsLobbyGameRunning")) return !!gv.get("IsLobbyGameRunning").getAsNumber(); if (gv && gv.has("LobbyGameIsRunning")) return !!gv.get("LobbyGameIsRunning").getAsNumber(); } catch(e){}
-    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("IsLobbyGameRunning")) return !!sv.get("IsLobbyGameRunning").getAsNumber(); } catch(e){}
-    return false;
-  }
-
-  // apply one texture/frame to a single object (isolated, ownership-safe)
-  function applyFrameToObject(info, tex, invertSideGlobal, coordinateMode, invertOffsetY){
-    const obj = info.obj;
-    try {
-      const texPixel = getTexturePixelSize(tex);
-      const texPxW = texPixel.w || 0; const texPxH = texPixel.h || 0;
-      const ro = obj.getRendererObject && obj.getRendererObject();
-      if (ro && ro.texture !== undefined) ro.texture = tex; else try { obj.getRendererObject().texture = tex; } catch(e){}
-
-      const ox_scene = 0; const oy_scene = 0;
-      let pixelToScene = 1;
-      if (coordinateMode === "psych") pixelToScene = (typeof info.pixelToSceneOriginal === "number" && info.pixelToSceneOriginal > 0) ? info.pixelToSceneOriginal : 1; else pixelToScene = 1;
-      const oyAdjusted = invertOffsetY ? -oy_scene : oy_scene;
-      const scaledTexWidth = texPxW * pixelToScene; const scaledTexHeight = texPxH * pixelToScene;
-      const targetFeetY = info.feetY + oyAdjusted; const targetCenterX = info.centerX + ox_scene;
-      const anchorX = (typeof info.anchorX === "number") ? info.anchorX : 0.5; const anchorY = (typeof info.anchorY === "number") ? info.anchorY : 0;
-      const currentWidth = scaledTexWidth; const currentHeight = scaledTexHeight;
-      const targetObjX = targetCenterX - (0.5 - anchorX) * currentWidth; const targetObjY = targetFeetY - (1 - anchorY) * currentHeight;
-      if (typeof obj.setX === "function") obj.setX(targetObjX); if (typeof obj.setY === "function") obj.setY(targetObjY);
-
-      try {
-        const baseScale = (typeof info.originalAbsScaleX === "number" && info.originalAbsScaleX > 0) ? info.originalAbsScaleX : (Math.abs(info.originalScaleX) || 1);
-        const wantScaleX = invertSideGlobal ? -baseScale : baseScale;
-        if (ro) { if (ro.scale && typeof ro.scale.x === "number") ro.scale.x = wantScaleX; else if (typeof ro.scaleX === "number") ro.scaleX = wantScaleX; else { ro.scale = ro.scale || {}; if (typeof ro.scale.x === "number") ro.scale.x = wantScaleX; } }
-      } catch(e){ warn("Error applying scale:", e); }
-
-    } catch(e){ console.error("Error applying frame to single object:", e); }
-  }
-
-  // create a per-object player controller (isolated state and timers)
-  function createPerObjectPlayer(runtimeScene, info, animations, opts){
-    const TARGET_ANIM_VAR = (opts && opts.targetAnimVar) ? opts.targetAnimVar : "BFAnim";
-    const invertOffsetY = (typeof opts.invertOffsetY === "boolean") ? opts.invertOffsetY : false;
-    const coordinateMode = (opts && opts.coordinateMode === "raw") ? "raw" : "psych";
-
-    // determine owner/player id for this object by target name convention: BFPixel -> player 2, BF -> player 1
-    const expectedOwner = (opts && opts.targetName === "BFPixel") ? 2 : 1;
-
-    // local player number (0 = offline/not in lobby)
-    const localPlayerNumber = (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.getCurrentPlayerNumber === 'function') ? gdjs.multiplayer.getCurrentPlayerNumber() : 0;
-
-    // per-player timing (ownerPlayerId decides defaults)
-    const perPlayerSettings = {
-      idleReturnDelay: expectedOwner === 2 ? 1000 : 300,   // player2 gets longer return to idle
-      forcedBuffer: expectedOwner === 2 ? 800 : 50,        // buffer to ensure whole animation plays for player2
-      idleBeatDelay: expectedOwner === 2 ? 1500 : 1000
-    };
-
-    const state = {
-      current: "idle",
-      frameIndex: 0,
-      elapsed: 0,
-      lastAnimValue: "",
-      lastTick: performance.now(),
-      _idleBeatTimeout: null,
-      _returnToIdleTimeout: null,
-      _createdBlobUrls: animations._createdBlobUrls || [],
-      _isPlayingSingAnimation: false,
-      _idleTimerRunning: false,
-      _forcedAnimEndTime: 0,
-      _settings: perPlayerSettings,
-      _raf: null
-    };
-
-    // helper: detect removed object and cleanup
-    function objectIsValid(){
-      try {
-        if (!info || !info.obj) return false;
-        // basic validity test: should have getX
-        return (typeof info.obj.getX === 'function');
-      } catch(e){ return false; }
-    }
-
-    const meta = (animations && animations.metadata) ? animations.metadata : (animations && animations.meta) ? animations.meta : {};
-
-    // parse OPPSide from package metadata if present (fallback to false)
-    const parseBoolean = (v) => { if (typeof v === "boolean") return v; if (typeof v === "number") return v !== 0; if (typeof v === "string") { const s = v.trim().toLowerCase(); if (s === "true" || s === "1" || s === "yes") return true; if (s === "false" || s === "0" || s === "no") return false; } return Boolean(v); };
-    const oppSideBool = parseBoolean((animations && animations.metadata && animations.metadata.OPPSide) ? animations.metadata.OPPSide : (meta.OPPSide));
-    const invertSideGlobal = (opts && opts.targetName === "BFPixel") ? !oppSideBool : oppSideBool;
-
-    function mapAnimToKey(rawAnim, invertSide){ if (!rawAnim) return ""; const v = rawAnim.toLowerCase(); if (invertSide) { if (v.includes("left")) return "singRIGHT"; if (v.includes("right")) return "singLEFT"; } else { if (v.includes("left")) return "singLEFT"; if (v.includes("right")) return "singRIGHT"; } if (v.includes("down")) return "singDOWN"; if (v.includes("up")) return "singUP"; return rawAnim; }
-
-    // read animation variable from the object only (object variables are the right place in multiplayer)
-    function readCurrentAnim(){
-      try {
-        if (info.obj && typeof info.obj.getVariables === 'function'){
-          const ov = info.obj.getVariables();
-          if (ov && ov.has && ov.has(TARGET_ANIM_VAR)) return ov.get(TARGET_ANIM_VAR).getAsString();
-        }
-      } catch(e){}
-      return ""; // do NOT fallback to scene/game variables: keep per-object isolation
-    }
-
-    function clearAllTimeouts(){ if (state._idleBeatTimeout){ clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout=null; } if (state._returnToIdleTimeout){ clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout=null; } state._idleTimerRunning = false; }
-
-    function tickSingle(now){
-      try {
-        // If object removed from scene, cleanup controller
-        if (!objectIsValid()){
-          cleanup();
-          return;
-        }
-
-        const dt = Math.min(100, now - (state.lastTick || now));
-        state.lastTick = now;
-
-        const currentAnim = readCurrentAnim();
-
-        if (currentAnim && currentAnim.trim() !== "" && currentAnim !== state.lastAnimValue){
-          clearAllTimeouts();
-          const key = mapAnimToKey(currentAnim, invertSideGlobal);
-          if (animations[key] && animations[key].frames && animations[key].frames.length > 0){
-            state.current = key; state.frameIndex = 0; state.elapsed = 0; state._isPlayingSingAnimation = true;
-            const anim = animations[key]; const msPerFrame = 1000 / (anim.fps || 24); const totalMs = (anim.frames.length || 1) * msPerFrame;
-            state._forcedAnimEndTime = performance.now() + Math.max(totalMs, 50) + state._settings.forcedBuffer;
-            // apply first frame to this single object only
-            applyFrameToObject(info, anim.frames[0], invertSideGlobal, coordinateMode, invertOffsetY);
-            state.lastAnimValue = currentAnim;
-          }
-        }
-
-        // If animation var cleared, only return to idle when forced time expired
-        if (state.current !== "idle" && (currentAnim === "" || currentAnim == null) && !state._idleTimerRunning){
-          if (performance.now() < state._forcedAnimEndTime){ /* wait until forced end */ }
-          else {
-            state._idleTimerRunning = true;
-            if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
-            state._returnToIdleTimeout = setTimeout(()=>{
-              state.current = "idle"; state.frameIndex = 0; state.elapsed = 0; state._forcedAnimEndTime = 0; if (animations.idle && animations.idle.frames[0]) applyFrameToObject(info, animations.idle.frames[0], invertSideGlobal, coordinateMode, invertOffsetY); state._returnToIdleTimeout = null; state._idleTimerRunning = false;
-            }, state._settings.idleReturnDelay);
-          }
-        }
-
-        if (state._idleTimerRunning && currentAnim !== "") clearAllTimeouts();
-
-        const anim = animations[state.current];
-        if (anim && anim.frames && anim.frames.length > 0){
-          const msPerFrame = 1000 / (anim.fps || 24);
-          state.elapsed += dt;
-          let frameChanged = false;
-          while (state.elapsed >= msPerFrame && !frameChanged){
-            state.elapsed -= msPerFrame; state.frameIndex++; frameChanged = true;
-            if (state.frameIndex >= anim.frames.length){
-              if (anim.loop){
-                if (anim.name === "idle" || state.current === "idle"){
-                  state.frameIndex = anim.frames.length - 1;
-                  if (!state._idleBeatTimeout){ state._idleBeatTimeout = setTimeout(()=>{ state._idleBeatTimeout = null; state.current = "idle"; state.frameIndex = 0; state.elapsed = 0; state._forcedAnimEndTime = 0; if (animations.idle && animations.idle.frames && animations.idle.frames[0]) applyFrameToObject(info, animations.idle.frames[0], invertSideGlobal, coordinateMode, invertOffsetY); }, state._settings.idleBeatDelay); }
-                } else { state.frameIndex = 0; }
-              } else { state.frameIndex = anim.frames.length - 1; if (state._isPlayingSingAnimation) state._isPlayingSingAnimation = false; state._forcedAnimEndTime = Math.max(state._forcedAnimEndTime, performance.now()); }
-            }
-          }
-          if (frameChanged){ const tex = anim.frames[state.frameIndex]; if (tex) applyFrameToObject(info, tex, invertSideGlobal, coordinateMode, invertOffsetY); }
-        }
-
-        state._raf = requestAnimationFrame(tickSingle);
-      } catch(e){
-        // safety: if anything fatal happens, cleanup controller to avoid infinite errors
-        console.error("Per-object tick error, cleaning up controller:", e);
-        cleanup();
-      }
-    }
-
-    // start with idle frame (if available)
-    if (animations.idle && animations.idle.frames && animations.idle.frames[0]) applyFrameToObject(info, animations.idle.frames[0], invertSideGlobal, coordinateMode, invertOffsetY);
-    state._raf = requestAnimationFrame(tickSingle);
-
-    function cleanup(){ try{ if (state._raf) cancelAnimationFrame(state._raf); if (state._idleBeatTimeout) clearTimeout(state._idleBeatTimeout); if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout); try { for (const b of state._createdBlobUrls) { try{ URL.revokeObjectURL(b);}catch(e){} } } catch(e){} }catch(e){} 
-      // remove marker on object if present
-      try { if (info && info.obj && info.obj._gd_skin_player_instance_key) { delete info.obj._gd_skin_player_instance_key; } } catch(e){} 
-    }
-
-    return { state, cleanup };
-  }
-
-  // apply package: create per-object controllers to avoid cross-player interference
   async function applyPackageToScene(runtimeScene, packageObj, opts = {}) {
     const TARGET_NAME = (opts && opts.targetName) ? opts.targetName : "BF";
+    const TARGET_ANIM_VAR = (opts && opts.targetAnimVar) ? opts.targetAnimVar : "BFAnim";
+    const invertOffsetY = (typeof opts.invertOffsetY === "boolean") ? opts.invertOffsetY : false;
+    const coordinateMode = (opts.coordinateMode === "raw") ? "raw" : "psych";
+
     const animations = packageObj.animations || {};
     const targetObjects = runtimeScene.getObjects(TARGET_NAME);
-    if (!targetObjects || targetObjects.length === 0) { warn(TARGET_NAME + " not found in scene when applying skin. Aborting apply."); return null; }
-
-    // prepare targetInfos
-    const targetInfos = [];
-    for (const obj of targetObjects){
-      try { const info = computeCenterAndFeetForObject(obj); let originalScaleX = 1; try{ const ro = obj.getRendererObject && obj.getRendererObject(); if (ro){ if (ro.scale && typeof ro.scale.x === 'number') originalScaleX = ro.scale.x; else if (typeof ro.scaleX === 'number') originalScaleX = ro.scaleX; } }catch(e){} const originalAbsScaleX = Math.abs(typeof originalScaleX === 'number' && isFinite(originalScaleX) ? originalScaleX : 1) || 1; targetInfos.push({ obj, centerX: info.centerX, feetY: info.feetY, anchorX: info.anchorX, anchorY: info.anchorY, size: info.size, originalScaleX, originalAbsScaleX, originalX: info.originalX, originalY: info.originalY, pixelToSceneOriginal: (typeof info.pixelToSceneOriginal === 'number' && isFinite(info.pixelToSceneOriginal)) ? info.pixelToSceneOriginal : 1 }); } catch(e){ const fallbackSize = getObjectSize(obj); const gx = (typeof obj.getX === 'function') ? obj.getX() : 0; const gy = (typeof obj.getY === 'function') ? obj.getY() : 0; targetInfos.push({ obj, centerX: gx, feetY: gy + (fallbackSize.h || 0), anchorX: 0.5, anchorY: 0, size: fallbackSize, originalScaleX: 1, originalAbsScaleX: 1, originalX: gx, originalY: gy, pixelToSceneOriginal: 1 }); }
+    if (!targetObjects || targetObjects.length === 0) {
+      warn(TARGET_NAME + " not found in scene when applying skin. Aborting apply.");
+      return null;
     }
 
-    // ensure instances container
-    window.GD_SKIN_PLAYER = window.GD_SKIN_PLAYER || {}; window.GD_SKIN_PLAYER.instances = window.GD_SKIN_PLAYER.instances || {};
+    // CAPTURAR POSIÇÕES ORIGINAIS
+    const targetInfos = [];
+    for (const obj of targetObjects) {
+      try {
+        const info = computeCenterAndFeetForObject(obj);
+        let originalScaleX = 1;
+        try {
+          const ro = obj.getRendererObject && obj.getRendererObject();
+          if (ro) {
+            if (ro.scale && typeof ro.scale.x === "number") originalScaleX = ro.scale.x;
+            else if (typeof ro.scaleX === "number") originalScaleX = ro.scaleX;
+          }
+        } catch(e){}
+        
+        // use absolute value as baseline to avoid inheriting an unwanted flip
+        const originalAbsScaleX = Math.abs(typeof originalScaleX === "number" && isFinite(originalScaleX) ? originalScaleX : 1) || 1;
 
-    // cleanup previous instances for this TARGET_NAME to avoid duplicates
-    try { for (const key of Object.keys(window.GD_SKIN_PLAYER.instances)) { if (key.startsWith(TARGET_NAME + "#")) { try { window.GD_SKIN_PLAYER.instances[key].cleanup(); } catch(e){} delete window.GD_SKIN_PLAYER.instances[key]; } } } catch(e){}
+        targetInfos.push({ 
+          obj, 
+          centerX: info.centerX, 
+          feetY: info.feetY, 
+          anchorX: info.anchorX, 
+          anchorY: info.anchorY, 
+          size: info.size, 
+          originalScaleX,
+          originalAbsScaleX,
+          originalX: info.originalX,
+          originalY: info.originalY,
+          pixelToSceneOriginal: (typeof info.pixelToSceneOriginal === "number" && isFinite(info.pixelToSceneOriginal)) ? info.pixelToSceneOriginal : 1
+        });
+        
+        log(`Original ${TARGET_NAME} pos - X:${info.originalX} Y:${info.originalY} centerX:${info.centerX} feetY:${info.feetY} size:${info.size.w}x${info.size.h} anchor:(${info.anchorX},${info.anchorY}) pxToScene:${info.pixelToSceneOriginal}`);
+      } catch(e){
+        const fallbackSize = getObjectSize(obj);
+        const gx = (typeof obj.getX === "function") ? obj.getX() : 0;
+        const gy = (typeof obj.getY === "function") ? obj.getY() : 0;
+        targetInfos.push({ 
+          obj, 
+          centerX: gx, 
+          feetY: gy + (fallbackSize.h || 0),
+          anchorX: 0.5, 
+          anchorY: 0, 
+          size: fallbackSize, 
+          originalScaleX: 1,
+          originalAbsScaleX: 1,
+          originalX: gx,
+          originalY: gy,
+          pixelToSceneOriginal: 1
+        });
+      }
+    }
 
-    // compute local player number (for ownership decisions)
-    const localPlayerNumber = (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.getCurrentPlayerNumber === 'function') ? gdjs.multiplayer.getCurrentPlayerNumber() : 0;
+    const state = {
+      current: "idle", 
+      frameIndex: 0, 
+      elapsed: 0, 
+      lastAnimValue: "", 
+      lastTick: performance.now(),
+      _idleBeatTimeout: null, 
+      _returnToIdleTimeout: null, 
+      _createdBlobUrls: packageObj._createdBlobUrls || [], 
+      _isPlayingSingAnimation: false,
+      _idleTimerRunning: false
+    };
 
-    // detect OPPSide from package metadata (used for passive idle application when not owner)
-    const parseBoolean = (v) => { if (typeof v === "boolean") return v; if (typeof v === "number") return v !== 0; if (typeof v === "string") { const s = v.trim().toLowerCase(); if (s === "true" || s === "1" || s === "yes") return true; if (s === "false" || s === "0" || s === "no") return false; } return Boolean(v); };
-    const oppSideBoolPkg = parseBoolean(packageObj.metadata && packageObj.metadata.OPPSide);
+    const meta = packageObj.metadata || {};
+    
+    // CORREÇÃO CRÍTICA: Lógica do flip para Opponent
+    let invertSideGlobal = false;
 
-    // create per-object players or apply passive idle for non-owner
-    targetInfos.forEach((info, idx) => {
-      // determine expected owner by convention
-      const expectedOwner = (TARGET_NAME === "BFPixel") ? 2 : 1;
+    // normalizar meta.OPPSide para boolean robusto (aceita "true"/"false"/1/0)
+    const parseBoolean = (v) => {
+      if (typeof v === "boolean") return v;
+      if (typeof v === "number") return v !== 0;
+      if (typeof v === "string") {
+        const s = v.trim().toLowerCase();
+        if (s === "true" || s === "1" || s === "yes") return true;
+        if (s === "false" || s === "0" || s === "no") return false;
+      }
+      return Boolean(v);
+    };
+    const oppSideBool = parseBoolean(meta.OPPSide);
 
-      // try to detect explicit ownership stored on the object (commonly used pattern)
-      let objectOwner = null;
-      try { if (info.obj && typeof info.obj.getVariables === 'function') { const ov = info.obj.getVariables(); if (ov && ov.has && ov.has('PlayerID')) objectOwner = ov.get('PlayerID').getAsNumber(); else if (ov && ov.has && ov.has('OwnerPlayer')) objectOwner = ov.get('OwnerPlayer').getAsNumber(); } } catch(e){}
-      const finalOwner = (typeof objectOwner === 'number' && !isNaN(objectOwner) && objectOwner > 0) ? objectOwner : expectedOwner;
+    if (TARGET_NAME === "BFPixel") {
+      // OPPSide = true -> SEM flip (normal), OPPSide = false -> COM flip
+      invertSideGlobal = !oppSideBool;
+      log(`Opponent flip logic: OPPSide=${meta.OPPSide} (parsed=${oppSideBool}), invertSideGlobal=${invertSideGlobal}`);
+    } else {
+      // BF: OPPSide = true -> COM flip, OPPSide = false -> SEM flip  
+      invertSideGlobal = oppSideBool;
+      log(`BF flip logic: OPPSide=${meta.OPPSide} (parsed=${oppSideBool}), invertSideGlobal=${invertSideGlobal}`);
+    }
 
-      // If local player is known and not the owner, do a passive apply (no controller). Otherwise create controller.
-      const ams = animations || {};
-      const invertSideGlobal = (TARGET_NAME === "BFPixel") ? !oppSideBoolPkg : oppSideBoolPkg;
-      if (localPlayerNumber > 0 && localPlayerNumber !== finalOwner){
-        // Passive: apply idle frame immediately so non-owner has reasonable visual until replication arrives.
-        if (ams.idle && ams.idle.frames && ams.idle.frames[0]) applyFrameToObject(info, ams.idle.frames[0], invertSideGlobal, (opts && opts.coordinateMode === 'raw') ? 'raw' : 'psych', !!opts.invertOffsetY);
-        // save applied skin info in object variable for debugging / sync
-        try { if (info.obj && typeof info.obj.getVariables === 'function'){ const ov = info.obj.getVariables(); if (ov && ov.has){ try{ if (!ov.has('AppliedSkin')) ov.get('AppliedSkin').setString && ov.get('AppliedSkin').setString(JSON.stringify(packageObj.metadata || {})); else ov.get('AppliedSkin').setString && ov.get('AppliedSkin').setString(JSON.stringify(packageObj.metadata || {})); }catch(e){} } } } catch(e){}
-        return;
+    function mapAnimToKey(rawAnim, invertSide){
+      if (!rawAnim) return "";
+      const v = rawAnim.toLowerCase();
+      if (invertSide) {
+        if (v.includes("left")) return "singRIGHT";
+        if (v.includes("right")) return "singLEFT";
+      } else {
+        if (v.includes("left")) return "singLEFT";
+        if (v.includes("right")) return "singRIGHT";
+      }
+      if (v.includes("down")) return "singDOWN";
+      if (v.includes("up")) return "singUP";
+      return rawAnim;
+    }
+
+    function applyFrameToAllObjects(tex){
+      if (!targetInfos || targetInfos.length === 0) return;
+      const texPixel = getTexturePixelSize(tex);
+      const texPxW = texPixel.w || 0;
+      const texPxH = texPixel.h || 0;
+
+      for (const info of targetInfos) {
+        const obj = info.obj;
+        try {
+          // Aplicar textura
+          const ro = obj.getRendererObject && obj.getRendererObject();
+          if (ro && ro.texture !== undefined) {
+            ro.texture = tex;
+          } else {
+            try { obj.getRendererObject().texture = tex; } catch(e){}
+          }
+
+          const ox_scene = 0;
+          const oy_scene = 0;
+
+          let pixelToScene = 1;
+          if (coordinateMode === "psych") {
+            pixelToScene = (typeof info.pixelToSceneOriginal === "number" && info.pixelToSceneOriginal > 0) ? info.pixelToSceneOriginal : 1;
+          } else {
+            pixelToScene = 1;
+          }
+
+          const oyAdjusted = invertOffsetY ? -oy_scene : oy_scene;
+
+          // USAR DIMENSÕES EXATAS DA TEXTURA
+          const scaledTexWidth = texPxW * pixelToScene;
+          const scaledTexHeight = texPxH * pixelToScene;
+
+          const targetFeetY = info.feetY + oyAdjusted;
+          const targetCenterX = info.centerX + ox_scene;
+
+          const anchorX = (typeof info.anchorX === "number") ? info.anchorX : 0.5;
+          const anchorY = (typeof info.anchorY === "number") ? info.anchorY : 0;
+
+          const currentWidth = scaledTexWidth;
+          const currentHeight = scaledTexHeight;
+
+          const targetObjX = targetCenterX - (0.5 - anchorX) * currentWidth;
+          const targetObjY = targetFeetY - (1 - anchorY) * currentHeight;
+
+          if (typeof obj.setX === "function") obj.setX(targetObjX);
+          if (typeof obj.setY === "function") obj.setY(targetObjY);
+
+          // CORREÇÃO APLICADA: Lógica de flip corrigida usando originalAbsScaleX
+          try {
+            if (ro) {
+              // baseline absoluto (garante que não herdamos um flip indesejado do original)
+              const baseScale = (typeof info.originalAbsScaleX === "number" && info.originalAbsScaleX > 0) ? info.originalAbsScaleX : (Math.abs(info.originalScaleX) || 1);
+              const wantScaleX = invertSideGlobal ? -baseScale : baseScale;
+
+              if (ro.scale && typeof ro.scale.x === "number") {
+                ro.scale.x = wantScaleX;
+              } else if (typeof ro.scaleX === "number") {
+                ro.scaleX = wantScaleX;
+              } else {
+                ro.scale = ro.scale || {};
+                if (typeof ro.scale.x === "number") ro.scale.x = wantScaleX;
+              }
+              
+              log(`Applied scale to ${TARGET_NAME}: ${wantScaleX} (invertSideGlobal: ${invertSideGlobal})`);
+            }
+          } catch(e){
+            warn("Error applying scale:", e);
+          }
+
+          const newFeetY = targetObjY + (1 - anchorY) * currentHeight;
+          const newCenterX = targetObjX + (0.5 - anchorX) * currentWidth;
+          log(`Applied frame to ${TARGET_NAME} - Texture:${texPxW}x${texPxH} Scaled:${scaledTexWidth}x${scaledTexHeight} ActualFeetY:${newFeetY} ActualCenterX:${newCenterX}`);
+        } catch(e){
+          console.error("Error applying frame to object:", e);
+        }
+      }
+    }
+
+    // Aplicar frame inicial (idle)
+    if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
+      applyFrameToAllObjects(animations.idle.frames[0]);
+    }
+
+    let rafHandle = null;
+    function clearAllTimeouts(){ 
+      if (state._idleBeatTimeout){ clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout=null; } 
+      if (state._returnToIdleTimeout){ clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout=null; } 
+      state._idleTimerRunning = false;
+    }
+    
+    function tick(now){
+      const dt = Math.min(100, now - (state.lastTick || now)); 
+      state.lastTick = now;
+      
+      let currentAnim = "";
+      try {
+        const sv = runtimeScene.getVariables();
+        const gv = runtimeScene.getGame().getVariables();
+        currentAnim = sv.has(TARGET_ANIM_VAR) ? sv.get(TARGET_ANIM_VAR).getAsString() : (gv.has(TARGET_ANIM_VAR) ? gv.get(TARGET_ANIM_VAR).getAsString() : "");
+      } catch(e){}
+      
+      // LÓGICA DO TIMER CORRIGIDA: só inicia quando animação for diferente
+      if (currentAnim && currentAnim.trim() !== "" && currentAnim !== state.lastAnimValue){
+        clearAllTimeouts();
+        const key = mapAnimToKey(currentAnim, invertSideGlobal);
+        if (animations[key] && animations[key].frames && animations[key].frames.length > 0){
+          state.current = key; 
+          state.frameIndex = 0; 
+          state.elapsed = 0; 
+          state._isPlayingSingAnimation = true;
+          const anim = animations[key]; 
+          applyFrameToAllObjects(anim.frames[0]); 
+          log("Started animation:", key);
+        }
+      }
+      
+      // Se a animação atual não é idle e a variável está vazia/diferente, iniciar timer
+      if (state.current !== "idle" && currentAnim === "" && !state._idleTimerRunning) {
+        state._idleTimerRunning = true;
+        if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
+        state._returnToIdleTimeout = setTimeout(()=>{
+          state.current = "idle"; 
+          state.frameIndex = 0; 
+          state.elapsed = 0;
+          if (animations.idle && animations.idle.frames[0]) {
+            applyFrameToAllObjects(animations.idle.frames[0]);
+          }
+          state._returnToIdleTimeout = null; 
+          state._idleTimerRunning = false;
+          log("Returned to idle after animation completion");
+        }, 300);
+      }
+      
+      // Se a animação mudou durante o timer, cancelar
+      if (state._idleTimerRunning && currentAnim !== "") {
+        clearAllTimeouts();
+      }
+      
+      state.lastAnimValue = currentAnim;
+
+      const anim = animations[state.current];
+      if (anim && anim.frames && anim.frames.length > 0){
+        const msPerFrame = 1000 / (anim.fps || 24);
+        state.elapsed += dt;
+        let frameChanged = false;
+        while (state.elapsed >= msPerFrame && !frameChanged){
+          state.elapsed -= msPerFrame; 
+          state.frameIndex++; 
+          frameChanged = true;
+          if (state.frameIndex >= anim.frames.length){
+            if (anim.loop){
+              if (anim.name === "idle" || state.current === "idle"){
+                state.frameIndex = anim.frames.length - 1;
+                if (!state._idleBeatTimeout){
+                  state._idleBeatTimeout = setTimeout(()=>{
+                    state._idleBeatTimeout = null;
+                    state.current = "idle";
+                    state.frameIndex = 0;
+                    state.elapsed = 0;
+                    if (animations.idle && animations.idle.frames && animations.idle.frames[0]){
+                      applyFrameToAllObjects(animations.idle.frames[0]);
+                    }
+                    log("Idle loop restarted after 1s delay");
+                  }, 1000);
+                }
+              } else {
+                state.frameIndex = 0;
+              }
+            } else {
+              state.frameIndex = anim.frames.length - 1;
+              if (state._isPlayingSingAnimation){
+                state._isPlayingSingAnimation = false;
+              }
+            }
+          }
+        }
+        if (frameChanged){
+          const tex = anim.frames[state.frameIndex]; 
+          if (tex) applyFrameToAllObjects(tex);
+        }
       }
 
-      // owner (or offline) -> create per-object controller
-      const inst = createPerObjectPlayer(runtimeScene, info, ams, { ...opts, targetName: TARGET_NAME });
-      const key = `${TARGET_NAME}#${idx}`;
-      window.GD_SKIN_PLAYER.instances[key] = inst;
+      rafHandle = requestAnimationFrame(tick);
+    }
+    rafHandle = requestAnimationFrame(tick);
 
-      // mark instance key on object for robust cleanup / avoiding duplicates later
-      try { info.obj._gd_skin_player_instance_key = key; } catch(e){}
+    function cleanup(){
+      if (rafHandle) cancelAnimationFrame(rafHandle);
+      clearAllTimeouts();
+      try { 
+        for (const b of state._createdBlobUrls){ 
+          try{ URL.revokeObjectURL(b); }catch(e){} 
+        } 
+      } catch(e){}
+      log("Player cleaned for " + TARGET_NAME);
+    }
 
-      // store applied skin metadata in object variable (helps keep per-object state and avoids global variables race)
-      try { if (info.obj && typeof info.obj.getVariables === 'function'){ const ov = info.obj.getVariables(); if (ov && ov.has){ try{ if (!ov.has('AppliedSkin')) ov.get('AppliedSkin').setString && ov.get('AppliedSkin').setString(JSON.stringify(packageObj.metadata || {})); else ov.get('AppliedSkin').setString && ov.get('AppliedSkin').setString(JSON.stringify(packageObj.metadata || {})); }catch(e){} } } } catch(e){}
-    });
-
-    return { target: TARGET_NAME, count: targetInfos.length };
+    const instance = { animations, state, cleanup, target: TARGET_NAME };
+    window[PLAYER_GLOBAL] = instance;
+    log("Player applied to " + TARGET_NAME + ". Anims:", Object.keys(animations).map(k=>`${k}(${animations[k].frames.length})`).join(", "));
+    return instance;
   }
 
-  // auto-apply for BF (per-player aware)
-  async function autoApplySelectedSkin(runtimeScene, opts = {}){
+  async function autoApplySelectedSkin(runtimeScene, opts = {}) {
     const defaults = (opts && opts.extraDefaults) ? opts.extraDefaults : { owner: "LucyYuih", repo: "gdev-custom-skins", branch: "main" };
     let selStr = null;
-    try{ const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString(); }catch(e){}
-    if ((!selStr || selStr.trim() === "") && window.localStorage){ try{ selStr = localStorage.getItem("gd_selected_skin"); }catch(e){} }
+    try {
+      const gv = runtimeScene.getGame().getVariables();
+      if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString();
+    } catch(e){}
+    if ((!selStr || selStr.trim() === "") && window.localStorage) {
+      try { selStr = localStorage.getItem("gd_selected_skin"); } catch(e){}
+    }
     if (!selStr) { log("autoApply: no SelectedSkin present."); return null; }
-    const parsed = safeParseJson(selStr); if (!parsed) { warn("autoApply: SelectedSkin invalid JSON:", selStr); return null; }
+    const parsed = safeParseJson(selStr);
+    if (!parsed) { warn("autoApply: SelectedSkin invalid JSON:", selStr); return null; }
+    log("autoApplySelectedSkin found:", parsed);
 
     const candidates = [];
     if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
-    if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); candidates.push(parsed.zip.replace(/ /g,"%20")); candidates.push("resources/" + parsed.zip.replace(/ /g,"%20")); }
-
-    const playerOnline = getPlayerOnlineValue(runtimeScene);
-    const lobbyRunning = isLobbyRunning(runtimeScene);
-    log(`Multiplayer check -> PlayerOnline=${playerOnline}, LobbyRunning=${lobbyRunning}`);
-
-    try{ let manifest = null; try{ const r = await fetch("resources/manifestskins.json"); if (r.ok) manifest = await r.json(); }catch(e){} if (!manifest){ const cdnTry = buildCdnUrl(defaults.owner, defaults.repo, defaults.branch, "manifestskins.json"); try{ const r2 = await fetch(cdnTry); if (r2.ok) manifest = await r2.json(); }catch(e){} } if (manifest && manifest._base){ const [ownerRepo, branch] = manifest._base.split("@"); const [owner, repo] = ownerRepo.split("/"); if (parsed.zip){ const cdnBuilt = buildCdnUrl(owner, repo, branch || "main", parsed.zip); if (cdnBuilt) candidates.unshift(cdnBuilt); } } }catch(e){ warn("manifest detection failed", e); }
-
-    let lastErr = null;
-    for (const c of candidates){
-      try{
-        log("player fetch try ->", c);
-        const r = await fetch(c); if (!r.ok) throw new Error("Fetch failed " + r.status);
-        const arr = await r.arrayBuffer(); log("player fetch ok ->", c);
-        const pkg = await loadFromArrayBuffer(runtimeScene, arr);
-
-        // rule: if playerOnline === 2 -> apply the BF selected skin to BFPixel and cleanup BF instances
-        if (playerOnline === 2){
-          log("PlayerOnline == 2: applying BF skin to BFPixel and removing BF instances");
-          try { if (window.GD_SKIN_PLAYER && window.GD_SKIN_PLAYER.instances) { for (const k of Object.keys(window.GD_SKIN_PLAYER.instances)) { if (k.startsWith("BF#")) { try { window.GD_SKIN_PLAYER.instances[k].cleanup(); } catch(e){} delete window.GD_SKIN_PLAYER.instances[k]; } } } } catch(e){}
-
-          const inst = await applyPackageToScene(runtimeScene, pkg, { ...opts, targetName: "BFPixel", targetAnimVar: "OPPAnim" });
-
-          try{ const playerKey = "SelectedSkin_P2"; const gv2 = runtimeScene.getGame().getVariables(); if (gv2.has(playerKey)) gv2.get(playerKey).setString(JSON.stringify(Object.assign({}, parsed, { zip_cdn: c }))); else runtimeScene.getGame().getVariables().pushNew(playerKey).setString(JSON.stringify(Object.assign({}, parsed, { zip_cdn: c }))); try{ localStorage.setItem(playerKey, JSON.stringify(Object.assign({}, parsed, { zip_cdn: c }))); }catch(e){} log("Updated "+playerKey+" ->", c); }catch(e){ warn("failed saving per-player SelectedSkin", e); }
-
-          return inst;
-        }
-
-        // normal apply (playerOnline !== 2)
-        const inst = await applyPackageToScene(runtimeScene, pkg, opts);
-        try{ const playerKey = (playerOnline === 2) ? "SelectedSkin_P2" : "SelectedSkin_P1"; const gv2 = runtimeScene.getGame().getVariables(); if (gv2.has(playerKey)) gv2.get(playerKey).setString(JSON.stringify(Object.assign({}, parsed, { zip_cdn: c }))); else runtimeScene.getGame().getVariables().pushNew(playerKey).setString(JSON.stringify(Object.assign({}, parsed, { zip_cdn: c }))); try{ localStorage.setItem(playerKey, JSON.stringify(Object.assign({}, parsed, { zip_cdn: c }))); }catch(e){} log("Updated "+playerKey+" ->", c); }catch(e){ warn("failed saving per-player SelectedSkin", e); }
-        return inst;
-
-      } catch(err){ lastErr = err; warn("player fetch failed for candidate ->", c, err && err.message ? err.message : err); }
+    if (parsed.zip) {
+      candidates.push(parsed.zip);
+      candidates.push("resources/" + parsed.zip);
+      candidates.push("./" + parsed.zip);
+      candidates.push(parsed.zip.replace(/ /g,"%20"));
+      candidates.push("resources/" + parsed.zip.replace(/ /g,"%20"));
     }
 
+    try {
+      let manifest = null;
+      try { const r = await fetch("resources/manifestskins.json"); if (r.ok) manifest = await r.json(); } catch(e){}
+      if (!manifest) {
+        const cdnTry = buildCdnUrl(defaults.owner, defaults.repo, defaults.branch, "manifestskins.json");
+        try { const r2 = await fetch(cdnTry); if (r2.ok) manifest = await r2.json(); } catch(e){}
+      }
+      if (manifest && manifest._base) {
+        const [ownerRepo, branch] = manifest._base.split("@");
+        const [owner, repo] = ownerRepo.split("/");
+        if (parsed.zip) {
+          const cdnBuilt = buildCdnUrl(owner, repo, branch || "main", parsed.zip);
+          if (cdnBuilt) candidates.unshift(cdnBuilt);
+        }
+      }
+    } catch(e){ warn("manifest detection failed", e); }
+
+    let lastErr = null;
+    for (const c of candidates) {
+      try {
+        log("player fetch try ->", c);
+        const r = await fetch(c);
+        if (!r.ok) throw new Error("Fetch failed " + r.status);
+        const arr = await r.arrayBuffer();
+        log("player fetch ok ->", c);
+        const pkg = await loadFromArrayBuffer(runtimeScene, arr);
+        const inst = await applyPackageToScene(runtimeScene, pkg, opts);
+
+        try {
+          if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
+          window.GD_SKIN_PLAYER.lastAppliedZipSource = c;
+          window.GD_SKIN_PLAYER.lastAppliedPackage = pkg;
+        } catch(e){}
+
+        try {
+          const selToSave = Object.assign({}, parsed, { zip_cdn: c });
+          const gv2 = runtimeScene.getGame().getVariables();
+          if (gv2.has("SelectedSkin")) gv2.get("SelectedSkin").setString(JSON.stringify(selToSave));
+          else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(selToSave));
+          try { localStorage.setItem("gd_selected_skin", JSON.stringify(selToSave)); } catch(e){}
+          log("Updated SelectedSkin.zip_cdn ->", c);
+        } catch(e){ warn("failed saving zip_cdn", e); }
+        return inst;
+      } catch(err){
+        lastErr = err;
+        warn("player fetch failed for candidate ->", c, err && err.message ? err.message : err);
+      }
+    }
     warn("autoApplySelectedSkin: all candidates failed.", lastErr);
     return null;
   }
 
-  // auto apply for Dad/Opponent (respects lobby rules)
-  async function autoApplySelectedDadSkin(runtimeScene, opts = {}){
+  async function autoApplySelectedDadSkin(runtimeScene, opts = {}) {
     const defaults = (opts && opts.extraDefaults) ? opts.extraDefaults : { owner: "LucyYuih", repo: "gdev-custom-skins", branch: "main" };
     let selStr = null;
-    try{ const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("SelectedDadSkin")) selStr = gv.get("SelectedDadSkin").getAsString(); }catch(e){}
-    if ((!selStr || selStr.trim() === "") && window.localStorage){ try{ selStr = localStorage.getItem("gd_selected_dad_skin"); }catch(e){} }
+    try {
+      const gv = runtimeScene.getGame().getVariables();
+      if (gv.has("SelectedDadSkin")) selStr = gv.get("SelectedDadSkin").getAsString();
+    } catch(e){}
+    if ((!selStr || selStr.trim() === "") && window.localStorage) {
+      try { selStr = localStorage.getItem("gd_selected_dad_skin"); } catch(e){}
+    }
     if (!selStr) { log("autoApply: no SelectedDadSkin present."); return null; }
-    const parsed = safeParseJson(selStr); if (!parsed) { warn("autoApply: SelectedDadSkin invalid JSON:", selStr); return null; }
+    const parsed = safeParseJson(selStr);
+    if (!parsed) { warn("autoApply: SelectedDadSkin invalid JSON:", selStr); return null; }
+    log("autoApplySelectedDadSkin found:", parsed);
 
     const candidates = [];
     if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
-    if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); candidates.push(parsed.zip.replace(/ /g,"%20")); candidates.push("resources/" + parsed.zip.replace(/ /g,"%20")); }
-
-    const playerOnline = getPlayerOnlineValue(runtimeScene);
-    const lobbyRunning = isLobbyRunning(runtimeScene);
-    log(`Multiplayer check (Dad) -> PlayerOnline=${playerOnline}, LobbyRunning=${lobbyRunning}`);
-
-    // if player 1 in lobby: skip opponent apply (host controls BF in lobby)
-    if (playerOnline === 1 && lobbyRunning){ log("PlayerOnline == 1 and lobby running: skipping opponent skin apply to avoid conflict"); return null; }
-
-    try{ let manifest = null; try{ const r = await fetch("resources/manifestskins.json"); if (r.ok) manifest = await r.json(); }catch(e){} if (!manifest){ const cdnTry = buildCdnUrl(defaults.owner, defaults.repo, defaults.branch, "manifestskins.json"); try{ const r2 = await fetch(cdnTry); if (r2.ok) manifest = await r2.json(); }catch(e){} } if (manifest && manifest._base){ const [ownerRepo, branch] = manifest._base.split("@"); const [owner, repo] = ownerRepo.split("/"); if (parsed.zip){ const cdnBuilt = buildCdnUrl(owner, repo, branch || "main", parsed.zip); if (cdnBuilt) candidates.unshift(cdnBuilt); } } }catch(e){ warn("manifest detection failed", e); }
-
-    let lastErr = null;
-    for (const c of candidates){
-      try{
-        log("player fetch try (Dad) ->", c);
-        const r = await fetch(c); if (!r.ok) throw new Error("Fetch failed " + r.status);
-        const arr = await r.arrayBuffer(); log("player fetch ok (Dad) ->", c);
-        const pkg = await loadFromArrayBuffer(runtimeScene, arr);
-        const inst = await applyPackageToScene(runtimeScene, pkg, { ...opts, targetName: "BFPixel", targetAnimVar: "OPPAnim" });
-        try{ const playerKey = (playerOnline === 2) ? "SelectedDadSkin_P2" : "SelectedDadSkin_P1"; const gv2 = runtimeScene.getGame().getVariables(); if (gv2.has(playerKey)) gv2.get(playerKey).setString(JSON.stringify(Object.assign({}, parsed, { zip_cdn: c }))); else runtimeScene.getGame().getVariables().pushNew(playerKey).setString(JSON.stringify(Object.assign({}, parsed, { zip_cdn: c }))); try{ localStorage.setItem(playerKey, JSON.stringify(Object.assign({}, parsed, { zip_cdn: c }))); }catch(e){} log("Updated "+playerKey+" ->", c); }catch(e){ warn("failed saving dad zip_cdn", e); }
-        return inst;
-      } catch(err){ lastErr = err; warn("player fetch failed for dad candidate ->", c, err && err.message ? err.message : err); }
+    if (parsed.zip) {
+      candidates.push(parsed.zip);
+      candidates.push("resources/" + parsed.zip);
+      candidates.push("./" + parsed.zip);
+      candidates.push(parsed.zip.replace(/ /g,"%20"));
+      candidates.push("resources/" + parsed.zip.replace(/ /g,"%20"));
     }
 
+    try {
+      let manifest = null;
+      try { const r = await fetch("resources/manifestskins.json"); if (r.ok) manifest = await r.json(); } catch(e){}
+      if (!manifest) {
+        const cdnTry = buildCdnUrl(defaults.owner, defaults.repo, defaults.branch, "manifestskins.json");
+        try { const r2 = await fetch(cdnTry); if (r2.ok) manifest = await r2.json(); } catch(e){}
+      }
+      if (manifest && manifest._base) {
+        const [ownerRepo, branch] = manifest._base.split("@");
+        const [owner, repo] = ownerRepo.split("/");
+        if (parsed.zip) {
+          const cdnBuilt = buildCdnUrl(owner, repo, branch || "main", parsed.zip);
+          if (cdnBuilt) candidates.unshift(cdnBuilt);
+        }
+      }
+    } catch(e){ warn("manifest detection failed", e); }
+
+    let lastErr = null;
+    for (const c of candidates) {
+      try {
+        log("player fetch try (Dad) ->", c);
+        const r = await fetch(c);
+        if (!r.ok) throw new Error("Fetch failed " + r.status);
+        const arr = await r.arrayBuffer();
+        log("player fetch ok (Dad) ->", c);
+        const pkg = await loadFromArrayBuffer(runtimeScene, arr);
+        const inst = await applyPackageToScene(runtimeScene, pkg, { 
+          ...opts, 
+          targetName: "BFPixel",
+          targetAnimVar: "OPPAnim"
+        });
+
+        try {
+          if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
+          window.GD_SKIN_PLAYER.lastAppliedDadZipSource = c;
+          window.GD_SKIN_PLAYER.lastAppliedDadPackage = pkg;
+        } catch(e){}
+
+        try {
+          const selToSave = Object.assign({}, parsed, { zip_cdn: c });
+          const gv2 = runtimeScene.getGame().getVariables();
+          if (gv2.has("SelectedDadSkin")) gv2.get("SelectedDadSkin").setString(JSON.stringify(selToSave));
+          else runtimeScene.getGame().getVariables().pushNew("SelectedDadSkin").setString(JSON.stringify(selToSave));
+          try { localStorage.setItem("gd_selected_dad_skin", JSON.stringify(selToSave)); } catch(e){}
+          log("Updated SelectedDadSkin.zip_cdn ->", c);
+        } catch(e){ warn("failed saving dad zip_cdn", e); }
+        return inst;
+      } catch(err){
+        lastErr = err;
+        warn("player fetch failed for dad candidate ->", c, err && err.message ? err.message : err);
+      }
+    }
     warn("autoApplySelectedDadSkin: all candidates failed.", lastErr);
     return null;
   }
 
-  function cleanupGlobal(){ try{ if (window.GD_SKIN_PLAYER && window.GD_SKIN_PLAYER.instances) { for (const k of Object.keys(window.GD_SKIN_PLAYER.instances)){ try{ const it = window.GD_SKIN_PLAYER.instances[k]; if (it && typeof it.cleanup === 'function') it.cleanup(); }catch(e){} } window.GD_SKIN_PLAYER.instances = {}; } }catch(e){} }
+  function cleanupGlobal(){ 
+    try { 
+      if (window[PLAYER_GLOBAL] && typeof window[PLAYER_GLOBAL].cleanup === "function") 
+        window[PLAYER_GLOBAL].cleanup(); 
+    } catch(e){} 
+    window[PLAYER_GLOBAL] = null; 
+  }
 
-  window.GD_SKIN_PLAYER = Object.assign(window.GD_SKIN_PLAYER || {}, { autoApplySelectedSkin, autoApplySelectedDadSkin, loadFromArrayBuffer, applyPackageToScene, cleanup: cleanupGlobal, lastDownloadedMetadata: window.GD_SKIN_PLAYER ? window.GD_SKIN_PLAYER.lastDownloadedMetadata : null, instances: (window.GD_SKIN_PLAYER && window.GD_SKIN_PLAYER.instances) ? window.GD_SKIN_PLAYER.instances : {} });
+  window.GD_SKIN_PLAYER = Object.assign(window.GD_SKIN_PLAYER || {}, { 
+    autoApplySelectedSkin, 
+    autoApplySelectedDadSkin,
+    loadFromArrayBuffer, 
+    applyPackageToScene, 
+    cleanup: cleanupGlobal, 
+    lastDownloadedMetadata: window.GD_SKIN_PLAYER ? window.GD_SKIN_PLAYER.lastDownloadedMetadata : null 
+  });
 
-  log("GD_SKIN_PLAYER ready. (multiplayer-aware, per-object controllers and timers)");
+  log("GD_SKIN_PLAYER ready. (Opponent flip FIXED)");
 
   (async ()=>{
-    try{ let rs = null; try{ if (typeof runtimeScene !== "undefined") rs = runtimeScene; }catch(e){} if (!rs && window.__gd_runtimeScene_for_skin) rs = window.__gd_runtimeScene_for_skin; if (!rs){ log("player: no runtimeScene on load; waiting for manual call."); return; }
-      try{ await window.GD_SKIN_PLAYER.autoApplySelectedSkin(rs, { extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } }); }catch(e){ warn("initial autoApply BF failed", e); }
-      try{ await window.GD_SKIN_PLAYER.autoApplySelectedDadSkin(rs, { extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } }); }catch(e){ warn("initial autoApply Dad failed", e); }
-    }catch(e){}
+    try {
+      let rs = null;
+      try { if (typeof runtimeScene !== "undefined") rs = runtimeScene; } catch(e){}
+      if (!rs && window.__gd_runtimeScene_for_skin) rs = window.__gd_runtimeScene_for_skin;
+      if (!rs) { log("player: no runtimeScene on load; waiting for manual call."); return; }
+      
+      try { 
+        await window.GD_SKIN_PLAYER.autoApplySelectedSkin(rs, { 
+          extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } 
+        }); 
+      } catch(e){ warn("initial autoApply BF failed", e); }
+      
+      try { 
+        await window.GD_SKIN_PLAYER.autoApplySelectedDadSkin(rs, { 
+          extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } 
+        }); 
+      } catch(e){ warn("initial autoApply Dad failed", e); }
+    } catch(e){}
   })();
 
 })();
@@ -1382,27 +1960,23 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1b4a008(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x1ab2888 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x2b488e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_loader_online.js
-// Versão do skin_loader adaptada para online multiplayer:
-// - mostra somente o botão relevante para o jogador local (PlayerOnline 1 => BF, 2 => Opponent)
-// - sincroniza SelectedSkin -> SelectedSkinOnline (player1) e SelectedDadSkin -> SelectedSkinDadOnline (player2)
-// - mantém formato de string (JSON) igual ao original
-// - NÃO aplica diretamente ao copiar (deixa o skin_player aplicar via watcher)
-
+// skin_loader_online_preserve_original_vars.js
+// Versão online — preserva exatamente o comportamento original ao salvar variáveis (SelectedSkin / SelectedDadSkin).
 (async function(runtimeScene) {
   const MANIFEST_NAME = "manifestskins.json";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
+  
+  function log(...s){ console.log("[skin-loader]", ...s); }
+  function warn(...s){ console.warn("[skin-loader]", ...s); }
 
-  function log(...s){ console.log("[skin-loader-online]", ...s); }
-  function warn(...s){ console.warn("[skin-loader-online]", ...s); }
-
+  // encodePath corrigido
   function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
   function buildCdnUrl(owner, repo, branch, path){ if (!owner || !repo) return null; const br = branch || "main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
 
@@ -1440,148 +2014,75 @@ gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
     throw new Error("All loader fetch attempts failed: " + (lastErr ? lastErr.message : "unknown"));
   }
 
-  // ---------- multiplayer helpers (same logic used by skin_player) ----------
-  function getPlayerOnlineValue(runtimeScene){
-    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("PlayerOnline")) { const n = gv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n) && n > 0) return n; } } catch(e){}
-    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("PlayerOnline")) { const n = sv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n) && n > 0) return n; } } catch(e){}
-    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.getCurrentPlayerNumber === 'function'){ const pn = gdjs.multiplayer.getCurrentPlayerNumber(); if (typeof pn === 'number' && pn > 0) return pn === 1 ? 1 : 2; } } catch(e){}
-    return 0;
-  }
-
-  function isLobbyRunning(runtimeScene){
-    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.isLobbyGameRunning === 'function') return !!gdjs.multiplayer.isLobbyGameRunning(runtimeScene); } catch(e){}
-    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("IsLobbyGameRunning")) return !!gv.get("IsLobbyGameRunning").getAsNumber(); if (gv && gv.has("LobbyGameIsRunning")) return !!gv.get("LobbyGameIsRunning").getAsNumber(); } catch(e){}
-    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("IsLobbyGameRunning")) return !!sv.get("IsLobbyGameRunning").getAsNumber(); } catch(e){}
-    return false;
-  }
-  // ------------------------------------------------------------------------
-
-  // Loading modal + UI are kept (copied/adapted from your original)
   function createLoadingModal() {
     const modal = document.createElement("div");
     modal.id = "skin-download-loading";
     modal.style.cssText = `
-      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-      display: flex; align-items: center; justify-content: center;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85); 
+      display: flex; align-items: center; justify-content: center; 
       z-index: 100000; color: white; font-family: Arial, sans-serif;
       flex-direction: column; gap: 16px;
     `;
-
     const spinner = document.createElement("div");
     spinner.style.cssText = `
       width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3);
       border-radius: 50%; border-top-color: #1976d2; animation: spin 1s linear infinite;
     `;
-
     const text = document.createElement("div");
     text.textContent = "Baixando skin...";
     text.style.fontSize = "16px";
-
     modal.appendChild(spinner);
     modal.appendChild(text);
-
     const style = document.createElement("style");
     style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
     document.head.appendChild(style);
-
     return modal;
   }
-
   function showLoadingModal() {
     const existing = document.getElementById("skin-download-loading");
     if (existing) return existing;
-
     const modal = createLoadingModal();
     document.body.appendChild(modal);
     return modal;
   }
-
   function hideLoadingModal() {
     const modal = document.getElementById("skin-download-loading");
-    if (modal && modal.parentNode) {
-      modal.parentNode.removeChild(modal);
-    }
+    if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
   }
 
-  // create the main selector modal (keeps your styling)
   function createModal(defaultOwner="LucyYuih", defaultRepo="gdev-custom-skins", defaultBranch="main") {
     const css = `
-      :root {
-        --modal-gap: 12px;
-        --panel-bg: #0f0f11;
-        --panel-radius: 12px;
-        --accent: #1976d2;
-        --muted: #999;
-      }
-      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; box-sizing: border-box; -webkit-overflow-scrolling: touch; }
-      .skin-panel {
-        width: min(1100px, 98%);
-        max-width: 1100px;
-        height: min(86vh, 820px);
-        background: var(--panel-bg);
-        color:#eee;
-        border-radius:var(--panel-radius);
-        display:grid;
-        grid-template-columns: 300px 1fr;
-        gap: var(--modal-gap);
-        overflow: hidden;
-        font-family: Arial, sans-serif;
-        box-shadow: 0 12px 32px rgba(0,0,0,0.6);
-      }
-
-      @media (max-width: 720px) {
-        .skin-panel { grid-template-columns: 1fr; height: calc(100vh - 36px); width: 100%; border-radius: 8px; }
-        .skin-left { order: 0; height: auto; max-height: 160px; overflow:auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.04); padding:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
-        .skin-left .skin-mod { flex: 0 0 auto; padding:6px 8px; font-size:13px; margin:4px; }
-        .skin-right { order: 1; padding:10px; overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
-      }
-
-      .skin-left { padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto; min-width: 180px; box-sizing:border-box; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
-      .skin-right { padding:14px; display:flex; flex-direction:column; box-sizing:border-box; min-width: 0; overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
-
-      .skin-left-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px; }
-      .skin-toggle-btn { background:transparent; border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color: #ddd; cursor:pointer; font-size:13px; }
-      .skin-mod { padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
-      .skin-mod:hover { background: rgba(255,255,255,0.03); }
-
-      .skin-top { display:flex; flex-direction:column; gap:8px; }
-      .skin-title-row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-      .skin-title { font-weight:700; font-size:1rem; }
-      .skin-controls { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
-      .skin-btn { padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px; }
-      .skin-btn:disabled { opacity:0.45; cursor:default; }
-      .skin-btn.opponent { background: #d32f2f; }
-      .skin-btn.bf { background: #1976d2; }
-
-      .cdn-inputs { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
-      .cdn-inputs input { background: #0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px; border-radius:6px; min-width:100px; box-sizing:border-box; font-size:13px; }
-
-      .skin-loading { color:var(--muted); font-size:13px; margin:6px 0; }
-      .skin-list { display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start; -webkit-overflow-scrolling: touch; }
-      .skin-list::-webkit-scrollbar { height:8px; width:8px; }
-      .skin-left-list { overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
-
-      .skin-card { width: clamp(110px, 22%, 160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; -webkit-user-select: none; user-select: none; }
-      .skin-card img { width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none; }
-      .skin-card .label { font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-      .skin-card .card-footer { display:flex; gap:6px; justify-content:center; align-items:center; flex-direction: column; }
-      .skin-card button.skin-btn { padding:6px 8px; font-size:12px; border-radius:6px; width: 100%; }
-
-      .skin-left::-webkit-scrollbar, .skin-list::-webkit-scrollbar, .skin-right::-webkit-scrollbar { height:8px; width:8px; }
-      .skin-left::-webkit-scrollbar-thumb, .skin-list::-webkit-scrollbar-thumb, .skin-right::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.04); border-radius:8px; }
-
-      .note-small { color:#9aa; font-size:12px; }
-      .skin-info-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+      :root { --modal-gap:12px; --panel-bg:#0f0f11; --panel-radius:12px; --accent:#1976d2; --muted:#999; }
+      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; box-sizing: border-box; }
+      .skin-panel { width: min(1100px,98%); max-width:1100px; height: min(86vh,820px); background:var(--panel-bg); color:#eee; border-radius:var(--panel-radius); display:grid; grid-template-columns:300px 1fr; gap:var(--modal-gap); overflow:hidden; font-family:Arial, sans-serif; box-shadow: 0 12px 32px rgba(0,0,0,0.6); }
+      @media (max-width:720px){ .skin-panel{ grid-template-columns:1fr; height:calc(100vh-36px); width:100%; border-radius:8px;} .skin-left{ order:0; max-height:160px; overflow:auto; } .skin-right{ order:1; } }
+      .skin-left{ padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto; min-width:180px; box-sizing:border-box;}
+      .skin-right{ padding:14px; display:flex; flex-direction:column; overflow:auto; box-sizing:border-box; }
+      .skin-left-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;}
+      .skin-toggle-btn{ background:transparent; border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color:#ddd; cursor:pointer; font-size:13px;}
+      .skin-mod{ padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; user-select:none;}
+      .skin-top{ display:flex; flex-direction:column; gap:8px;}
+      .skin-title-row{ display:flex; justify-content:space-between; align-items:center; gap:8px;}
+      .skin-title{ font-weight:700; font-size:1rem; }
+      .skin-controls{ display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
+      .skin-btn{ padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px;}
+      .skin-btn.opponent{ background:#d32f2f; } .skin-btn.bf{ background:#1976d2; }
+      .cdn-inputs{ display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;}
+      .cdn-inputs input{ background:#0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px; border-radius:6px; min-width:100px; }
+      .skin-loading{ color:var(--muted); font-size:13px; margin:6px 0; }
+      .skin-list{ display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start; }
+      .skin-card{ width: clamp(110px,22%,160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; user-select:none; }
+      .skin-card img{ width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none; }
+      .skin-card .label{ font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+      .skin-card .card-footer{ display:flex; gap:6px; justify-content:center; align-items:center; flex-direction: column; }
+      .skin-card button.skin-btn{ padding:6px 8px; font-size:12px; border-radius:6px; width:100%; }
     `;
     const style = document.createElement("style");
     style.className = "skin-loader-style";
     style.textContent = css;
     document.head.appendChild(style);
 
-    const modal = document.createElement("div"); modal.className = "skin-modal";
-    modal.setAttribute("role", "dialog");
-    modal.setAttribute("aria-modal", "true");
-
+    const modal = document.createElement("div"); modal.className = "skin-modal"; modal.setAttribute("role","dialog"); modal.setAttribute("aria-modal","true");
     const panel = document.createElement("div"); panel.className = "skin-panel";
     const left = document.createElement("div"); left.className = "skin-left";
     const leftList = document.createElement("div"); leftList.className = "skin-left-list";
@@ -1591,8 +2092,7 @@ gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
     const leftTitle = document.createElement("div"); leftTitle.textContent = "Mods"; leftTitle.style.fontWeight = "700";
     const toggleBtn = document.createElement("button"); toggleBtn.className = "skin-toggle-btn"; toggleBtn.textContent = "Toggle";
     leftHeader.appendChild(leftTitle); leftHeader.appendChild(toggleBtn);
-    left.appendChild(leftHeader);
-    left.appendChild(leftList);
+    left.appendChild(leftHeader); left.appendChild(leftList);
 
     const top = document.createElement("div"); top.className = "skin-top";
     const titleRow = document.createElement("div"); titleRow.className = "skin-title-row";
@@ -1603,9 +2103,9 @@ gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
     titleRow.appendChild(title); titleRow.appendChild(controls);
 
     const cdnRow = document.createElement("div"); cdnRow.className = "cdn-inputs";
-    const ownerIn = document.createElement("input"); ownerIn.placeholder = "Owner"; ownerIn.value = defaultOwner;
-    const repoIn = document.createElement("input"); repoIn.placeholder = "Repo"; repoIn.value = defaultRepo;
-    const branchIn = document.createElement("input"); branchIn.placeholder = "Branch"; branchIn.value = defaultBranch;
+    const ownerIn = document.createElement("input"); ownerIn.placeholder = "Owner"; ownerIn.value = defaultOwner || "LucyYuih";
+    const repoIn = document.createElement("input"); repoIn.placeholder = "Repo"; repoIn.value = defaultRepo || "gdev-custom-skins";
+    const branchIn = document.createElement("input"); branchIn.placeholder = "Branch"; branchIn.value = defaultBranch || "main";
     const note = document.createElement("div"); note.className = "note-small"; note.textContent = "CDN-first: thumbs/zips serão buscados no jsDelivr.";
     cdnRow.appendChild(ownerIn); cdnRow.appendChild(repoIn); cdnRow.appendChild(branchIn); cdnRow.appendChild(note);
 
@@ -1613,16 +2113,12 @@ gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
     const skinListWrap = document.createElement("div"); skinListWrap.style.flex = "1"; skinListWrap.style.overflow = "auto";
 
     top.appendChild(titleRow); top.appendChild(cdnRow);
-
     right.appendChild(top); right.appendChild(info); right.appendChild(skinListWrap);
     panel.appendChild(left); panel.appendChild(right); modal.appendChild(panel); document.body.appendChild(modal);
 
-    return {
-      modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls
-    };
+    return { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls };
   }
 
-  // helper to find skin in manifest (keeps your original)
   function findSkinInManifest(manifest, modName, skinName){
     if (!manifest || !modName || !skinName) return null;
     const arr = manifest[modName] || [];
@@ -1631,50 +2127,215 @@ gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
     return null;
   }
 
-  // ---- main UI open (adapted to show only relevant download buttons per player) ----
+  // small helper to get PlayerOnline (tries game vars, scene vars, gdjs.multiplayer fallback)
+  function getPlayerOnlineValue(runtimeScene){
+    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("PlayerOnline")) { const n = gv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n)) return n; } } catch(e){}
+    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("PlayerOnline")) { const n = sv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n)) return n; } } catch(e){}
+    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.getCurrentPlayerNumber === 'function'){ const pn = gdjs.multiplayer.getCurrentPlayerNumber(); if (typeof pn === 'number') return pn === 1 ? 1 : 2; } } catch(e){}
+    return 0;
+  }
+
+  // UI logic: create buttons but show/hide according to PlayerOnline WITHOUT changing what those buttons do
+  let globalManifest = null;
+  let modalOwner = null, modalRepo = null, modalBranch = null;
+
+  // Keep the exact original variable behavior on download/apply/reset functions:
+  // When target === "BF" -> set SelectedSkin & gd_selected_skin
+  // When target === "Opponent" -> set SelectedDadSkin & gd_selected_dad_skin
+
+  async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
+    if (downloadAndSaveOnly._busy) return;
+    downloadAndSaveOnly._busy = true;
+    let zipPath = skinObj.zip || "";
+    if (!zipPath) {
+      const found = findSkinInManifest(globalManifest, modName, skinObj.name);
+      if (found && found.zip) zipPath = found.zip;
+    }
+    if (!zipPath) { downloadAndSaveOnly._busy = false; return; }
+
+    const loadingModal = showLoadingModal();
+    try {
+      const cdnBase = { owner: modalOwner||"LucyYuih", repo: modalRepo||"gdev-custom-skins", branch: modalBranch||"main" };
+      const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+
+      // just check availability (like original did)
+      await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+
+      // Build selection object exactly like original
+      const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+      if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
+      else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+
+      // Preserve original behavior: set SelectedSkin or SelectedDadSkin and localStorage keys
+      const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
+      const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
+      const gv = runtimeScene.getGame().getVariables();
+      if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
+      else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
+      try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
+      log("[skin-loader] Downloaded+Saved " + varName + ":", JSON.stringify(sel));
+    } catch(e){
+      console.error("Download/save failed:", e);
+    } finally {
+      hideLoadingModal();
+      downloadAndSaveOnly._busy = false;
+    }
+  }
+
+  async function applyNow(modName, skinObj, target){
+    if (applyNow._busy) return;
+    applyNow._busy = true;
+    let zipPath = skinObj.zip || "";
+    if (!zipPath) {
+      const found = findSkinInManifest(globalManifest, modName, skinObj.name);
+      if (found && found.zip) zipPath = found.zip;
+    }
+    if (!zipPath) { applyNow._busy = false; return; }
+
+    const loadingModal = showLoadingModal();
+    try {
+      const cdnBase = { owner: modalOwner||"LucyYuih", repo: modalRepo||"gdev-custom-skins", branch: modalBranch||"main" };
+      const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+      const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+
+      const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+      if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
+      else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+      
+      // ORIGINAL behavior: write SelectedSkin or SelectedDadSkin and storage keys
+      const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
+      const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
+      const gv = runtimeScene.getGame().getVariables();
+      if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
+      else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
+      try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
+      log("[skin-loader] Saved " + varName + ":", JSON.stringify(sel));
+
+      // apply via GD_SKIN_PLAYER (same as original)
+      if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
+        try {
+          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel" });
+          await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { 
+            targetName: target === "BF" ? "BF" : "BFPixel",
+            targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim"
+          });
+        } catch(e){
+          warn("apply via player failed", e);
+        }
+      }
+    } catch(e){
+      console.error("applyNow failed:", e);
+    } finally {
+      hideLoadingModal();
+      applyNow._busy = false;
+    }
+  }
+
+  async function resetAndRedownload(modName, skinObj, auto=false){
+    if (resetAndRedownload._busy) return;
+    resetAndRedownload._busy = true;
+    let zipPath = skinObj.zip || "";
+    if (!zipPath) {
+      const found = findSkinInManifest(globalManifest, modName, skinObj.name);
+      if (found && found.zip) zipPath = found.zip;
+    }
+    if (!zipPath) { resetAndRedownload._busy = false; return; }
+
+    const loadingModal = showLoadingModal();
+    try {
+      const cdnBase = { owner: modalOwner||"LucyYuih", repo: modalRepo||"gdev-custom-skins", branch: modalBranch||"main" };
+      const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+
+      try {
+        // Clear SelectedSkin/SelectedDadSkin if they reference this skin (preserve original logic)
+        try {
+          const gv = runtimeScene.getGame().getVariables();
+          if (gv.has("SelectedSkin")) {
+            const cur = gv.get("SelectedSkin").getAsString();
+            if (cur && cur.includes(skinObj.name)) gv.get("SelectedSkin").setString("");
+          }
+          if (gv.has("SelectedDadSkin")) {
+            const cur = gv.get("SelectedDadSkin").getAsString();
+            if (cur && cur.includes(skinObj.name)) gv.get("SelectedDadSkin").setString("");
+          }
+        } catch(e2){}
+        
+        try {
+          const ls1 = localStorage.getItem("gd_selected_skin");
+          if (ls1 && ls1.includes(skinObj.name)) localStorage.removeItem("gd_selected_skin");
+          const ls2 = localStorage.getItem("gd_selected_dad_skin");
+          if (ls2 && ls2.includes(skinObj.name)) localStorage.removeItem("gd_selected_dad_skin");
+        } catch(e2){}
+
+        if (window.GD_SKIN_PLAYER) {
+          try {
+            if (typeof window.GD_SKIN_PLAYER.uninstallPackage === "function") {
+              await window.GD_SKIN_PLAYER.uninstallPackage(modName, skinObj.name);
+              log("Called GD_SKIN_PLAYER.uninstallPackage");
+            } else if (typeof window.GD_SKIN_PLAYER.removePackageByUrl === "function") {
+              await window.GD_SKIN_PLAYER.removePackageByUrl(cdnCandidate);
+              log("Called GD_SKIN_PLAYER.removePackageByUrl");
+            } else if (typeof window.GD_SKIN_PLAYER.clearCache === "function") {
+              await window.GD_SKIN_PLAYER.clearCache();
+              log("Called GD_SKIN_PLAYER.clearCache");
+            }
+          } catch(e3){
+            warn("player cache clear attempt failed", e3);
+          }
+        }
+      } catch(eClear){
+        warn("Reset: local cache removal failed", eClear);
+      }
+
+      const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+
+      const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+      if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
+      else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+      
+      // Save to SelectedSkin (original behavior) — choose BF variable for reset (original script did this)
+      try {
+        const gv = runtimeScene.getGame().getVariables();
+        if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
+        else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(sel));
+      } catch(e2){}
+      try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e2){}
+      log("Reset: saved SelectedSkin after redownload", sel);
+
+      if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
+        try {
+          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: "BF" });
+          await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: "BF" });
+        } catch(e){
+          warn("Reset apply via player failed", e);
+        }
+      }
+    } catch(e){
+      console.error("resetAndRedownload failed:", e);
+    } finally {
+      hideLoadingModal();
+      resetAndRedownload._busy = false;
+    }
+  }
+
+  // ---------- UI / modal with PlayerOnline-based button hiding ----------
   async function openSkinSelector(manifest){
+    globalManifest = manifest || { "": [] };
     let baseOwner=null, baseRepo=null, baseBranch=null;
     if (manifest && typeof manifest._base === "string" && manifest._base.includes("/")) {
-      try {
-        const base = manifest._base.trim();
-        const [ownerRepo, branch] = base.split("@");
-        const [owner, repo] = ownerRepo.split("/");
-        baseOwner = owner; baseRepo = repo; baseBranch = branch || "main";
-      } catch(e){}
+      try { const base = manifest._base.trim(); const [ownerRepo, branch] = base.split("@"); const [owner, repo] = ownerRepo.split("/"); baseOwner = owner; baseRepo = repo; baseBranch = branch || "main"; } catch(e){}
     }
 
     const ui = createModal(baseOwner||"LucyYuih", baseRepo||"gdev-custom-skins", baseBranch||"main");
     const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl, controlsEl } = ui;
     let currentMod = null; let thumbsCache = {}; let downloading = false;
+
+    modalOwner = ownerIn.value || baseOwner; modalRepo = repoIn.value || baseRepo; modalBranch = branchIn.value || baseBranch || "main";
+
     const prevOverflow = document.documentElement.style.overflow;
     try { document.documentElement.style.overflow = 'hidden'; } catch(e){}
 
-    // add a small utility to decide which apply buttons are visible
-    function refreshPlayerButtonsVisibility(applyBtnBF, applyBtnOpp) {
-      const playerOnline = getPlayerOnlineValue(runtimeScene);
-      if (playerOnline === 1) {
-        // host: show BF button only
-        if (applyBtnBF) applyBtnBF.style.display = '';
-        if (applyBtnOpp) applyBtnOpp.style.display = 'none';
-      } else if (playerOnline === 2) {
-        // player2: show Opponent button only
-        if (applyBtnBF) applyBtnBF.style.display = 'none';
-        if (applyBtnOpp) applyBtnOpp.style.display = '';
-      } else {
-        // offline or unknown: show both (useful for local debug)
-        if (applyBtnBF) applyBtnBF.style.display = '';
-        if (applyBtnOpp) applyBtnOpp.style.display = '';
-      }
-    }
-
-    // event handlers and UI interactions
-    [leftList, skinListWrap, right, left].forEach(el => {
-      try {
-        if (!el) return;
-        el.addEventListener('touchstart', ()=>{}, {passive:true});
-        el.addEventListener('touchmove', ()=>{}, {passive:true});
-      } catch(e){}
-    });
+    [leftList, skinListWrap, right, left].forEach(el => { try { if (!el) return; el.addEventListener('touchstart', ()=>{}, {passive:true}); el.addEventListener('touchmove', ()=>{}, {passive:true}); } catch(e){} });
 
     const resetSelectedBtn = document.createElement("button");
     resetSelectedBtn.className = "skin-btn";
@@ -1715,21 +2376,25 @@ gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
     let leftHidden = false;
     function setLeftHidden(hide){
       leftHidden = !!hide;
-      if (window.innerWidth <= 720) {
-        left.style.display = hide ? 'none' : 'flex';
-      } else {
-        left.style.display = 'block';
-      }
+      if (window.innerWidth <= 720) left.style.display = hide ? 'none' : 'flex';
+      else left.style.display = 'block';
     }
     toggleBtn.onclick = ()=> setLeftHidden(!leftHidden);
     window.addEventListener('resize', ()=> { if (window.innerWidth > 720) left.style.display = 'block'; else if (leftHidden) left.style.display='none'; });
 
     closeBtn.onclick = () => { if (downloading) return; cleanupAndRemove(); };
-
     function onKeyDown(e){ if (e.key === 'Escape') { closeBtn.click(); } }
     window.addEventListener('keydown', onKeyDown);
 
     function unloadModThumbs(modName){ const arr = thumbsCache[modName]; if (!arr) return; for (const it of arr) { if (it.blobUrl) try{URL.revokeObjectURL(it.blobUrl)}catch(e){} } delete thumbsCache[modName]; log("Unloaded thumbs for",modName); }
+
+    function createApplyButtonsForItem(){
+      const playerOnline = getPlayerOnlineValue(runtimeScene);
+      // playerOnline 1 => only BF; 2 => only Opponent; 0 => both
+      const showBF = (playerOnline === 0 || playerOnline === 1);
+      const showOpp = (playerOnline === 0 || playerOnline === 2);
+      return { showBF, showOpp, playerOnline };
+    }
 
     async function selectMod(modName){
       if (downloading) return;
@@ -1742,27 +2407,29 @@ gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
 
       thumbsCache[modName]=[];
       const cdnBase={ owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
+
       for (const sk of skins){
         const card=document.createElement("div"); card.className="skin-card";
         const img=document.createElement("img"); img.alt=sk.name; img.src=""; img.draggable = false;
         const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=sk.name;
         const footer = document.createElement("div"); footer.className="card-footer";
+        
+        const { showBF, showOpp } = createApplyButtonsForItem();
 
-        // BF button
-        const applyBtnBF = document.createElement("button");
-        applyBtnBF.className = "skin-btn bf";
+        const applyBtnBF = document.createElement("button"); 
+        applyBtnBF.className = "skin-btn bf"; 
         applyBtnBF.textContent = "BF";
         applyBtnBF.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "BF"); };
+        if (!showBF) applyBtnBF.style.display = "none";
 
-        // Opponent button
-        const applyBtnOpp = document.createElement("button");
-        applyBtnOpp.className = "skin-btn opponent";
+        const applyBtnOpp = document.createElement("button"); 
+        applyBtnOpp.className = "skin-btn opponent"; 
         applyBtnOpp.textContent = "Opponent";
         applyBtnOpp.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "Opponent"); };
+        if (!showOpp) applyBtnOpp.style.display = "none";
 
-        // Reset button
-        const resetBtn = document.createElement("button");
-        resetBtn.className = "skin-btn";
+        const resetBtn = document.createElement("button"); 
+        resetBtn.className = "skin-btn"; 
         resetBtn.textContent = "Reset";
         resetBtn.title = "Apaga cache/localStorage relacionado e rebaixa o .zip";
         resetBtn.onclick = (ev)=> { ev.stopPropagation(); resetAndRedownload(modName, sk, false); };
@@ -1771,227 +2438,29 @@ gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
         footer.appendChild(applyBtnOpp);
         footer.appendChild(resetBtn);
         card.appendChild(img); card.appendChild(lbl); card.appendChild(footer);
-
-        card.onclick = ()=> downloadAndSaveOnly(modName, sk, false);
+        
+        // default click on card -> download+save for the slot this player controls (preserve original default logic)
+        card.onclick = ()=> downloadAndSaveOnly(modName, sk, false, (getPlayerOnlineValue(runtimeScene) === 2 ? "Opponent" : "BF"));
         card.addEventListener('touchstart', ()=>{}, {passive:true});
         list.appendChild(card);
         thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card, applyBtnBF, applyBtnOpp, resetBtn });
-
-        // initial visibility based on playerOnline
-        refreshPlayerButtonsVisibility(applyBtnBF, applyBtnOpp);
       }
-
-      // dynamic: update visibility every 1s in case playerOnline changes while modal open
-      const visInterval = setInterval(() => {
-        const arr = thumbsCache[modName] || [];
-        for (const it of arr) refreshPlayerButtonsVisibility(it.applyBtnBF, it.applyBtnOpp);
-      }, 1000);
-
-      // cleanup interval when modal closed or mod changed
-      const cleanupVis = () => clearInterval(visInterval);
-      // store cleanup reference
-      thumbsCache[modName]._visCleanup = cleanupVis;
 
       for (const item of thumbsCache[modName]){
         const sk = item.skin; let thumb = sk.thumb || "";
         if (!thumb) { item.imgEl.style.background="#222"; continue; }
-        (async () => {
-          try {
-            let candidate = (thumb.startsWith("http://")||thumb.startsWith("https://")) ? thumb : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumb);
-            const blob = await fetchCdnFirst(candidate || thumb, "blob", cdnBase);
-            const url = URL.createObjectURL(blob);
-            item.blobUrl = url; item.imgEl.src = url;
-          } catch(e){ warn("Thumb load failed for",sk.name,e); }
-        })();
-      }
-    }
-
-    // similar download/save/apply functions from original code, unchanged behaviour,
-    // but when saving we will also call updateOnlineVariablesIfNeeded() to sync local -> online if necessary
-    async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
-      if (downloading) return;
-      let zipPath = skinObj.zip || "";
-      if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, skinObj.name);
-        if (found && found.zip) zipPath = found.zip;
-      }
-      if (!zipPath) return;
-
-      downloading = true;
-      const loadingModal = showLoadingModal();
-      try {
-        const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
-        const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-
-        await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
-        const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
-        if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
-        else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-
-        const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
-        const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
-
-        const gv = runtimeScene.getGame().getVariables();
-        if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
-        else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
-        try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
-
-        log("[skin-loader-online] Downloaded+Saved " + varName + ":", JSON.stringify(sel));
-
-        // after saving locally, check if we should copy to Online vars (sync)
-        try { updateOnlineVariablesIfNeeded(runtimeScene); } catch(e){ warn("post-download sync failed", e); }
-
-      } catch(e){
-        console.error("Download/save failed:", e);
-      } finally {
-        hideLoadingModal();
-        downloading = false;
-      }
-    }
-
-    async function applyNow(modName, skinObj, target){
-      if (downloading) return;
-      let zipPath = skinObj.zip || "";
-      if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, skinObj.name);
-        if (found && found.zip) zipPath = found.zip;
-      }
-      if (!zipPath) return;
-
-      downloading = true;
-      const loadingModal = showLoadingModal();
-      try {
-        const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
-        const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-        const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
-        const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
-        if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
-        else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-
-        const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
-        const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
-
-        const gv = runtimeScene.getGame().getVariables();
-        if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
-        else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
-        try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
-
-        log("[skin-loader-online] Saved " + varName + ":", JSON.stringify(sel));
-
-        // sync to online variables if needed (copy local -> online only when different)
-        try { updateOnlineVariablesIfNeeded(runtimeScene); } catch(e){ warn("post-apply sync failed", e); }
-
-        // Apply immediately locally using existing GD_SKIN_PLAYER if available
-        if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
-          try {
-            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel" });
-            await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { 
-              targetName: target === "BF" ? "BF" : "BFPixel",
-              targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim"
-            });
-          } catch(e){
-            warn("apply via player failed", e);
-          }
-        }
-      } catch(e){
-        console.error("applyNow failed:", e);
-      } finally {
-        hideLoadingModal();
-        downloading = false;
-      }
-    }
-
-    async function resetAndRedownload(modName, skinObj, auto=false){
-      if (downloading) return;
-      let zipPath = skinObj.zip || "";
-      if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, skinObj.name);
-        if (found && found.zip) zipPath = found.zip;
-      }
-      if (!zipPath) return;
-
-      downloading = true;
-      const loadingModal = showLoadingModal();
-      try {
-        const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
-        const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-
         try {
-          try {
-            const gv = runtimeScene.getGame().getVariables();
-            if (gv.has("SelectedSkin")) {
-              const cur = gv.get("SelectedSkin").getAsString();
-              if (cur && cur.includes(skinObj.name)) gv.get("SelectedSkin").setString("");
-            }
-            if (gv.has("SelectedDadSkin")) {
-              const cur = gv.get("SelectedDadSkin").getAsString();
-              if (cur && cur.includes(skinObj.name)) gv.get("SelectedDadSkin").setString("");
-            }
-          } catch(e2){}
-
-          try {
-            const ls1 = localStorage.getItem("gd_selected_skin");
-            if (ls1 && ls1.includes(skinObj.name)) localStorage.removeItem("gd_selected_skin");
-            const ls2 = localStorage.getItem("gd_selected_dad_skin");
-            if (ls2 && ls2.includes(skinObj.name)) localStorage.removeItem("gd_selected_dad_skin");
-          } catch(e2){}
-        } catch(eClear){
-          warn("Reset: local cache removal failed", eClear);
-        }
-
-        const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
-        const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
-        if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
-        else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-
-        try {
-          const gv = runtimeScene.getGame().getVariables();
-          if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
-          else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(sel));
-        } catch(e2){}
-        try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e2){}
-        log("Reset: saved SelectedSkin after redownload", sel);
-
-        if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
-          try {
-            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: "BF" });
-            await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: "BF" });
-          } catch(e){
-            warn("Reset apply via player failed", e);
-          }
-        }
-      } catch(e){
-        console.error("resetAndRedownload failed:", e);
-      } finally {
-        hideLoadingModal();
-        downloading = false;
+          let candidate = (thumb.startsWith("http://")||thumb.startsWith("https://")) ? thumb : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumb);
+          const blob = await fetchCdnFirst(candidate || thumb, "blob", cdnBase);
+          const url = URL.createObjectURL(blob);
+          item.blobUrl = url; item.imgEl.src = url;
+        } catch(e){ warn("Thumb load failed for",sk.name,e); }
       }
     }
-
-    try {
-      const gv = runtimeScene.getGame().getVariables();
-      let selStr = null;
-      if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString();
-      if ((!selStr || selStr.trim()==="") && window.localStorage) selStr = localStorage.getItem("gd_selected_skin");
-      if (selStr) {
-        try {
-          const parsed = JSON.parse(selStr);
-          log("Loader: SelectedSkin detected (not auto-applying).", parsed);
-        } catch(e){ warn("Loader read SelectedSkin failed", e); }
-      }
-    } catch(e){ warn("Loader selectedskin check failed", e); }
 
     function cleanupAndRemove(){
       try {
-        for (const k in thumbsCache) {
-          try {
-            if (thumbsCache[k] && thumbsCache[k]._visCleanup) thumbsCache[k]._visCleanup();
-            unloadModThumbs(k);
-          } catch(e){}
-        }
+        for (const k in thumbsCache) unloadModThumbs(k);
         const m = document.querySelector(".skin-modal");
         if (m) document.body.removeChild(m);
         try { document.head.removeChild(styleEl); } catch(e){}
@@ -2005,91 +2474,90 @@ gdjs.PlayonlineCode.userFunc0x1ab21e0(runtimeScene);
     return { close: cleanupAndRemove, unloadModThumbs };
   }
 
-  // ---------- ONLINE SYNC: copy SelectedSkin -> SelectedSkinOnline and SelectedDadSkin -> SelectedSkinDadOnline ----------
-  // This function only copies when the two values are different and depending on playerOnline value.
-  let _onlineSyncInterval = null;
-  let _lastSyncSeen = { SelectedSkin: null, SelectedDadSkin: null, SelectedSkinOnline: null, SelectedSkinDadOnline: null };
+  // ---------- watcher (observes other player's var changes and applies pack locally) ----------
+  let _skinWatcherInterval = null;
+  let _skinWatcherLast = { SelectedSkin: null, SelectedDadSkin: null };
 
-  function updateOnlineVariablesIfNeeded(runtimeScene){
+  async function applySelectionString(runtimeScene, selStr, opts = {}){
+    if (!selStr || !selStr.trim()) return null;
+    let parsed = null;
+    try { parsed = JSON.parse(selStr); } catch(e){ return null; }
+    const candidates = [];
+    if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
+    if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); candidates.push(parsed.zip.replace(/ /g,"%20")); candidates.push("resources/" + parsed.zip.replace(/ /g,"%20")); }
+    for (const c of candidates){
+      try {
+        log("watcher fetch try ->", c);
+        const r = await fetch(c);
+        if (!r.ok) throw new Error("Fetch failed " + r.status);
+        const arr = await r.arrayBuffer();
+        const pkg = await (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" ? window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arr) : Promise.reject(new Error("GD_SKIN_PLAYER missing")));
+        if (pkg) return window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, opts);
+      } catch(e){ warn("watcher apply candidate failed", e); }
+    }
+    return null;
+  }
+
+  async function skinWatcherTick(runtimeScene){
     try{
-      const gv = runtimeScene.getGame().getVariables();
-      if (!gv) return;
-      // ensure variables exist
+      const gv = runtimeScene.getGame().getVariables(); if (!gv) return;
       if (!gv.has('SelectedSkin')) gv.pushNew('SelectedSkin').setString('');
       if (!gv.has('SelectedDadSkin')) gv.pushNew('SelectedDadSkin').setString('');
-      if (!gv.has('SelectedSkinOnline')) gv.pushNew('SelectedSkinOnline').setString('');
-      if (!gv.has('SelectedSkinDadOnline')) gv.pushNew('SelectedSkinDadOnline').setString('');
 
-      const cur = {
-        SelectedSkin: gv.get('SelectedSkin').getAsString() || '',
-        SelectedDadSkin: gv.get('SelectedDadSkin').getAsString() || '',
-        SelectedSkinOnline: gv.get('SelectedSkinOnline').getAsString() || '',
-        SelectedSkinDadOnline: gv.get('SelectedSkinDadOnline').getAsString() || ''
-      };
-
+      const cur = { SelectedSkin: gv.get('SelectedSkin').getAsString(), SelectedDadSkin: gv.get('SelectedDadSkin').getAsString() };
       const playerOnline = getPlayerOnlineValue(runtimeScene);
 
-      // Player 1: copy SelectedSkin -> SelectedSkinOnline when different
-      if (playerOnline === 1) {
-        if ((cur.SelectedSkin || '') !== (cur.SelectedSkinOnline || '')) {
-          // update online var
-          try {
-            gv.get('SelectedSkinOnline').setString(cur.SelectedSkin || '');
-            try { localStorage.setItem('gd_selected_skin_online', cur.SelectedSkin || ''); } catch(e){}
-            log('Online sync: SelectedSkin -> SelectedSkinOnline (player1)');
-          } catch(e){ warn('Online sync copy failed (player1)', e); }
+      // If SelectedSkin changed and this client is NOT player 1, download+apply host's BF skin locally
+      if ((cur.SelectedSkin || '') !== (_skinWatcherLast.SelectedSkin || '')){
+        if (playerOnline !== 1){
+          const sel = cur.SelectedSkin || '';
+          if (sel && sel.trim() !== ''){
+            log("Watcher: SelectedSkin changed by host -> applying host's BF skin locally");
+            try { await applySelectionString(runtimeScene, sel, { targetName: "BF", targetAnimVar: "BFAnim" }); } catch(e){ warn("Watcher apply host BF failed", e); }
+          }
         }
       }
 
-      // Player 2: copy SelectedDadSkin -> SelectedSkinDadOnline when different
-      if (playerOnline === 2) {
-        if ((cur.SelectedDadSkin || '') !== (cur.SelectedSkinDadOnline || '')) {
-          try {
-            gv.get('SelectedSkinDadOnline').setString(cur.SelectedDadSkin || '');
-            try { localStorage.setItem('gd_selected_dad_skin_online', cur.SelectedDadSkin || ''); } catch(e){}
-            log('Online sync: SelectedDadSkin -> SelectedSkinDadOnline (player2)');
-          } catch(e){ warn('Online sync copy failed (player2)', e); }
+      // If SelectedDadSkin changed and this client is NOT player 2, download+apply opponent skin locally
+      if ((cur.SelectedDadSkin || '') !== (_skinWatcherLast.SelectedDadSkin || '')){
+        if (playerOnline !== 2){
+          const sel = cur.SelectedDadSkin || '';
+          if (sel && sel.trim() !== ''){
+            log("Watcher: SelectedDadSkin changed by player2 -> applying opponent skin locally");
+            try { await applySelectionString(runtimeScene, sel, { targetName: "BFPixel", targetAnimVar: "OPPAnim" }); } catch(e){ warn("Watcher apply opponent failed", e); }
+          }
         }
       }
 
-      // store last seen
-      _lastSyncSeen = cur;
-    }catch(e){ warn('updateOnlineVariablesIfNeeded error', e); }
+      _skinWatcherLast.SelectedSkin = cur.SelectedSkin;
+      _skinWatcherLast.SelectedDadSkin = cur.SelectedDadSkin;
+    } catch(e){ warn("skinWatcherTick error:", e); }
   }
 
-  function startOnlineSync(runtimeScene, intervalMs = 800){
-    stopOnlineSync();
-    if (!runtimeScene) return;
-    _onlineSyncInterval = setInterval(()=>{ try{ updateOnlineVariablesIfNeeded(runtimeScene); }catch(e){ warn('onlineSync tick failed', e); } }, intervalMs);
-    // immediate tick
-    try{ updateOnlineVariablesIfNeeded(runtimeScene); }catch(e){ }
-    log('Online sync started (interval', intervalMs, 'ms)');
+  function startSkinWatcher(runtimeScene){
+    if (_skinWatcherInterval) return;
+    _skinWatcherInterval = setInterval(()=> skinWatcherTick(runtimeScene).catch(e=>warn("skinWatcherTick outer:",e)), 700);
+    skinWatcherTick(runtimeScene).catch(e=>warn("skinWatcherTick initial:",e));
+    log("Skin watcher started.");
   }
+  function stopSkinWatcher(){ if (_skinWatcherInterval){ clearInterval(_skinWatcherInterval); _skinWatcherInterval = null; log("Skin watcher stopped."); } }
 
-  function stopOnlineSync(){ if (_onlineSyncInterval) { clearInterval(_onlineSyncInterval); _onlineSyncInterval = null; log('Online sync stopped'); } }
-
-  // ---------- startup: load manifest and open UI, and start online sync ----------
+  // ---------- bootstrap: load manifest, open UI, start watcher ----------
   try {
     let manifest = null;
     try { manifest = await fetchCdnFirst(MANIFEST_NAME, "json", null); } catch(e){ manifest = null; }
     if (!manifest) { try { manifest = await fetchCdnFirst("resources/" + MANIFEST_NAME, "json", null); } catch(e){ manifest = null; } }
-    if (!manifest) { console.warn("manifestskins.json not found; opening UI empty. Consider generating manifest with _base owner/repo@branch."); manifest = { "": [] }; }
-
-    // open UI
-    const ui = await openSkinSelector(manifest);
-
-    // start online sync so we copy SelectedSkin/Dad -> SelectedSkinOnline/DadOnline when appropriate
-    try { startOnlineSync(runtimeScene, 800); } catch(e){ warn("startOnlineSync failed", e); }
-
-    // expose controls for debugging / external usage
-    window.SKIN_LOADER_ONLINE = window.SKIN_LOADER_ONLINE || {};
-    window.SKIN_LOADER_ONLINE.startOnlineSync = () => startOnlineSync(runtimeScene, 800);
-    window.SKIN_LOADER_ONLINE.stopOnlineSync = stopOnlineSync;
-    window.SKIN_LOADER_ONLINE.openUI = () => ui && ui.close ? openSkinSelector(manifest) : null;
-
+    if (!manifest) { console.warn("manifestskins.json not found; opening UI empty."); manifest = { "": [] }; }
+    await openSkinSelector(manifest);
+    startSkinWatcher(runtimeScene);
   } catch(e){
-    console.error("Skin loader online startup failed:", e);
+    console.error("Skin loader startup failed:", e);
   }
+
+  // small debug hooks
+  window.__skin_loader_online = window.__skin_loader_online || {};
+  window.__skin_loader_online.stopWatcher = () => stopSkinWatcher();
+  window.__skin_loader_online.startWatcher = (rs) => startSkinWatcher(rs || runtimeScene);
 
 })(runtimeScene);
 
@@ -2099,12 +2567,12 @@ gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1ab2888(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x2b488e0(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x12b6f68 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x2b48d68 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -3416,7 +3884,7 @@ gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x12b6f68(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x2b48d68(runtimeScene);
 
 }
 
@@ -3467,15 +3935,19 @@ if (isConditionTrue_0) {
 }
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(57));
 }
-{gdjs.multiplayerVariablesManager.setPlayerVariableOwnership(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(7), 2);
-}
-{gdjs.multiplayerVariablesManager.setPlayerVariableOwnership(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(5), 1);
-}
 {gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "Play");
 }
 {runtimeScene.getGame().getVariables().getFromIndex(9).setNumber(1);
 }
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(14));
+}
+{gdjs.multiplayerVariablesManager.setPlayerVariableOwnership(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(7), 2);
+}
+{gdjs.multiplayerVariablesManager.setPlayerVariableOwnership(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(8), 2);
+}
+{gdjs.multiplayerVariablesManager.setPlayerVariableOwnership(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(5), 1);
+}
+{gdjs.multiplayerVariablesManager.setPlayerVariableOwnership(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(6), 1);
 }
 
 { //Subevents
@@ -3552,10 +4024,9 @@ gdjs.PlayonlineCode.eventsList3(runtimeScene);} //End of subevents
 
 let isConditionTrue_0 = false;
 {
-gdjs.copyArray(runtimeScene.getObjects("Hard"), gdjs.PlayonlineCode.GDHardObjects1);
-{for(var i = 0, len = gdjs.PlayonlineCode.GDHardObjects1.length ;i < len;++i) {
-    gdjs.PlayonlineCode.GDHardObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(7).getAsString());
+{runtimeScene.getGame().getVariables().getFromIndex(8).setString(runtimeScene.getGame().getVariables().getFromIndex(7).getAsString());
 }
+{runtimeScene.getGame().getVariables().getFromIndex(6).setString(runtimeScene.getGame().getVariables().getFromIndex(5).getAsString());
 }
 }
 
@@ -3600,34 +4071,6 @@ isConditionTrue_0 = !(gdjs.multiplayer.isCurrentPlayerHost());
 }
 if (isConditionTrue_0) {
 {runtimeScene.getGame().getVariables().getFromIndex(16).setNumber(2);
-}
-}
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
-if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(5).setString(runtimeScene.getGame().getVariables().getFromIndex(6).getAsString());
-}
-}
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-isConditionTrue_0 = !(gdjs.multiplayer.isCurrentPlayerHost());
-if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(7).setString(runtimeScene.getGame().getVariables().getFromIndex(8).getAsString());
 }
 }
 
