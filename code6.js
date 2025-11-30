@@ -141,7 +141,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0xefa3a8 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x1836b18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
@@ -735,7 +735,7 @@ gdjs.PlayonlineCode.userFunc0xefa3a8 = function GDJSInlineCode(runtimeScene) {
 })(runtimeScene);
 
 };
-gdjs.PlayonlineCode.userFunc0xe3e108 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x1ada9a8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_watcher_online.js
 // Watcher separado: observa SelectedSkin / SelectedDadSkin e aplica apenas quando mudarem.
@@ -1042,7 +1042,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xefa3a8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1836b18(runtimeScene);
 
 }
 
@@ -1050,7 +1050,7 @@ gdjs.PlayonlineCode.userFunc0xefa3a8(runtimeScene);
 {
 
 
-gdjs.PlayonlineCode.userFunc0xe3e108(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1ada9a8(runtimeScene);
 
 }
 
@@ -1162,7 +1162,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xe9a630 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x17b37f8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -2030,12 +2030,12 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xe9a630(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x17b37f8(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x130edf0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1c03ba0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader_online_preserve_original_vars.js
 // Versão online — preserva exatamente o comportamento original ao salvar variáveis (SelectedSkin / SelectedDadSkin).
@@ -2672,12 +2672,12 @@ gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x130edf0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1c03ba0(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x1af5ee8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x19db260 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -4024,7 +4024,7 @@ gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1af5ee8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x19db260(runtimeScene);
 
 }
 
