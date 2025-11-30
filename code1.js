@@ -413,7 +413,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x2b06598 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x7dc2a0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -1725,12 +1725,12 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2b06598(runtimeScene);
+gdjs.InicioCode.userFunc0x7dc2a0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1d19760 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x17d6a08 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -2347,7 +2347,7 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1d19760(runtimeScene);
+gdjs.InicioCode.userFunc0x17d6a08(runtimeScene);
 
 }
 
