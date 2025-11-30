@@ -141,7 +141,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0xa77380 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x1b38de8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
@@ -735,7 +735,7 @@ gdjs.PlayonlineCode.userFunc0xa77380 = function GDJSInlineCode(runtimeScene) {
 })(runtimeScene);
 
 };
-gdjs.PlayonlineCode.userFunc0xf20c18 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x19d8d18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_watcher_online.js
 // Watcher separado: observa SelectedSkin / SelectedDadSkin e aplica apenas quando mudarem.
@@ -1042,7 +1042,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xa77380(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1b38de8(runtimeScene);
 
 }
 
@@ -1050,7 +1050,7 @@ gdjs.PlayonlineCode.userFunc0xa77380(runtimeScene);
 {
 
 
-gdjs.PlayonlineCode.userFunc0xf20c18(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x19d8d18(runtimeScene);
 
 }
 
@@ -1162,7 +1162,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x178e648 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1b39130 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -2030,12 +2030,12 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1b39130(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x1aed528 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1d363e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader_online_preserve_original_vars.js
 // Versão online — preserva exatamente o comportamento original ao salvar variáveis (SelectedSkin / SelectedDadSkin).
@@ -2082,6 +2082,34 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
       }
     }
     throw new Error("All loader fetch attempts failed: " + (lastErr ? lastErr.message : "unknown"));
+  }
+
+  // Helper: get skin "name" (compatibilidade: derive from path if name absent)
+  function getSkinName(sk) {
+    if (!sk) return "";
+    if (sk.name && typeof sk.name === "string" && sk.name.trim() !== "") return sk.name;
+    if (sk.path && typeof sk.path === "string") {
+      const parts = sk.path.replace(/\\/g,'/').split('/');
+      return parts[parts.length - 1] || "";
+    }
+    return "";
+  }
+
+  // Helper: build the stored thumb/zip path.
+  // If sk[field] is an absolute URL -> return as-is
+  // If sk[field] contains '/' -> assume it's already a relative path and return it
+  // Else join sk.path + '/' + sk[field]
+  function buildFilePathFromSkin(sk, field) {
+    if (!sk) return "";
+    const v = sk[field] || "";
+    if (!v) return "";
+    if (typeof v !== "string") return "";
+    if (v.startsWith("http://") || v.startsWith("https://")) return v;
+    if (v.indexOf('/') !== -1) return v.replace(/\\/g,'/');
+    if (sk.path && typeof sk.path === "string") {
+      return sk.path.replace(/\\/g,'/') + "/" + v;
+    }
+    return v;
   }
 
   function createLoadingModal() {
@@ -2189,11 +2217,12 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
     return { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls };
   }
 
+  // Updated to use getSkinName for compatibility with new manifest format
   function findSkinInManifest(manifest, modName, skinName){
     if (!manifest || !modName || !skinName) return null;
     const arr = manifest[modName] || [];
     if (!Array.isArray(arr)) return null;
-    for (const s of arr) if ((s.name||"").toString() === skinName.toString()) return s;
+    for (const s of arr) if (getSkinName(s).toString() === skinName.toString()) return s;
     return null;
   }
 
@@ -2216,10 +2245,12 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
   async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
     if (downloadAndSaveOnly._busy) return;
     downloadAndSaveOnly._busy = true;
-    let zipPath = skinObj.zip || "";
+
+    // try to build zipPath properly (supports filename-only in manifest)
+    let zipPath = buildFilePathFromSkin(skinObj, "zip") || (skinObj.zip || "");
     if (!zipPath) {
-      const found = findSkinInManifest(globalManifest, modName, skinObj.name);
-      if (found && found.zip) zipPath = found.zip;
+      const found = findSkinInManifest(globalManifest, modName, getSkinName(skinObj));
+      if (found) zipPath = buildFilePathFromSkin(found, "zip") || (found.zip || "");
     }
     if (!zipPath) { downloadAndSaveOnly._busy = false; return; }
 
@@ -2232,7 +2263,7 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
       await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
 
       // Build selection object exactly like original
-      const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+      const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || (skinObj.thumb || null) };
       if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
       else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
 
@@ -2255,10 +2286,11 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
   async function applyNow(modName, skinObj, target){
     if (applyNow._busy) return;
     applyNow._busy = true;
-    let zipPath = skinObj.zip || "";
+
+    let zipPath = buildFilePathFromSkin(skinObj, "zip") || (skinObj.zip || "");
     if (!zipPath) {
-      const found = findSkinInManifest(globalManifest, modName, skinObj.name);
-      if (found && found.zip) zipPath = found.zip;
+      const found = findSkinInManifest(globalManifest, modName, getSkinName(skinObj));
+      if (found) zipPath = buildFilePathFromSkin(found, "zip") || (found.zip || "");
     }
     if (!zipPath) { applyNow._busy = false; return; }
 
@@ -2268,7 +2300,7 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
       const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
       const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
 
-      const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+      const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || (skinObj.thumb || null) };
       if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
       else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
       
@@ -2304,10 +2336,11 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
   async function resetAndRedownload(modName, skinObj, auto=false){
     if (resetAndRedownload._busy) return;
     resetAndRedownload._busy = true;
-    let zipPath = skinObj.zip || "";
+
+    let zipPath = buildFilePathFromSkin(skinObj, "zip") || (skinObj.zip || "");
     if (!zipPath) {
-      const found = findSkinInManifest(globalManifest, modName, skinObj.name);
-      if (found && found.zip) zipPath = found.zip;
+      const found = findSkinInManifest(globalManifest, modName, getSkinName(skinObj));
+      if (found) zipPath = buildFilePathFromSkin(found, "zip") || (found.zip || "");
     }
     if (!zipPath) { resetAndRedownload._busy = false; return; }
 
@@ -2322,25 +2355,25 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
           const gv = runtimeScene.getGame().getVariables();
           if (gv.has("SelectedSkin")) {
             const cur = gv.get("SelectedSkin").getAsString();
-            if (cur && cur.includes(skinObj.name)) gv.get("SelectedSkin").setString("");
+            if (cur && cur.includes(getSkinName(skinObj))) gv.get("SelectedSkin").setString("");
           }
           if (gv.has("SelectedDadSkin")) {
             const cur = gv.get("SelectedDadSkin").getAsString();
-            if (cur && cur.includes(skinObj.name)) gv.get("SelectedDadSkin").setString("");
+            if (cur && cur.includes(getSkinName(skinObj))) gv.get("SelectedDadSkin").setString("");
           }
         } catch(e2){}
         
         try {
           const ls1 = localStorage.getItem("gd_selected_skin");
-          if (ls1 && ls1.includes(skinObj.name)) localStorage.removeItem("gd_selected_skin");
+          if (ls1 && ls1.includes(getSkinName(skinObj))) localStorage.removeItem("gd_selected_skin");
           const ls2 = localStorage.getItem("gd_selected_dad_skin");
-          if (ls2 && ls2.includes(skinObj.name)) localStorage.removeItem("gd_selected_dad_skin");
+          if (ls2 && ls2.includes(getSkinName(skinObj))) localStorage.removeItem("gd_selected_dad_skin");
         } catch(e2){}
 
         if (window.GD_SKIN_PLAYER) {
           try {
             if (typeof window.GD_SKIN_PLAYER.uninstallPackage === "function") {
-              await window.GD_SKIN_PLAYER.uninstallPackage(modName, skinObj.name);
+              await window.GD_SKIN_PLAYER.uninstallPackage(modName, getSkinName(skinObj));
               log("Called GD_SKIN_PLAYER.uninstallPackage");
             } else if (typeof window.GD_SKIN_PLAYER.removePackageByUrl === "function") {
               await window.GD_SKIN_PLAYER.removePackageByUrl(cdnCandidate);
@@ -2359,7 +2392,7 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
 
       const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
 
-      const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+      const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || (skinObj.thumb || null) };
       if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
       else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
       
@@ -2480,8 +2513,8 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
 
       for (const sk of skins){
         const card=document.createElement("div"); card.className="skin-card";
-        const img=document.createElement("img"); img.alt=sk.name; img.src=""; img.draggable = false;
-        const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=sk.name;
+        const img=document.createElement("img"); img.alt=getSkinName(sk); img.src=""; img.draggable = false;
+        const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=getSkinName(sk);
         const footer = document.createElement("div"); footer.className="card-footer";
         
         const { showBF, showOpp } = createApplyButtonsForItem();
@@ -2517,14 +2550,16 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
       }
 
       for (const item of thumbsCache[modName]){
-        const sk = item.skin; let thumb = sk.thumb || "";
-        if (!thumb) { item.imgEl.style.background="#222"; continue; }
+        const sk = item.skin; 
+        // build thumb path using helper (supports filename-only)
+        let thumbPath = buildFilePathFromSkin(sk, "thumb") || (sk.thumb || "");
+        if (!thumbPath) { item.imgEl.style.background="#222"; continue; }
         try {
-          let candidate = (thumb.startsWith("http://")||thumb.startsWith("https://")) ? thumb : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumb);
-          const blob = await fetchCdnFirst(candidate || thumb, "blob", cdnBase);
+          let candidate = (thumbPath.startsWith("http://")||thumbPath.startsWith("https://")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
+          const blob = await fetchCdnFirst(candidate || thumbPath, "blob", cdnBase);
           const url = URL.createObjectURL(blob);
           item.blobUrl = url; item.imgEl.src = url;
-        } catch(e){ warn("Thumb load failed for",sk.name,e); }
+        } catch(e){ warn("Thumb load failed for",getSkinName(sk),e); }
       }
     }
 
@@ -2548,7 +2583,7 @@ gdjs.PlayonlineCode.userFunc0x178e648(runtimeScene);
   let _skinWatcherInterval = null;
   let _skinWatcherLast = { SelectedSkin: null, SelectedDadSkin: null };
 
-  async function applySelectionString(runtimeScene, selStr, opts = {}){
+  async function applySelectionString(runtimeScene, selStr, opts = {}){ 
     if (!selStr || !selStr.trim()) return null;
     let parsed = null;
     try { parsed = JSON.parse(selStr); } catch(e){ return null; }
@@ -2637,12 +2672,12 @@ gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1aed528(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1d363e0(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xf213a8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x197a528 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -3954,7 +3989,7 @@ gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xf213a8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x197a528(runtimeScene);
 
 }
 
@@ -4043,7 +4078,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35141948);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35189644);
 }
 }
 if (isConditionTrue_0) {
@@ -4066,7 +4101,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35144380);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35192076);
 }
 }
 }
@@ -4178,7 +4213,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDHardObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35169372);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35198348);
 }
 }
 if (isConditionTrue_0) {
@@ -4224,7 +4259,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35171244);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35200356);
 }
 }
 if (isConditionTrue_0) {
@@ -4251,7 +4286,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35173060);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35202100);
 }
 }
 if (isConditionTrue_0) {

@@ -413,7 +413,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0xa77380 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1b38de8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -1725,14 +1725,14 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xa77380(runtimeScene);
+gdjs.InicioCode.userFunc0x1b38de8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x12aac10 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1b38758 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_loader.js (versão com suporte BF/Opponent + loading modal)
+// skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
   const MANIFEST_NAME = "manifestskins.json";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
@@ -1777,6 +1777,35 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
     throw new Error("All loader fetch attempts failed: " + (lastErr ? lastErr.message : "unknown"));
   }
 
+  // Helper: get skin "name" (compatibility: derive from path if name absent)
+  function getSkinName(sk) {
+    if (!sk) return "";
+    if (sk.name && typeof sk.name === "string" && sk.name.trim() !== "") return sk.name;
+    if (sk.path && typeof sk.path === "string") {
+      const parts = sk.path.replace(/\\/g,'/').split('/');
+      return parts[parts.length - 1] || "";
+    }
+    return "";
+  }
+
+  // Helper: build the stored thumb/zip path.
+  // If sk[field] is an absolute URL -> return as-is
+  // If sk[field] contains '/' -> assume it's already a relative path and return it
+  // Else join sk.path + '/' + sk[field]
+  function buildFilePathFromSkin(sk, field) {
+    if (!sk) return "";
+    const v = sk[field] || "";
+    if (!v) return "";
+    if (typeof v !== "string") return "";
+    if (v.startsWith("http://") || v.startsWith("https://")) return v;
+    if (v.indexOf('/') !== -1) return v.replace(/\\/g,'/');
+    if (sk.path && typeof sk.path === "string") {
+      return sk.path.replace(/\\/g,'/') + "/" + v;
+    }
+    return v;
+  }
+
+  // UI / modal creation reused (unchanged)...
   function createLoadingModal() {
     const modal = document.createElement("div");
     modal.id = "skin-download-loading";
@@ -1945,7 +1974,10 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
     if (!manifest || !modName || !skinName) return null;
     const arr = manifest[modName] || [];
     if (!Array.isArray(arr)) return null;
-    for (const s of arr) if ((s.name||"").toString() === skinName.toString()) return s;
+    for (const s of arr) {
+      const sname = getSkinName(s);
+      if (sname === skinName.toString()) return s;
+    }
     return null;
   }
 
@@ -1991,7 +2023,7 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
         if (!selStr) return;
         const parsed = JSON.parse(selStr);
         if (!parsed || (!parsed.zip && !parsed.zip_cdn)) return;
-        await resetAndRedownload(parsed.mod || parsed.modName || "", { name: parsed.name || "", zip: parsed.zip || parsed.zip_cdn }, true);
+        await resetAndRedownload(parsed.mod || parsed.modName || "", { name: parsed.name || (parsed.path ? parsed.path.split('/').pop() : ""), zip: parsed.zip || parsed.zip_cdn }, true);
       } catch(e){
         console.error("Reset Selected failed:", e);
       }
@@ -2043,8 +2075,8 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
       const cdnBase={ owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
       for (const sk of skins){
         const card=document.createElement("div"); card.className="skin-card";
-        const img=document.createElement("img"); img.alt=sk.name; img.src=""; img.draggable = false;
-        const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=sk.name;
+        const img=document.createElement("img"); img.alt=getSkinName(sk); img.src=""; img.draggable = false;
+        const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=getSkinName(sk);
         const footer = document.createElement("div"); footer.className="card-footer";
         
         const applyBtnBF = document.createElement("button"); 
@@ -2075,23 +2107,24 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
       }
 
       for (const item of thumbsCache[modName]){
-        const sk = item.skin; let thumb = sk.thumb || "";
-        if (!thumb) { item.imgEl.style.background="#222"; continue; }
+        const sk = item.skin; 
+        let thumbPath = buildFilePathFromSkin(sk, "thumb") || "";
+        if (!thumbPath) { item.imgEl.style.background="#222"; continue; }
         try {
-          let candidate = (thumb.startsWith("http://")||thumb.startsWith("https://")) ? thumb : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumb);
-          const blob = await fetchCdnFirst(candidate || thumb, "blob", cdnBase);
+          const candidate = (thumbPath.startsWith("http://")||thumbPath.startsWith("https://")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
+          const blob = await fetchCdnFirst(candidate || thumbPath, "blob", cdnBase);
           const url = URL.createObjectURL(blob);
           item.blobUrl = url; item.imgEl.src = url;
-        } catch(e){ warn("Thumb load failed for",sk.name,e); }
+        } catch(e){ warn("Thumb load failed for",getSkinName(sk),e); }
       }
     }
 
     async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
       if (downloading) return;
-      let zipPath = skinObj.zip || "";
+      let zipPath = buildFilePathFromSkin(skinObj, "zip") || "";
       if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, skinObj.name);
-        if (found && found.zip) zipPath = found.zip;
+        const found = findSkinInManifest(manifest, modName, getSkinName(skinObj));
+        if (found) zipPath = buildFilePathFromSkin(found, "zip") || "";
       }
       if (!zipPath) return;
 
@@ -2103,7 +2136,8 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
         
         await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
         
-        const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+        const selName = getSkinName(skinObj);
+        const sel = { mod: modName, name: selName, path: skinObj.path || null, zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || null };
         if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
         else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
         
@@ -2126,10 +2160,10 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
 
     async function applyNow(modName, skinObj, target){
       if (downloading) return;
-      let zipPath = skinObj.zip || "";
+      let zipPath = buildFilePathFromSkin(skinObj, "zip") || "";
       if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, skinObj.name);
-        if (found && found.zip) zipPath = found.zip;
+        const found = findSkinInManifest(manifest, modName, getSkinName(skinObj));
+        if (found) zipPath = buildFilePathFromSkin(found, "zip") || "";
       }
       if (!zipPath) return;
 
@@ -2140,7 +2174,8 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
         const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
         const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
 
-        const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+        const selName = getSkinName(skinObj);
+        const sel = { mod: modName, name: selName, path: skinObj.path || null, zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || null };
         if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
         else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
         
@@ -2175,10 +2210,16 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
 
     async function resetAndRedownload(modName, skinObj, auto=false){
       if (downloading) return;
-      let zipPath = skinObj.zip || "";
+      // skinObj may be older format or new; try to get zip path
+      let zipPath = "";
+      if (typeof skinObj === "string") {
+        zipPath = skinObj;
+      } else {
+        zipPath = buildFilePathFromSkin(skinObj, "zip") || skinObj.zip || "";
+      }
       if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, skinObj.name);
-        if (found && found.zip) zipPath = found.zip;
+        const found = findSkinInManifest(manifest, modName, (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj));
+        if (found) zipPath = buildFilePathFromSkin(found, "zip") || "";
       }
       if (!zipPath) return;
 
@@ -2193,25 +2234,25 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
             const gv = runtimeScene.getGame().getVariables();
             if (gv.has("SelectedSkin")) {
               const cur = gv.get("SelectedSkin").getAsString();
-              if (cur && cur.includes(skinObj.name)) gv.get("SelectedSkin").setString("");
+              if (cur && cur.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) gv.get("SelectedSkin").setString("");
             }
             if (gv.has("SelectedDadSkin")) {
               const cur = gv.get("SelectedDadSkin").getAsString();
-              if (cur && cur.includes(skinObj.name)) gv.get("SelectedDadSkin").setString("");
+              if (cur && cur.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) gv.get("SelectedDadSkin").setString("");
             }
           } catch(e2){}
           
           try {
             const ls1 = localStorage.getItem("gd_selected_skin");
-            if (ls1 && ls1.includes(skinObj.name)) localStorage.removeItem("gd_selected_skin");
+            if (ls1 && ls1.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) localStorage.removeItem("gd_selected_skin");
             const ls2 = localStorage.getItem("gd_selected_dad_skin");
-            if (ls2 && ls2.includes(skinObj.name)) localStorage.removeItem("gd_selected_dad_skin");
+            if (ls2 && ls2.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) localStorage.removeItem("gd_selected_dad_skin");
           } catch(e2){}
 
           if (window.GD_SKIN_PLAYER) {
             try {
               if (typeof window.GD_SKIN_PLAYER.uninstallPackage === "function") {
-                await window.GD_SKIN_PLAYER.uninstallPackage(modName, skinObj.name);
+                await window.GD_SKIN_PLAYER.uninstallPackage(modName, (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj));
                 log("Called GD_SKIN_PLAYER.uninstallPackage");
               } else if (typeof window.GD_SKIN_PLAYER.removePackageByUrl === "function") {
                 await window.GD_SKIN_PLAYER.removePackageByUrl(cdnCandidate);
@@ -2230,7 +2271,8 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
 
         const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
 
-        const sel = { mod: modName, name: skinObj.name, zip: zipPath || null, thumb: skinObj.thumb || null };
+        const selName = (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj);
+        const sel = { mod: modName, name: selName, zip: zipPath || null };
         if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
         else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
         
@@ -2298,13 +2340,14 @@ gdjs.InicioCode.userFunc0xa77380(runtimeScene);
   }
 
 })(runtimeScene);
+
 };
 gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0x12aac10(runtimeScene);
+gdjs.InicioCode.userFunc0x1b38758(runtimeScene);
 
 }
 
@@ -2342,7 +2385,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.asyncCallback34250228 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback34280964 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(67), null);
 }
@@ -2356,7 +2399,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34250228, gdjs.InicioCode.asyncCallback34250228);
+gdjs.InicioCode.idToCallbackMap.set(34280964, gdjs.InicioCode.asyncCallback34280964);
 gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 
 {
@@ -2366,7 +2409,7 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback34250228(runtimeScene, asyncObjectsList)), 34250228, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback34280964(runtimeScene, asyncObjectsList)), 34280964, asyncObjectsList);
 }
 }
 
@@ -2531,14 +2574,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback34278140 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback34308876 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
 gdjs.InicioCode.eventsList14(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34278140, gdjs.InicioCode.asyncCallback34278140);
+gdjs.InicioCode.idToCallbackMap.set(34308876, gdjs.InicioCode.asyncCallback34308876);
 gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 
 {
@@ -2548,20 +2591,20 @@ gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34278140(runtimeScene, asyncObjectsList)), 34278140, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34308876(runtimeScene, asyncObjectsList)), 34308876, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback34287372 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback34318108 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34287372, gdjs.InicioCode.asyncCallback34287372);
+gdjs.InicioCode.idToCallbackMap.set(34318108, gdjs.InicioCode.asyncCallback34318108);
 gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 
 {
@@ -2571,14 +2614,14 @@ gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback34287372(runtimeScene, asyncObjectsList)), 34287372, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback34318108(runtimeScene, asyncObjectsList)), 34318108, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback34292916 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback34323652 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 
@@ -2588,7 +2631,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPoin
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34292916, gdjs.InicioCode.asyncCallback34292916);
+gdjs.InicioCode.idToCallbackMap.set(34323652, gdjs.InicioCode.asyncCallback34323652);
 gdjs.InicioCode.eventsList17 = function(runtimeScene) {
 
 {
@@ -2599,7 +2642,7 @@ gdjs.InicioCode.eventsList17 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34292916(runtimeScene, asyncObjectsList)), 34292916, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34323652(runtimeScene, asyncObjectsList)), 34323652, asyncObjectsList);
 }
 }
 
@@ -2617,7 +2660,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34290396);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34321132);
 }
 }
 if (isConditionTrue_0) {
@@ -2653,7 +2696,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34292996);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34323732);
 }
 }
 if (isConditionTrue_0) {
@@ -2731,7 +2774,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34232068);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34262804);
 }
 }
 if (isConditionTrue_0) {
@@ -2759,7 +2802,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34233892);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34264628);
 }
 }
 if (isConditionTrue_0) {
@@ -2828,7 +2871,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34250020);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34280756);
 }
 }
 if (isConditionTrue_0) {
@@ -3136,7 +3179,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34276428);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34307164);
 }
 }
 }
@@ -3198,7 +3241,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34283732);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34314468);
 }
 }
 if (isConditionTrue_0) {
@@ -3269,7 +3312,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34288748);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34319484);
 }
 }
 if (isConditionTrue_0) {
@@ -3346,7 +3389,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34297188);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34327924);
 }
 }
 if (isConditionTrue_0) {
