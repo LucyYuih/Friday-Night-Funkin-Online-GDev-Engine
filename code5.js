@@ -3916,7 +3916,7 @@ const parentAsyncObjectsList = asyncObjectsList;
 const asyncObjectsList = gdjs.LongLivedObjectsList.from(parentAsyncObjectsList);
 asyncObjectsList.backupLocalVariablesContainers(gdjs.PlayCode.localVariables);
 /* Don't save BlackScreen as it will be provided by the parent asyncObjectsList. */
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), (runtimeScene) => (gdjs.PlayCode.asyncCallback35717892(runtimeScene, asyncObjectsList)), 35717892, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(1), (runtimeScene) => (gdjs.PlayCode.asyncCallback35717892(runtimeScene, asyncObjectsList)), 35717892, asyncObjectsList);
 }
 }
 
@@ -4366,7 +4366,7 @@ isConditionTrue_0 = false;
 }
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(71).setNumber(-(2) - runtimeScene.getScene().getVariables().getFromIndex(41).getAsNumber());
+{runtimeScene.getGame().getVariables().getFromIndex(71).setNumber(-(1) - runtimeScene.getScene().getVariables().getFromIndex(41).getAsNumber());
 }
 {runtimeScene.getGame().getVariables().getFromIndex(70).getChild(0).setBoolean(true);
 }
@@ -17915,7 +17915,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1993648 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x17e8918 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18105,7 +18105,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1993648(runtimeScene);
+gdjs.PlayCode.userFunc0x17e8918(runtimeScene);
 
 }
 
@@ -18285,7 +18285,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xf1a240 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1992aa0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18475,7 +18475,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xf1a240(runtimeScene);
+gdjs.PlayCode.userFunc0x1992aa0(runtimeScene);
 
 }
 
@@ -22218,7 +22218,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0xa8e2d0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xe3e108 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22237,7 +22237,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0xa8e370 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0xe9dac8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22502,7 +22502,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0xa8e2d0(runtimeScene);
+gdjs.PlayCode.userFunc0xe3e108(runtimeScene);
 
 }
 
@@ -22510,7 +22510,7 @@ gdjs.PlayCode.userFunc0xa8e2d0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0xa8e370(runtimeScene);
+gdjs.PlayCode.userFunc0xe9dac8(runtimeScene);
 
 }
 
@@ -22632,7 +22632,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1c30228 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1b8cd18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -23500,7 +23500,7 @@ gdjs.PlayCode.eventsList272 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x1c30228(runtimeScene);
+gdjs.PlayCode.userFunc0x1b8cd18(runtimeScene);
 
 }
 
@@ -23580,7 +23580,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x13663f0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xa62738 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -23694,7 +23694,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   }
 
   // ---------- IndexedDB (opcional) ----------
-  // simples wrapper minimal sem dependencies
   const idb = {
     db: null,
     async open() {
@@ -23763,6 +23762,80 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     if (!entry) return null;
     if (entry.manifestUrl) return entry.manifestUrl;
     if (entry.owner && entry.repo) return `https://cdn.jsdelivr.net/gh/${entry.owner}/${entry.repo}@${entry.branch}/manifest.json`;
+    return null;
+  }
+
+  // ---------- NEW: manifest helper para o novo formato ----------
+  function getBaseUrlFromManifest(manifest) {
+    if (manifest && manifest._base) {
+      // _base pode ser "owner/repo@branch" ou "owner/repo"
+      const base = manifest._base;
+      // se já for um URL, devolve direto
+      if (/^https?:\/\//i.test(base)) return base.replace(/\/?$/, '/');
+      return `https://cdn.jsdelivr.net/gh/${base.replace(/\/+$/, '')}/`;
+    }
+    // fallback para active repo
+    const active = getActiveRepo();
+    return `https://cdn.jsdelivr.net/gh/${active.owner}/${active.repo}@${active.branch}/`;
+  }
+
+  function buildFileUrl(baseUrl, folderPath, filePath) {
+    if (!filePath) return null;
+    if (/^https?:\/\//i.test(filePath)) return filePath;
+    // if filePath contains slash, assume it's relative to repo root
+    if (filePath.indexOf('/') !== -1) {
+      return baseUrl + filePath.replace(/^\/+/, '');
+    }
+    if (folderPath && folderPath !== "") {
+      return baseUrl + folderPath.replace(/^\/+|\/+$/g,'') + "/" + filePath;
+    }
+    return baseUrl + filePath;
+  }
+
+  function parseManifestEntry(entry, baseUrl = "", folderPath = "") {
+    if (!entry) return null;
+
+    // array de strings: pode ser files (contendo '.' ou '/'), ou subdirs (nomes simples)
+    if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "string") {
+      const first = entry[0];
+      if (first.includes('.') || first.includes('/')) {
+        // arquivos listados (cada string é file path)
+        return {
+          type: 'files',
+          value: entry.map(fp => {
+            const name = fp.split('/').pop();
+            return { name: name, type: 'file', url: buildFileUrl(baseUrl, folderPath, fp) };
+          })
+        };
+      } else {
+        // lista de subdirs
+        return { type: 'subdirs', value: entry.slice() };
+      }
+    }
+
+    // object com subdirs e files
+    if (typeof entry === 'object' && entry !== null && !Array.isArray(entry)) {
+      if (entry.subdirs || entry.files) {
+        const subdirs = Array.isArray(entry.subdirs) ? entry.subdirs.slice() : [];
+        const files = Array.isArray(entry.files) ? entry.files.map(fp => ({ name: fp.split('/').pop(), type:'file', url: buildFileUrl(baseUrl, folderPath, fp) })) : [];
+        return { type: 'folder', subdirs, files };
+      }
+    }
+
+    // array de objetos (legado) -> cada item tem { n / name, u / url }
+    if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "object") {
+      return {
+        type: 'files',
+        value: entry.map(it => {
+          const name = it.n || it.name || (it.path ? it.path.split('/').pop() : '');
+          let url = it.u || it.url || it.download_url || null;
+          if (!url) url = buildFileUrl(baseUrl, folderPath, name);
+          else if (!/^https?:\/\//i.test(url) && url.indexOf('/') !== -1) url = baseUrl + url.replace(/^\/+/, '');
+          return { name, type: 'file', url };
+        })
+      };
+    }
+
     return null;
   }
 
@@ -23876,9 +23949,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   const limit = createLimiter(CONFIG.maxParallelDownloads);
 
   // ---------- AUDIO POOL e gerenciamento de blobUrls ----------
-  // Objetos:
-  //   window.gdjsCustomAudio[folder] = { audios: { name: { blobUrl, audioElId } }, rawFiles: { name: text } }
-  //   audioPool: array de elements HTMLAudioElement pré-criados
   const audioPool = {
     pool: [],
     maxSize: 8,
@@ -23898,7 +23968,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       while (this.pool.length < needed) this.pool.push(this.createElement());
     },
     acquire(blobUrl) {
-      // reuse existing element if its src equals blobUrl
       for (const el of this.pool) {
         if (!el._gdjs_in_use) {
           el._gdjs_in_use = true;
@@ -23906,7 +23975,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
           return el;
         }
       }
-      // none available: create new if under maxSize
       if (this.pool.length < this.maxSize) {
         const el = this.createElement();
         el._gdjs_in_use = true;
@@ -23914,7 +23982,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         this.pool.push(el);
         return el;
       }
-      // fallback: reuse first one forcibly
       const el = this.pool[0];
       try { el.pause(); } catch(e){}
       try { el.src = blobUrl; } catch(e){}
@@ -23936,7 +24003,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       const cur = this.refsByBlob.get(blobUrl) || 0;
       if (cur <= 1) {
         this.refsByBlob.delete(blobUrl);
-        // revoke URL to free memory
         try { URL.revokeObjectURL(blobUrl); } catch(e){ }
       } else {
         this.refsByBlob.set(blobUrl, cur - 1);
@@ -23952,15 +24018,25 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
   function isJsonFile(name){ return /\.json$/i.test(name); }
 
+  // ---------- helper: getFilesFromManifestPath (usa parseManifestEntry) ----------
+  async function getFilesFromManifestPath(entry, manifest, pathKey) {
+    try {
+      if (!manifest || !manifest.hasOwnProperty(pathKey)) return null;
+      const baseUrl = getBaseUrlFromManifest(manifest);
+      const parsed = parseManifestEntry(manifest[pathKey], baseUrl, pathKey);
+      if (!parsed) return null;
+      if (parsed.type === 'files') return parsed.value;
+      if (parsed.type === 'folder' && parsed.files) return parsed.files;
+      return null;
+    } catch(e){ return null; }
+  }
+
   // ---------- CARREGAMENTO DE ÁUDIOS/JSONS PARA UMA PASTA (melhorado) ----------
-  // Nota: esta função preserva a semântica original: NÃO chama play() automaticamente.
   async function downloadAndPrepareFolderFlexible(folderPathOrRoot, outerController, opts) {
     const ctrl = outerController;
     const difficultyName = opts && opts.difficultyName ? opts.difficultyName : null;
 
     try {
-      // cleanup anterior (revoke se necessário)
-      // mas não revocar os blobUrls que vamos reutilizar; apenas limpar canais
       stopAndCleanupAll(true);
 
       const rootFolder = (() => {
@@ -23979,12 +24055,11 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       try { setVarString("SongName", basenameNoExt((rootFolder || "").split("/").pop()||"")); } catch(e){}
       try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPathOrRoot); } catch(e){}
 
-      // sinal de carregando
       setVarNumber("AllLoaded", 0);
 
-      // prepare manifest + active repo
       const activeRepo = getActiveRepo();
       const manifest = await loadManifestPreferLocalFor(activeRepo);
+      const baseUrl = manifest ? getBaseUrlFromManifest(manifest) : `https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/`;
 
       // listagem de arquivos de áudio
       let audioFiles = [];
@@ -23992,10 +24067,21 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
         audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
       } else {
-        const mp = (manifest && manifest.hasOwnProperty(folderPathOrRoot)) ? manifest[folderPathOrRoot] : null;
-        if (mp && Array.isArray(mp) && mp.length>0 && typeof mp[0] === "object") {
-          audioFiles = mp.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
-        } else {
+        // caso manifest disponha da pasta
+        if (manifest && manifest.hasOwnProperty(folderPathOrRoot)) {
+          const parsed = parseManifestEntry(manifest[folderPathOrRoot], baseUrl, folderPathOrRoot);
+          if (parsed) {
+            if (parsed.type === 'files') {
+              audioFiles = parsed.value.filter(e => isAudioFile(e.name)).map(e => ({ name: e.name, url: e.url }));
+            } else if (parsed.type === 'folder' && parsed.files) {
+              audioFiles = parsed.files.filter(e => isAudioFile(e.name)).map(e => ({ name: e.name, url: e.url }));
+            } else {
+              audioFiles = [];
+            }
+          }
+        } 
+        // fallback GH API
+        if (!audioFiles || audioFiles.length === 0) {
           try {
             const api = await (async ()=> { try { return await ghListApi(folderPathOrRoot); } catch(e) { return []; } })();
             audioFiles = (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
@@ -24008,9 +24094,11 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       if (inferredDifficulty) {
         const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
         if (manifest && manifest.hasOwnProperty(difficultyPath)) {
-          const entry = manifest[difficultyPath];
-          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-            entry.filter(e=> isJsonFile(e.name)).forEach(e=> allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: difficultyPath });
+          const parsed = parseManifestEntry(manifest[difficultyPath], baseUrl, difficultyPath);
+          if (parsed && parsed.type === 'files') {
+            parsed.value.filter(e => isJsonFile(e.name)).forEach(e => { allJsonsMap[e.name] = { name: e.name, url: e.url, origin: difficultyPath }; });
+          } else if (parsed && parsed.type === 'folder' && parsed.files) {
+            parsed.files.filter(e => isJsonFile(e.name)).forEach(e => { allJsonsMap[e.name] = { name: e.name, url: e.url, origin: difficultyPath }; });
           }
         } else {
           try {
@@ -24022,9 +24110,11 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       // include jsons from rootFolder as fallback
       try {
         if (manifest && manifest.hasOwnProperty(rootFolder)) {
-          const entry = manifest[rootFolder];
-          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-            entry.filter(e=> isJsonFile(e.name)).forEach(e=> { if (!allJsonsMap[e.name]) allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: rootFolder }; });
+          const parsedRoot = parseManifestEntry(manifest[rootFolder], baseUrl, rootFolder);
+          if (parsedRoot && parsedRoot.type === 'files') {
+            parsedRoot.value.filter(e=> isJsonFile(e.name)).forEach(e=> { if (!allJsonsMap[e.name]) allJsonsMap[e.name] = { name: e.name, url: e.url, origin: rootFolder }; });
+          } else if (parsedRoot && parsedRoot.type === 'folder' && parsedRoot.files) {
+            parsedRoot.files.filter(e=> isJsonFile(e.name)).forEach(e=> { if (!allJsonsMap[e.name]) allJsonsMap[e.name] = { name: e.name, url: e.url, origin: rootFolder }; });
           }
         } else {
           const api = await (async ()=> { try { return await ghListApi(rootFolder); } catch(e){ return []; } })();
@@ -24041,35 +24131,28 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       const tasks = (audioFiles || []).map(f => async () => {
         if (ctrl.signal.aborted) throw new Error("aborted");
         try {
-          setVarString("SongName", setVarString || "" ); // noop guard to keep variable reference alive
-          // tentar recuperar de IDB se ativado
-          const cacheKeyBlob = "blob::" + folderPathOrRoot + "::" + f.name;
+          const cacheKeyBlob = "blob::" + rootFolder + "::" + f.name;
           let blob = null;
           if (CONFIG.useIndexedDBCache) {
             try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyBlob); if (cached) blob = cached; } catch(e){ /* ignore */ }
           }
           if (!blob) {
-            // fetch e salvar
             const b = await fetchAsBlob(f.url, ctrl.signal);
             blob = b;
             if (CONFIG.useIndexedDBCache) {
               try { await idb.put(CONFIG.indexedDBStoreFiles, cacheKeyBlob, b); } catch(e){}
             }
           }
-          // create blobUrl e store
           const blobUrl = URL.createObjectURL(blob);
           audioPool.incBlobRef(blobUrl);
-          // create audio element from pool
           const audioEl = audioPool.acquire(blobUrl);
-          // store dest
           dest.audios[f.name] = { blobUrl, audioEl };
           window.gdjsChannels[nextChannelIndex] = audioEl;
           nextChannelIndex++;
         } catch(e){
-          // skip error for this file
+          // skip this file on error
         }
       });
-      // run tasks com concurrency
       await Promise.all(tasks.map(t => limit(t)));
 
       // --------- download jsons (charts) ----------
@@ -24078,8 +24161,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         if (ctrl.signal.aborted) throw new Error("aborted");
         try {
           const j = allJsonsMap[name];
-          // idb cache key
-          const cacheKeyTxt = "txt::" + folderPathOrRoot + "::" + j.name;
+          const cacheKeyTxt = "txt::" + rootFolder + "::" + j.name;
           let txt = null;
           if (CONFIG.useIndexedDBCache) {
             try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyTxt); if (cached) txt = cached; } catch(e){}
@@ -24117,12 +24199,10 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       });
       await Promise.all(jsonTasks.map(t => limit(t)));
 
-      // finalize: connect channel 0 watcher / audio context setup (sem tocar)
+      // finalize
       attachEndedWatcherToChannel0();
       await ensureAudioContext();
       setVarNumber("jsmusicfinish", 0);
-
-      // success
       setVarNumber("AllLoaded", 1);
       return { ok:true };
     } catch(err) {
@@ -24136,15 +24216,17 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   async function findAudioFilesWithFallback(rootFolder, difficultyPath) {
     const activeRepo = getActiveRepo();
     const manifest = await loadManifestPreferLocalFor(activeRepo);
+    const baseUrl = manifest ? getBaseUrlFromManifest(manifest) : `https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/`;
 
     async function audioListFromManifestPath(p) {
       try {
         if (!manifest) return [];
         if (!manifest.hasOwnProperty(p)) return [];
-        const entry = manifest[p];
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-          return entry.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
-        }
+        const parsed = parseManifestEntry(manifest[p], baseUrl, p);
+        if (!parsed) return [];
+        if (parsed.type === 'files') return parsed.value.filter(e => isAudioFile(e.name)).map(e => ({ name: e.name, url: e.url }));
+        if (parsed.type === 'folder' && parsed.files) return parsed.files.filter(e => isAudioFile(e.name)).map(e => ({ name: e.name, url: e.url }));
+        return [];
       } catch(e){}
       return [];
     }
@@ -24260,7 +24342,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
   }
 
   // ---------- carregador leve para reprodução-on-demand (mantém sem autoplay) ----------
-  // Garante que se existir entrada cached em window.gdjsCustomAudio[selected] ela será mapeada para channels
   async function ensureChannelsReadyNonBlocking() {
     try {
       let selected = getVarString("selectedTrackKey");
@@ -24272,7 +24353,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       const folderName = selected.split("/").pop() || selected;
       if (!getVarString("SongName")) setVarString("SongName", basenameNoExt(folderName));
       if (window.gdjsCustomAudio[selected] && Object.keys(window.gdjsCustomAudio[selected].audios||{}).length > 0) {
-        // rebuild channels mapping
         window.gdjsChannels = {};
         let i = 0;
         for (const nm of Object.keys(window.gdjsCustomAudio[selected].audios)) {
@@ -24286,7 +24366,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         setVarNumber("jsmusicfinish", 0);
         return;
       }
-      // else try to load audios for track (non-blocking)
       const loaded = await loadAudiosForTrack(selected);
       if ((loaded || []).length > 0) { attachEndedWatcherToChannel0(); ensureAudioContext(); setVarNumber("jsmusicfinish", 0); }
     } catch(e){}
@@ -24298,11 +24377,14 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     window.gdjsCustomAudio[selected] = window.gdjsCustomAudio[selected] || { audios: {}, rawFiles: {} };
     const entry = window.gdjsCustomAudio[selected];
     const manifest = await loadManifestPreferLocalFor(getActiveRepo());
+    const baseUrl = manifest ? getBaseUrlFromManifest(manifest) : `https://cdn.jsdelivr.net/gh/${getActiveRepo().owner}/${getActiveRepo().repo}@${getActiveRepo().branch}/`;
     let files = null;
     if (manifest && manifest.hasOwnProperty(selected)) {
-      const raw = manifest[selected];
-      if (Array.isArray(raw) && raw.length>0 && typeof raw[0] === "object") {
-        files = raw.map(e => ({ name: e.name, url: e.url }));
+      const parsed = parseManifestEntry(manifest[selected], baseUrl, selected);
+      if (parsed && parsed.type === 'files') {
+        files = parsed.value.map(e => ({ name: e.name, url: e.url }));
+      } else if (parsed && parsed.type === 'folder' && parsed.files) {
+        files = parsed.files.map(e => ({ name: e.name, url: e.url }));
       } else {
         files = [];
       }
@@ -24439,8 +24521,15 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     log("IndexedDB cache set to", CONFIG.useIndexedDBCache);
   };
 
+  // Additional exposed function to download a folder with an AbortController
+  window._gdjs_loader_utils.downloadFolder = async function(folderPath, opts) {
+    const ac = new AbortController();
+    const p = await downloadAndPrepareFolderFlexible(folderPath, ac, opts || {});
+    return { result: p, abort: ()=> ac.abort() };
+  };
+
   // ---------- fim do script ----------
-  log("Script B (optimized) loaded");
+  log("Script B (optimized) loaded - manifest-aware");
 })(runtimeScene);
 
 };
@@ -24461,7 +24550,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x13663f0(runtimeScene);
+gdjs.PlayCode.userFunc0xa62738(runtimeScene);
 
 }
 
@@ -24669,10 +24758,6 @@ let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.evtTools.runtimeScene.sceneJustBegins(runtimeScene);
 if (isConditionTrue_0) {
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(14));
-}
-{gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(9));
-}
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(13));
 }
 {gdjs.multiplayerVariablesManager.disableVariableSynchronization(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(27));

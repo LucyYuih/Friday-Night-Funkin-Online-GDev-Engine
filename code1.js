@@ -413,7 +413,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x7dc2a0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xe9dac8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -425,7 +425,7 @@ if (true) {
   const FAVORITES_STORAGE_KEY = "gdjs_fav_songs_v1";
 
   function defaultRepoEntry() {
-    return { id: "official", name: "oficial (LucyYuih/gdev-custom-charts)", owner: "LucyYuih", repo: "gdev-custom-skins", branch: "main", enabled: true };
+    return { id: "official", name: "oficial (LucyYuih/gdev-custom-charts)", owner: "LucyYuih", repo: "gdev-custom-charts", branch: "main", enabled: true };
   }
 
   function loadRepoList() {
@@ -492,36 +492,53 @@ if (true) {
     return `https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/`;
   }
 
-  function parseManifestEntry(entry, baseUrl = "") {
+  // monta url final a partir de baseUrl, folderPath e filePath (respeita URLs e caminhos já completos)
+  function buildFileUrl(baseUrl, folderPath, filePath) {
+    if (!filePath) return null;
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
+    // se filePath já contém '/', assume caminho relativo ao repo root -> baseUrl + filePath
+    if (filePath.indexOf('/') !== -1) {
+      return baseUrl + filePath.replace(/^\/+/,'');
+    }
+    // senao: é só o nome do arquivo -> junta folderPath
+    if (folderPath && folderPath !== "") {
+      return baseUrl + folderPath.replace(/^\/+|\/+$/g,'') + "/" + filePath;
+    }
+    return baseUrl + filePath;
+  }
+
+  // parseManifestEntry agora recebe também folderPath (chave do manifest) para montar URLs corretamente
+  function parseManifestEntry(entry, baseUrl = "", folderPath = "") {
     if (!entry) return null;
-    
+
     // Se for array de strings (diretórios ou arquivos)
     if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "string") {
-      // Verificar se são diretórios (não contém ponto) ou arquivos (contém ponto)
       const firstItem = entry[0];
+      // Se o primeiro item contém '.' (arquivo) ou contém '/' -> consideramos arquivos.
       if (firstItem.includes('.') || firstItem.includes('/')) {
-        // São arquivos (nova estrutura otimizada)
+        // São arquivos (nova estrutura otimizada ou antiga)
         return {
           type: 'files',
           value: entry.map(filePath => {
             const fileName = filePath.split('/').pop();
+            const url = buildFileUrl(baseUrl, folderPath, filePath);
             return {
               name: fileName,
               type: "file",
-              url: baseUrl + filePath
+              url: url
             };
           })
         };
       } else {
-        // São diretórios
+        // São subdiretórios
         return {
-          type: 'subdirs', 
-          value: entry
+          type: 'subdirs',
+          value: entry.slice()
         };
       }
     }
-    
-    // Se for objeto com subdirs e files (nova estrutura com áudios em pastas não-folhas)
+
+    // Se for objeto com subdirs e files (nova estrutura)
     if (typeof entry === 'object' && entry !== null && !Array.isArray(entry)) {
       if (entry.subdirs && entry.files) {
         return {
@@ -529,28 +546,42 @@ if (true) {
           subdirs: entry.subdirs,
           files: entry.files.map(filePath => {
             const fileName = filePath.split('/').pop();
+            const url = buildFileUrl(baseUrl, folderPath, filePath);
             return {
               name: fileName,
-              type: "file", 
-              url: baseUrl + filePath
+              type: "file",
+              url: url
             };
           })
         };
       }
     }
-    
+
     // Se for array de objetos (estrutura legada)
     if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "object") {
       return {
         type: 'files',
-        value: entry.map(item => ({
-          name: item.n || item.name,
-          type: "file",
-          url: item.u || item.url
-        }))
+        value: entry.map(item => {
+          const name = item.n || item.name;
+          const urlRaw = item.u || item.url || "";
+          // urlRaw pode ser relativo (path) ou completo; se for relativo e não contém '/', assumimos folderPath + '/' + urlRaw
+          let url;
+          if (!urlRaw) {
+            url = buildFileUrl(baseUrl, folderPath, name);
+          } else if (urlRaw.startsWith("http://") || urlRaw.startsWith("https://") || urlRaw.indexOf('/') !== -1) {
+            url = urlRaw.startsWith("http") ? urlRaw : baseUrl + urlRaw.replace(/^\/+/,'');
+          } else {
+            url = buildFileUrl(baseUrl, folderPath, urlRaw);
+          }
+          return {
+            name: name,
+            type: "file",
+            url: url
+          };
+        })
       };
     }
-    
+
     return null;
   }
 
@@ -801,7 +832,6 @@ if (true) {
 
   // --- CACHE manager modal ---
   function showCacheManager() {
-    // [código idêntico ao anterior...]
     const overlay = document.createElement("div");
     Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 10000000, display: "flex", alignItems: "center", justifyContent: "center" });
     const box = document.createElement("div");
@@ -987,7 +1017,7 @@ if (true) {
           
           if (manifest && manifest.hasOwnProperty(p)) {
             const baseUrl = getBaseUrl(manifest);
-            const parsed = parseManifestEntry(manifest[p], baseUrl);
+            const parsed = parseManifestEntry(manifest[p], baseUrl, p);
             
             if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs && parsed.subdirs.length > 0))) {
               hasSubdirs = true;
@@ -1054,7 +1084,8 @@ if (true) {
     try {
       const manifest = await loadManifestPreferLocalFor(entry, window.runtimeScene || undefined);
       if (manifest && manifest.hasOwnProperty(folderPath)) {
-        const parsed = parseManifestEntry(manifest[folderPath]);
+        const baseUrl = getBaseUrl(manifest);
+        const parsed = parseManifestEntry(manifest[folderPath], baseUrl, folderPath);
         if (parsed && parsed.type === 'subdirs') {
           return parsed.value.slice();
         } else if (parsed && parsed.type === 'folder' && parsed.subdirs) {
@@ -1077,7 +1108,8 @@ if (true) {
       const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
       let items = [];
       if (manifest && manifest.hasOwnProperty(path)) {
-        const parsed = parseManifestEntry(manifest[path]);
+        const baseUrl = getBaseUrl(manifest);
+        const parsed = parseManifestEntry(manifest[path], baseUrl, path);
         if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
           const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
           items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
@@ -1094,7 +1126,7 @@ if (true) {
       currentModPath = "";
       renderModsList(modsList);
       renderSongsList([]);
-      setStatus(((path||"Mods")) + ` — ${modsList.length} pastas`);
+      setStatus(((path||"Mods")) + ` — ${modsList.length} mods`);
       setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10);
       // update saved favorites variable in runtime scene
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || [])); } catch(e){}
@@ -1122,10 +1154,14 @@ if (true) {
       const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
       let items = [];
       if (manifest && manifest.hasOwnProperty(path)) {
-        const parsed = parseManifestEntry(manifest[path]);
+        const baseUrl = getBaseUrl(manifest);
+        const parsed = parseManifestEntry(manifest[path], baseUrl, path);
         if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
           const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
           items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
+        } else if (parsed && parsed.type === 'files') {
+          // If manifest path directly lists files, treat each file as an item (name = filename, path = path/filename)
+          items = (parsed.value || []).map(f => ({ name: f.name, path: (path? path + "/" + f.name : f.name) }));
         }
       } else {
         try {
@@ -1149,7 +1185,7 @@ if (true) {
       if (!manifest || !manifest.hasOwnProperty(path)) return null;
       
       const baseUrl = getBaseUrl(manifest);
-      const parsed = parseManifestEntry(manifest[path], baseUrl);
+      const parsed = parseManifestEntry(manifest[path], baseUrl, path);
       
       if (!parsed) return null;
       
@@ -1219,7 +1255,7 @@ if (true) {
     const activeRepo = getActiveRepo();
     const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
 
-    async function audioListFromManifestPath(p) {
+    async function audioListFromManifestPathLocal(p) {
       try {
         const files = await getFilesFromManifest(p);
         if (!files) return [];
@@ -1236,10 +1272,9 @@ if (true) {
       return [];
     }
 
-    // CORREÇÃO: Procurar áudios exatamente como no script original
     // 1. Primeiro tenta na pasta da difficulty
     try {
-      let list = await audioListFromManifestPath(difficultyPath);
+      let list = await audioListFromManifestPathLocal(difficultyPath);
       if (list && list.length>0) return list;
       list = await audioListFromGithubPath(difficultyPath);
       if (list && list.length>0) return list;
@@ -1247,7 +1282,7 @@ if (true) {
 
     // 2. Se não achou, tenta na pasta da música (rootFolder)
     try {
-      let list = await audioListFromManifestPath(rootFolder);
+      let list = await audioListFromManifestPathLocal(rootFolder);
       if (list && list.length>0) return list;
       list = await audioListFromGithubPath(rootFolder);
       if (list && list.length>0) return list;
@@ -1259,7 +1294,7 @@ if (true) {
       if (parts.length >= 2) {
         const modFolder = parts.slice(0, parts.length - 1).join("/");
         if (modFolder) {
-          let list = await audioListFromManifestPath(modFolder);
+          let list = await audioListFromManifestPathLocal(modFolder);
           if (list && list.length>0) return list;
           list = await audioListFromGithubPath(modFolder);
           if (list && list.length>0) return list;
@@ -1625,56 +1660,56 @@ if (true) {
   btnManage.onclick = ()=> showRepoManagerModal();
   btnCache.onclick = ()=> showCacheManager();
   btnRefresh.onclick = async ()=> {
-  try { setStatus("Atualizando..."); } catch(e){}
-  try { for (const it of modsList) delete hasSubCache[it.path]; } catch(e){}
-  try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
+    try { setStatus("Atualizando..."); } catch(e){}
+    try { for (const it of modsList) delete hasSubCache[it.path]; } catch(e){}
+    try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
 
-  // guarda qual mod estava aberto antes do refresh
-  const prevOpen = currentModPath;
+    // guarda qual mod estava aberto antes do refresh
+    const prevOpen = currentModPath;
 
-  // Recarrega a lista raiz (evita transformar songs em mods)
-  await loadFolder("");
+    // Recarrega a lista raiz (evita transformar songs em mods)
+    await loadFolder("");
 
-  // tenta reabrir o mod antigo (se ainda existir)
-  try {
-    if (prevOpen && prevOpen === "__favorites__") {
-      openMod("__favorites__");
-    } else if (prevOpen) {
-      // pequeno delay para garantir que modsList foi populada
-      setTimeout(()=>{
-        try {
-          const found = modsList.find(m => m.path === prevOpen);
-          if (found) openMod(prevOpen);
-        } catch(e){}
-      }, 60);
-    }
-  } catch(e){}
-};
-
-// Substitua o handler de troca de repo (repoSelect.onchange) por este
-repoSelect.onchange = ()=> {
-  try { setActiveRepoById(repoSelect.value); } catch(e){}
-  try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
-  const prevOpen = currentModPath;
-  // recarrega raiz e tenta reabrir o mod (se existir)
-  loadFolder("").then(()=>{
+    // tenta reabrir o mod antigo (se ainda existir)
     try {
       if (prevOpen && prevOpen === "__favorites__") {
         openMod("__favorites__");
       } else if (prevOpen) {
-        const found = modsList.find(m => m.path === prevOpen);
-        if (found) openMod(prevOpen);
+        // pequeno delay para garantir que modsList foi populada
+        setTimeout(()=>{
+          try {
+            const found = modsList.find(m => m.path === prevOpen);
+            if (found) openMod(prevOpen);
+          } catch(e){}
+        }, 60);
       }
     } catch(e){}
-  }).catch(()=>{});
-};
+  };
+
+  // Substitua o handler de troca de repo (repoSelect.onchange) por este
+  repoSelect.onchange = ()=> {
+    try { setActiveRepoById(repoSelect.value); } catch(e){}
+    try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
+    const prevOpen = currentModPath;
+    // recarrega raiz e tenta reabrir o mod (se existir)
+    loadFolder("").then(()=>{
+      try {
+        if (prevOpen && prevOpen === "__favorites__") {
+          openMod("__favorites__");
+        } else if (prevOpen) {
+          const found = modsList.find(m => m.path === prevOpen);
+          if (found) openMod(prevOpen);
+        }
+      } catch(e){}
+    }).catch(()=>{});
+  };
 
   // SEARCH: agora impacta ambas as listas
   searchInput.addEventListener("input", ()=> {
     const q = searchInput.value.trim().toLowerCase();
     if (!q) {
       renderModsList(modsList);
-      setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`);
+      setStatus((currentModPath||"Mods")+` — ${modsList.length}`);
       // if a mod is open, re-open it to show all songs
       if (currentModPath) {
         if (currentModPath === "__favorites__") openMod("__favorites__");
@@ -1702,7 +1737,7 @@ repoSelect.onchange = ()=> {
       setTimeout(()=> startBackgroundCheckOnSongs(filteredSongs), 10);
     } else {
       // no mod open: just inform mods results
-      setStatus(`Resultado: ${filteredMods.length} / ${modsList.length} pastas`);
+      setStatus(`Resultado: ${filteredMods.length} / ${modsList.length}`);
     }
   });
 
@@ -1725,12 +1760,12 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x7dc2a0(runtimeScene);
+gdjs.InicioCode.userFunc0xe9dac8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x17d6a08 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xe9d438 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -2347,7 +2382,7 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x17d6a08(runtimeScene);
+gdjs.InicioCode.userFunc0xe9d438(runtimeScene);
 
 }
 
