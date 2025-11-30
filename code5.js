@@ -17915,7 +17915,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1b138f8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x19d7ee8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18105,7 +18105,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1b138f8(runtimeScene);
+gdjs.PlayCode.userFunc0x19d7ee8(runtimeScene);
 
 }
 
@@ -18285,7 +18285,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1864dc0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x19d9550 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18475,7 +18475,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1864dc0(runtimeScene);
+gdjs.PlayCode.userFunc0x19d9550(runtimeScene);
 
 }
 
@@ -22218,7 +22218,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x2b489c0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x17a7c28 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22237,7 +22237,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x1b4a118 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x17a7cc8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22502,7 +22502,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x2b489c0(runtimeScene);
+gdjs.PlayCode.userFunc0x17a7c28(runtimeScene);
 
 }
 
@@ -22510,7 +22510,7 @@ gdjs.PlayCode.userFunc0x2b489c0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x1b4a118(runtimeScene);
+gdjs.PlayCode.userFunc0x17a7cc8(runtimeScene);
 
 }
 
@@ -22632,9 +22632,9 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x12ab5f0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x190c938 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_player.js (correção do flip do Opponent) - versão modificada
+// skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
   const JSZIP_CDN = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
@@ -22974,7 +22974,8 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       _returnToIdleTimeout: null, 
       _createdBlobUrls: packageObj._createdBlobUrls || [], 
       _isPlayingSingAnimation: false,
-      _idleTimerRunning: false
+      _idleTimerRunning: false,
+      _watchdogCounter: 0
     };
 
     const meta = packageObj.metadata || {};
@@ -23111,6 +23112,39 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       state._idleTimerRunning = false;
     }
     
+    // Helper robusto para decidir se um valor de animação é "vazio" (deve voltar para idle)
+    function animValueIsEmpty(s){
+      if (s === null || s === undefined) return true;
+      try {
+        const st = String(s).trim().toLowerCase();
+        return st === "" || st === "idle";
+      } catch(e){ return true; }
+    }
+
+    // Retorna ao idle com segurança
+    function scheduleReturnToIdle(delayMs = 150){
+      // sempre cancela timers anteriores para evitar múltiplos timers concorrentes
+      if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
+      state._idleTimerRunning = true;
+      state._returnToIdleTimeout = setTimeout(()=>{
+        state._returnToIdleTimeout = null;
+        state._idleTimerRunning = false;
+        state.current = "idle";
+        state.frameIndex = 0;
+        state.elapsed = 0;
+        state._isPlayingSingAnimation = false;
+        if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
+          applyFrameToAllObjects(animations.idle.frames[0]);
+        }
+        log("Returned to idle after scheduled timeout (multiplayer-safe)");
+      }, delayMs);
+    }
+
+    // Watchdog para evitar ficar preso em animação sem avanço
+    let watchdogLastFrameIndex = null;
+    let watchdogCounter = 0;
+    const WATCHDOG_MAX_TICKS = 40; // se por ~40 ticks (com dt limitado) não avançar ou variável estiver inconsistente, volta ao idle
+
     function tick(now){
       const dt = Math.min(100, now - (state.lastTick || now)); 
       state.lastTick = now;
@@ -23119,11 +23153,21 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       try {
         const sv = runtimeScene.getVariables();
         const gv = runtimeScene.getGame().getVariables();
-        currentAnim = sv.has(TARGET_ANIM_VAR) ? sv.get(TARGET_ANIM_VAR).getAsString() : (gv.has(TARGET_ANIM_VAR) ? gv.get(TARGET_ANIM_VAR).getAsString() : "");
-      } catch(e){}
+        // Tentar ler da variável de cena -> se não existir, ler game variable
+        if (sv && sv.has && sv.has(TARGET_ANIM_VAR)) {
+          currentAnim = sv.get(TARGET_ANIM_VAR).getAsString();
+        } else if (gv && gv.has && gv.has(TARGET_ANIM_VAR)) {
+          currentAnim = gv.get(TARGET_ANIM_VAR).getAsString();
+        } else {
+          currentAnim = "";
+        }
+      } catch(e){
+        currentAnim = "";
+      }
       
-      // LÓGICA DO TIMER CORRIGIDA: só inicia quando animação for diferente
-      if (currentAnim && currentAnim.trim() !== "" && currentAnim !== state.lastAnimValue){
+      // Início de nova animação: detectar mudanças claras (inclui caso em que variável vinha vazia)
+      if (!animValueIsEmpty(currentAnim) && currentAnim !== state.lastAnimValue){
+        // nova animação -> cancelar timers de retorno e iniciar
         clearAllTimeouts();
         const key = mapAnimToKey(currentAnim, invertSideGlobal);
         if (animations[key] && animations[key].frames && animations[key].frames.length > 0){
@@ -23131,36 +23175,32 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
           state.frameIndex = 0; 
           state.elapsed = 0; 
           state._isPlayingSingAnimation = true;
+          state._idleTimerRunning = false;
+          watchdogLastFrameIndex = 0;
+          watchdogCounter = 0;
           const anim = animations[key]; 
           applyFrameToAllObjects(anim.frames[0]); 
-          log("Started animation:", key);
+          log("Started animation (multiplayer-safe):", key, "from animVar:", currentAnim);
+        } else {
+          // se não existe animação correspondente, schedule quick return to idle
+          scheduleReturnToIdle(1000);
         }
       }
-      
-      // Se a animação atual não é idle e a variável está vazia/diferente, iniciar timer
-      if (state.current !== "idle" && currentAnim === "" && !state._idleTimerRunning) {
-        state._idleTimerRunning = true;
-        if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
-        state._returnToIdleTimeout = setTimeout(()=>{
-          state.current = "idle"; 
-          state.frameIndex = 0; 
-          state.elapsed = 0;
-          if (animations.idle && animations.idle.frames[0]) {
-            applyFrameToAllObjects(animations.idle.frames[0]);
-          }
-          state._returnToIdleTimeout = null; 
-          state._idleTimerRunning = false;
-          log("Returned to idle after animation completion");
-        }, 300);
+
+      // Se variável está vazia/idle, iniciar retorno ao idle (mas com debounce curto)
+      if (animValueIsEmpty(currentAnim) && state.current !== "idle" && !state._idleTimerRunning){
+        // sempre (re)agendar; se durante o delay a variável voltar a ter valor, será cancelado abaixo
+        scheduleReturnToIdle(1000);
       }
-      
-      // Se a animação mudou durante o timer, cancelar
-      if (state._idleTimerRunning && currentAnim !== "") {
+
+      // Se timer está correndo e a variável voltou a ter valor, cancelar retorno
+      if (state._idleTimerRunning && !animValueIsEmpty(currentAnim)){
         clearAllTimeouts();
       }
       
       state.lastAnimValue = currentAnim;
 
+      // Animação atual -- avançar frames
       const anim = animations[state.current];
       if (anim && anim.frames && anim.frames.length > 0){
         const msPerFrame = 1000 / (anim.fps || 24);
@@ -23173,6 +23213,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
           if (state.frameIndex >= anim.frames.length){
             if (anim.loop){
               if (anim.name === "idle" || state.current === "idle"){
+                // manter último quadro até beat timeout — preserve o comportamento original, mas garante reinício
                 state.frameIndex = anim.frames.length - 1;
                 if (!state._idleBeatTimeout){
                   state._idleBeatTimeout = setTimeout(()=>{
@@ -23183,7 +23224,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
                     if (animations.idle && animations.idle.frames && animations.idle.frames[0]){
                       applyFrameToAllObjects(animations.idle.frames[0]);
                     }
-                    log("Idle loop restarted after 1s delay");
+                    log("Idle loop restarted after 1s delay (multiplayer-safe)");
                   }, 1000);
                 }
               } else {
@@ -23199,7 +23240,36 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         }
         if (frameChanged){
           const tex = anim.frames[state.frameIndex]; 
-          if (tex) applyFrameToAllObjects(tex);
+          if (tex) {
+            applyFrameToAllObjects(tex);
+          }
+          // watchdog: se anim é sing (não idle) e não avançou por muitos ticks, forçar idle
+          if (state.current !== "idle"){
+            if (watchdogLastFrameIndex === state.frameIndex) {
+              watchdogCounter++;
+            } else {
+              watchdogCounter = 0;
+            }
+            watchdogLastFrameIndex = state.frameIndex;
+            if (watchdogCounter > WATCHDOG_MAX_TICKS){
+              // forçar retorno ao idle como fallback
+              log("Watchdog triggered: forcing return to idle due to stalled animation (multiplayer)");
+              clearAllTimeouts();
+              state.current = "idle";
+              state.frameIndex = 0;
+              state.elapsed = 0;
+              state._isPlayingSingAnimation = false;
+              if (animations.idle && animations.idle.frames && animations.idle.frames[0]) applyFrameToAllObjects(animations.idle.frames[0]);
+            }
+          } else {
+            watchdogCounter = 0;
+            watchdogLastFrameIndex = null;
+          }
+        }
+      } else {
+        // sem frames para animação atual -> garantir retorno ao idle
+        if (state.current !== "idle"){
+          scheduleReturnToIdle(1000);
         }
       }
 
@@ -23399,7 +23469,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     lastDownloadedMetadata: window.GD_SKIN_PLAYER ? window.GD_SKIN_PLAYER.lastDownloadedMetadata : null 
   });
 
-  log("GD_SKIN_PLAYER ready. (Opponent flip FIXED)");
+  log("GD_SKIN_PLAYER ready. (Opponent flip FIXED, multiplayer idle robustness)");
 
   (async ()=>{
     try {
@@ -23430,7 +23500,7 @@ gdjs.PlayCode.eventsList272 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x12ab5f0(runtimeScene);
+gdjs.PlayCode.userFunc0x190c938(runtimeScene);
 
 }
 
@@ -23510,7 +23580,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x12a0b78 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1948e68 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -24391,7 +24461,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x12a0b78(runtimeScene);
+gdjs.PlayCode.userFunc0x1948e68(runtimeScene);
 
 }
 
