@@ -9,7 +9,7 @@ gdjs.evtsExt__ExtendedVariables__VariableString = {};
 gdjs.evtsExt__ExtendedVariables__VariableString.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__ExtendedVariables__VariableString.userFunc0x101e730 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__ExtendedVariables__VariableString.userFunc0x1020b88 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 const sceneVariables = runtimeScene.getVariables();
 const variableExist = sceneVariables.has(eventsFunctionContext.getArgument("SceneVariableName"));
@@ -23,7 +23,7 @@ gdjs.evtsExt__ExtendedVariables__VariableString.eventsList0 = function(runtimeSc
 {
 
 
-gdjs.evtsExt__ExtendedVariables__VariableString.userFunc0x101e730(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__ExtendedVariables__VariableString.userFunc0x1020b88(runtimeScene, eventsFunctionContext);
 
 }
 

@@ -31,6 +31,9 @@ gdjs.PlayonlineCode.GDBFPixelObjects3= [];
 gdjs.PlayonlineCode.GDHardObjects1= [];
 gdjs.PlayonlineCode.GDHardObjects2= [];
 gdjs.PlayonlineCode.GDHardObjects3= [];
+gdjs.PlayonlineCode.GDBackObjects1= [];
+gdjs.PlayonlineCode.GDBackObjects2= [];
+gdjs.PlayonlineCode.GDBackObjects3= [];
 gdjs.PlayonlineCode.GDStatisticsObjects1= [];
 gdjs.PlayonlineCode.GDStatisticsObjects2= [];
 gdjs.PlayonlineCode.GDStatisticsObjects3= [];
@@ -141,7 +144,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x1836b18 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0xef9280 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
@@ -735,7 +738,7 @@ gdjs.PlayonlineCode.userFunc0x1836b18 = function GDJSInlineCode(runtimeScene) {
 })(runtimeScene);
 
 };
-gdjs.PlayonlineCode.userFunc0x1ada9a8 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0xdaf3e8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_watcher_online.js
 // Watcher separado: observa SelectedSkin / SelectedDadSkin e aplica apenas quando mudarem.
@@ -1042,7 +1045,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1836b18(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xef9280(runtimeScene);
 
 }
 
@@ -1050,7 +1053,7 @@ gdjs.PlayonlineCode.userFunc0x1836b18(runtimeScene);
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1ada9a8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xdaf3e8(runtimeScene);
 
 }
 
@@ -1162,7 +1165,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x17b37f8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1c01260 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -2030,12 +2033,12 @@ gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x17b37f8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1c01260(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x1c03ba0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0xdaf8c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader_online_preserve_original_vars.js
 // Versão online — preserva exatamente o comportamento original ao salvar variáveis (SelectedSkin / SelectedDadSkin).
@@ -2421,7 +2424,12 @@ gdjs.PlayonlineCode.userFunc0x17b37f8(runtimeScene);
     }
   }
 
-  // ---------- UI / modal with PlayerOnline-based button hiding ----------
+  // UI logic: create the modal, populate the mod list, handle skin selection
+  let styleEl = null;
+  let prevOverflow = null;
+  let thumbsCache = {};
+  let currentModName = null;
+
   async function openSkinSelector(manifest){
     globalManifest = manifest || { "": [] };
     let baseOwner=null, baseRepo=null, baseBranch=null;
@@ -2430,12 +2438,14 @@ gdjs.PlayonlineCode.userFunc0x17b37f8(runtimeScene);
     }
 
     const ui = createModal(baseOwner||"LucyYuih", baseRepo||"gdev-custom-skins", baseBranch||"main");
-    const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl, controlsEl } = ui;
-    let currentMod = null; let thumbsCache = {}; let downloading = false;
-
+    const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: s, controlsEl } = ui;
+    let currentMod = null; let downloading = false;
+    
+    // Variáveis globais atualizadas
+    styleEl = s;
     modalOwner = ownerIn.value || baseOwner; modalRepo = repoIn.value || baseRepo; modalBranch = branchIn.value || baseBranch || "main";
 
-    const prevOverflow = document.documentElement.style.overflow;
+    prevOverflow = document.documentElement.style.overflow;
     try { document.documentElement.style.overflow = 'hidden'; } catch(e){}
 
     [leftList, skinListWrap, right, left].forEach(el => { try { if (!el) return; el.addEventListener('touchstart', ()=>{}, {passive:true}); el.addEventListener('touchmove', ()=>{}, {passive:true}); } catch(e){} });
@@ -2484,6 +2494,18 @@ gdjs.PlayonlineCode.userFunc0x17b37f8(runtimeScene);
     }
     toggleBtn.onclick = ()=> setLeftHidden(!leftHidden);
     window.addEventListener('resize', ()=> { if (window.innerWidth > 720) left.style.display = 'block'; else if (leftHidden) left.style.display='none'; });
+
+    const cleanupAndRemove = () => {
+      try {
+        for (const k in thumbsCache) unloadModThumbs(k);
+        if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+        try { document.head.removeChild(styleEl); } catch(e){}
+        hideLoadingModal();
+      } catch(e){ console.error("cleanup failed", e); }
+      try { document.documentElement.style.overflow = prevOverflow || ""; } catch(e){}
+      window.removeEventListener('keydown', onKeyDown);
+      try { window.removeEventListener('resize', ()=>{}); } catch(e){}
+    };
 
     closeBtn.onclick = () => { if (downloading) return; cleanupAndRemove(); };
     function onKeyDown(e){ if (e.key === 'Escape') { closeBtn.click(); } }
@@ -2563,18 +2585,8 @@ gdjs.PlayonlineCode.userFunc0x17b37f8(runtimeScene);
       }
     }
 
-    function cleanupAndRemove(){
-      try {
-        for (const k in thumbsCache) unloadModThumbs(k);
-        const m = document.querySelector(".skin-modal");
-        if (m) document.body.removeChild(m);
-        try { document.head.removeChild(styleEl); } catch(e){}
-        hideLoadingModal();
-      } catch(e){ console.error("cleanup failed", e); }
-      try { document.documentElement.style.overflow = prevOverflow || ""; } catch(e){}
-      window.removeEventListener('keydown', onKeyDown);
-      try { window.removeEventListener('resize', ()=>{}); } catch(e){}
-    }
+    // A função cleanupAndRemove original foi movida para dentro de openSkinSelector
+    // para ter acesso às variáveis locais.
 
     return { close: cleanupAndRemove, unloadModThumbs };
   }
@@ -2647,12 +2659,81 @@ gdjs.PlayonlineCode.userFunc0x17b37f8(runtimeScene);
   }
   function stopSkinWatcher(){ if (_skinWatcherInterval){ clearInterval(_skinWatcherInterval); _skinWatcherInterval = null; log("Skin watcher stopped."); } }
 
+  // ---------- NOVO: Função para carregar o manifest com fallback para localStorage ----------
+  // O repositório e branch padrão são 'LucyYuih/gdev-custom-skins' e 'main', inferidos do código original.
+  const GITHUB_RAW_URL = `https://raw.githubusercontent.com/LucyYuih/gdev-custom-skins/main/${MANIFEST_NAME}`;
+  const LOCAL_STORAGE_KEY = "skin_loader_manifest";
+
+  async function loadManifestWithFallback(){
+    let manifest = null;
+
+    // 1. Tenta ler do GitHub API (usando o link raw)
+    try {
+      log("Tentando carregar manifest do GitHub:", GITHUB_RAW_URL);
+      const response = await fetch(GITHUB_RAW_URL);
+      
+      if (!response.ok) {
+        // Se falhar (incluindo rate limit, 404, etc.), lança erro para ir para o catch
+        throw new Error(`Falha ao carregar do GitHub. Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // 2. Sucesso: Salva no localStorage e usa o manifest
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+        log("Manifest carregado do GitHub e salvo no localStorage.");
+      } catch(e) {
+        warn("Falha ao salvar manifest no localStorage:", e);
+      }
+      manifest = data;
+
+    } catch(e) {
+      warn("Falha ao carregar manifest do GitHub:", e.message);
+      
+      // 3. Falha: Tenta ler do localStorage
+      try {
+        const storedManifest = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (storedManifest) {
+          manifest = JSON.parse(storedManifest);
+          log("Manifest carregado com sucesso do localStorage como fallback.");
+        } else {
+          throw new Error("localStorage vazio.");
+        }
+      } catch(e) {
+        warn("Falha ao carregar manifest do localStorage:", e.message);
+        
+        // 4. Falha no localStorage: Tenta o fallback original (CDN/Local)
+        log("Tentando fallback original (CDN/Local)...");
+        try { 
+          manifest = await fetchCdnFirst(MANIFEST_NAME, "json", null); 
+        } catch(e){ 
+          manifest = null; 
+        }
+        if (!manifest) { 
+          try { 
+            manifest = await fetchCdnFirst("resources/" + MANIFEST_NAME, "json", null); 
+          } catch(e){ 
+            manifest = null; 
+          } 
+        }
+      }
+    }
+
+    if (!manifest) { 
+      console.warn("manifestskins.json não encontrado em nenhuma fonte; abrindo UI vazia."); 
+      manifest = { "": [] }; 
+    }
+    
+    return manifest;
+  }
+  // ---------- FIM NOVO ----------
+
   // ---------- bootstrap: load manifest, open UI, start watcher ----------
   try {
-    let manifest = null;
-    try { manifest = await fetchCdnFirst(MANIFEST_NAME, "json", null); } catch(e){ manifest = null; }
-    if (!manifest) { try { manifest = await fetchCdnFirst("resources/" + MANIFEST_NAME, "json", null); } catch(e){ manifest = null; } }
-    if (!manifest) { console.warn("manifestskins.json not found; opening UI empty."); manifest = { "": [] }; }
+    // O código original de carregamento foi substituído pela nova função
+    const manifest = await loadManifestWithFallback();
+    
     await openSkinSelector(manifest);
     startSkinWatcher(runtimeScene);
   } catch(e){
@@ -2672,12 +2753,12 @@ gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1c03ba0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xdaf8c8(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x19db260 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0xf8a078 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -4024,7 +4105,7 @@ gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x19db260(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xf8a078(runtimeScene);
 
 }
 
@@ -4113,7 +4194,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35189644);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35178652);
 }
 }
 if (isConditionTrue_0) {
@@ -4136,7 +4217,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35192076);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35181084);
 }
 }
 }
@@ -4248,7 +4329,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDHardObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35198348);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35187356);
 }
 }
 if (isConditionTrue_0) {
@@ -4294,7 +4375,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35200356);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35189364);
 }
 }
 if (isConditionTrue_0) {
@@ -4321,7 +4402,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35202100);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35191108);
 }
 }
 if (isConditionTrue_0) {
@@ -4458,6 +4539,9 @@ gdjs.PlayonlineCode.GDBFPixelObjects3.length = 0;
 gdjs.PlayonlineCode.GDHardObjects1.length = 0;
 gdjs.PlayonlineCode.GDHardObjects2.length = 0;
 gdjs.PlayonlineCode.GDHardObjects3.length = 0;
+gdjs.PlayonlineCode.GDBackObjects1.length = 0;
+gdjs.PlayonlineCode.GDBackObjects2.length = 0;
+gdjs.PlayonlineCode.GDBackObjects3.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects1.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects2.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects3.length = 0;
@@ -4598,6 +4682,9 @@ gdjs.PlayonlineCode.GDBFPixelObjects3.length = 0;
 gdjs.PlayonlineCode.GDHardObjects1.length = 0;
 gdjs.PlayonlineCode.GDHardObjects2.length = 0;
 gdjs.PlayonlineCode.GDHardObjects3.length = 0;
+gdjs.PlayonlineCode.GDBackObjects1.length = 0;
+gdjs.PlayonlineCode.GDBackObjects2.length = 0;
+gdjs.PlayonlineCode.GDBackObjects3.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects1.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects2.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects3.length = 0;

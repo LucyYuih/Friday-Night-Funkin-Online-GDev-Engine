@@ -9,7 +9,7 @@ gdjs.evtsExt__CameraShake__DeleteAll = {};
 gdjs.evtsExt__CameraShake__DeleteAll.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__CameraShake__DeleteAll.userFunc0xfc0278 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__CameraShake__DeleteAll.userFunc0x17ff568 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 gdjs._cameraShakeExtension.noiseManager.deleteAllGenerators();
 };
@@ -18,7 +18,7 @@ gdjs.evtsExt__CameraShake__DeleteAll.eventsList0 = function(runtimeScene, events
 {
 
 
-gdjs.evtsExt__CameraShake__DeleteAll.userFunc0xfc0278(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__CameraShake__DeleteAll.userFunc0x17ff568(runtimeScene, eventsFunctionContext);
 
 }
 

@@ -9,7 +9,7 @@ gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal = {};
 gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.userFunc0x11e8120 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.userFunc0x11e9ef0 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 eventsFunctionContext
     .getArgument("Variable")
@@ -26,7 +26,7 @@ gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.eventsList0 = function(runtim
 {
 
 
-gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.userFunc0x11e8120(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.userFunc0x11e9ef0(runtimeScene, eventsFunctionContext);
 
 }
 
