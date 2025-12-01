@@ -34,6 +34,9 @@ gdjs.PlayonlineCode.GDHardObjects3= [];
 gdjs.PlayonlineCode.GDBackObjects1= [];
 gdjs.PlayonlineCode.GDBackObjects2= [];
 gdjs.PlayonlineCode.GDBackObjects3= [];
+gdjs.PlayonlineCode.GDJoin2Objects1= [];
+gdjs.PlayonlineCode.GDJoin2Objects2= [];
+gdjs.PlayonlineCode.GDJoin2Objects3= [];
 gdjs.PlayonlineCode.GDStatisticsObjects1= [];
 gdjs.PlayonlineCode.GDStatisticsObjects2= [];
 gdjs.PlayonlineCode.GDStatisticsObjects3= [];
@@ -144,7 +147,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x17df1a8 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x1d6fb08 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
@@ -738,7 +741,7 @@ gdjs.PlayonlineCode.userFunc0x17df1a8 = function GDJSInlineCode(runtimeScene) {
 })(runtimeScene);
 
 };
-gdjs.PlayonlineCode.userFunc0xf3a518 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x2a063c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_watcher_online.js
 // Watcher separado: observa SelectedSkin / SelectedDadSkin e aplica apenas quando mudarem.
@@ -1045,7 +1048,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x17df1a8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1d6fb08(runtimeScene);
 
 }
 
@@ -1053,7 +1056,7 @@ gdjs.PlayonlineCode.userFunc0x17df1a8(runtimeScene);
 {
 
 
-gdjs.PlayonlineCode.userFunc0xf3a518(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x2a063c8(runtimeScene);
 
 }
 
@@ -1117,6 +1120,36 @@ if (isConditionTrue_0) {
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
+isConditionTrue_0 = gdjs.playerAuthentication.isAuthenticated();
+if (isConditionTrue_0) {
+{gdjs.multiplayer.authenticateAndQuickJoinLobby(runtimeScene, true, true);
+}
+}
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+isConditionTrue_0 = !(gdjs.playerAuthentication.isAuthenticated());
+if (isConditionTrue_0) {
+{gdjs.playerAuthentication.openAuthenticationWindow(runtimeScene);
+}
+}
+
+}
+
+
+};gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 {runtimeScene.getGame().getVariables().getFromIndex(16).setNumber(1);
@@ -1165,7 +1198,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x18d8b60 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1700b68 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -2028,17 +2061,17 @@ let isConditionTrue_0 = false;
 })();
 
 };
-gdjs.PlayonlineCode.eventsList4 = function(runtimeScene) {
+gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0x18d8b60(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1700b68(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x1c88fc0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x19dc390 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader_online_preserve_original_vars.js
 // Versão online — preserva exatamente o comportamento original ao salvar variáveis (SelectedSkin / SelectedDadSkin).
@@ -2748,17 +2781,17 @@ gdjs.PlayonlineCode.userFunc0x18d8b60(runtimeScene);
 })(runtimeScene);
 
 };
-gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
+gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0x1c88fc0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x19dc390(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xf399c8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0xca2188 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -4100,18 +4133,18 @@ gdjs.PlayonlineCode.userFunc0x1c88fc0(runtimeScene);
 })();
 
 };
-gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
+gdjs.PlayonlineCode.eventsList7 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0xf399c8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xca2188(runtimeScene);
 
 }
 
 
 };gdjs.PlayonlineCode.mapOfGDgdjs_9546PlayonlineCode_9546GDStartObjects1Objects = Hashtable.newFrom({"Start": gdjs.PlayonlineCode.GDStartObjects1});
-gdjs.PlayonlineCode.eventsList7 = function(runtimeScene) {
+gdjs.PlayonlineCode.eventsList8 = function(runtimeScene) {
 
 {
 
@@ -4194,13 +4227,41 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35178652);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35225828);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
 gdjs.PlayonlineCode.eventsList2(runtimeScene);} //End of subevents
+}
+
+}
+
+
+{
+
+gdjs.copyArray(runtimeScene.getObjects("Join2"), gdjs.PlayonlineCode.GDJoin2Objects1);
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoin2Objects1.length;i<l;++i) {
+    if ( gdjs.PlayonlineCode.GDJoin2Objects1[i].IsClicked(null) ) {
+        isConditionTrue_0 = true;
+        gdjs.PlayonlineCode.GDJoin2Objects1[k] = gdjs.PlayonlineCode.GDJoin2Objects1[i];
+        ++k;
+    }
+}
+gdjs.PlayonlineCode.GDJoin2Objects1.length = k;
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36415140);
+}
+}
+if (isConditionTrue_0) {
+
+{ //Subevents
+gdjs.PlayonlineCode.eventsList3(runtimeScene);} //End of subevents
 }
 
 }
@@ -4217,7 +4278,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35181084);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35228260);
 }
 }
 }
@@ -4234,7 +4295,7 @@ gdjs.copyArray(runtimeScene.getObjects("Player2text"), gdjs.PlayonlineCode.GDPla
 }
 
 { //Subevents
-gdjs.PlayonlineCode.eventsList3(runtimeScene);} //End of subevents
+gdjs.PlayonlineCode.eventsList4(runtimeScene);} //End of subevents
 }
 
 }
@@ -4307,7 +4368,7 @@ isConditionTrue_0 = gdjs.evtTools.runtimeScene.sceneJustBegins(runtimeScene);
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayonlineCode.eventsList4(runtimeScene);} //End of subevents
+gdjs.PlayonlineCode.eventsList5(runtimeScene);} //End of subevents
 }
 
 }
@@ -4329,13 +4390,13 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDHardObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35187356);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35234532);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayonlineCode.eventsList5(runtimeScene);} //End of subevents
+gdjs.PlayonlineCode.eventsList6(runtimeScene);} //End of subevents
 }
 
 }
@@ -4375,13 +4436,13 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35189364);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35236540);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayonlineCode.eventsList6(runtimeScene);} //End of subevents
+gdjs.PlayonlineCode.eventsList7(runtimeScene);} //End of subevents
 }
 
 }
@@ -4402,7 +4463,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35191108);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35238284);
 }
 }
 if (isConditionTrue_0) {
@@ -4542,6 +4603,9 @@ gdjs.PlayonlineCode.GDHardObjects3.length = 0;
 gdjs.PlayonlineCode.GDBackObjects1.length = 0;
 gdjs.PlayonlineCode.GDBackObjects2.length = 0;
 gdjs.PlayonlineCode.GDBackObjects3.length = 0;
+gdjs.PlayonlineCode.GDJoin2Objects1.length = 0;
+gdjs.PlayonlineCode.GDJoin2Objects2.length = 0;
+gdjs.PlayonlineCode.GDJoin2Objects3.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects1.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects2.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects3.length = 0;
@@ -4651,7 +4715,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects1.length = 0;
 gdjs.PlayonlineCode.GDStatistics2Objects2.length = 0;
 gdjs.PlayonlineCode.GDStatistics2Objects3.length = 0;
 
-gdjs.PlayonlineCode.eventsList7(runtimeScene);
+gdjs.PlayonlineCode.eventsList8(runtimeScene);
 gdjs.PlayonlineCode.GDJoinObjects1.length = 0;
 gdjs.PlayonlineCode.GDJoinObjects2.length = 0;
 gdjs.PlayonlineCode.GDJoinObjects3.length = 0;
@@ -4685,6 +4749,9 @@ gdjs.PlayonlineCode.GDHardObjects3.length = 0;
 gdjs.PlayonlineCode.GDBackObjects1.length = 0;
 gdjs.PlayonlineCode.GDBackObjects2.length = 0;
 gdjs.PlayonlineCode.GDBackObjects3.length = 0;
+gdjs.PlayonlineCode.GDJoin2Objects1.length = 0;
+gdjs.PlayonlineCode.GDJoin2Objects2.length = 0;
+gdjs.PlayonlineCode.GDJoin2Objects3.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects1.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects2.length = 0;
 gdjs.PlayonlineCode.GDStatisticsObjects3.length = 0;

@@ -9,7 +9,7 @@ gdjs.evtsExt__THNK__PickPlayerByID = {};
 gdjs.evtsExt__THNK__PickPlayerByID.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__THNK__PickPlayerByID.userFunc0x1e1d430 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__THNK__PickPlayerByID.userFunc0xf6dc70 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 eventsFunctionContext.returnValue =
     THNK.players.switchPlayerContext(eventsFunctionContext.getArgument("PlayerID"));
@@ -20,7 +20,7 @@ gdjs.evtsExt__THNK__PickPlayerByID.eventsList0 = function(runtimeScene, eventsFu
 {
 
 
-gdjs.evtsExt__THNK__PickPlayerByID.userFunc0x1e1d430(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__THNK__PickPlayerByID.userFunc0xf6dc70(runtimeScene, eventsFunctionContext);
 
 }
 
