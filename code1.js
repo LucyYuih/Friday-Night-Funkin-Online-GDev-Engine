@@ -413,7 +413,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1b08038 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1ab1890 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -1760,12 +1760,12 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
+gdjs.InicioCode.userFunc0x1ab1890(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1ae5338 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1ab2210 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -1974,8 +1974,7 @@ gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
     const leftTitle = document.createElement("div"); leftTitle.textContent = "Mods"; leftTitle.style.fontWeight = "700";
     const toggleBtn = document.createElement("button"); toggleBtn.className = "skin-toggle-btn"; toggleBtn.textContent = "Toggle";
     leftHeader.appendChild(leftTitle); leftHeader.appendChild(toggleBtn);
-    left.appendChild(leftHeader);
-    left.appendChild(leftList);
+    left.appendChild(leftHeader); left.appendChild(leftList);
 
     const top = document.createElement("div"); top.className = "skin-top";
     const titleRow = document.createElement("div"); titleRow.className = "skin-title-row";
@@ -1986,9 +1985,9 @@ gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
     titleRow.appendChild(title); titleRow.appendChild(controls);
 
     const cdnRow = document.createElement("div"); cdnRow.className = "cdn-inputs";
-    const ownerIn = document.createElement("input"); ownerIn.placeholder = "Owner"; ownerIn.value = defaultOwner;
-    const repoIn = document.createElement("input"); repoIn.placeholder = "Repo"; repoIn.value = defaultRepo;
-    const branchIn = document.createElement("input"); branchIn.placeholder = "Branch"; branchIn.value = defaultBranch;
+    const ownerIn = document.createElement("input"); ownerIn.placeholder = "Owner"; ownerIn.value = defaultOwner || "LucyYuih";
+    const repoIn = document.createElement("input"); repoIn.placeholder = "Repo"; repoIn.value = defaultRepo || "gdev-custom-skins";
+    const branchIn = document.createElement("input"); branchIn.placeholder = "Branch"; branchIn.value = defaultBranch || "main";
     const note = document.createElement("div"); note.className = "note-small"; note.textContent = "CDN-first: thumbs/zips serão buscados no jsDelivr.";
     cdnRow.appendChild(ownerIn); cdnRow.appendChild(repoIn); cdnRow.appendChild(branchIn); cdnRow.appendChild(note);
 
@@ -1996,51 +1995,244 @@ gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
     const skinListWrap = document.createElement("div"); skinListWrap.style.flex = "1"; skinListWrap.style.overflow = "auto";
 
     top.appendChild(titleRow); top.appendChild(cdnRow);
-
     right.appendChild(top); right.appendChild(info); right.appendChild(skinListWrap);
     panel.appendChild(left); panel.appendChild(right); modal.appendChild(panel); document.body.appendChild(modal);
 
-    return {
-      modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls
-    };
+    return { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls };
   }
 
+  // Updated to use getSkinName for compatibility with new manifest format
   function findSkinInManifest(manifest, modName, skinName){
     if (!manifest || !modName || !skinName) return null;
     const arr = manifest[modName] || [];
     if (!Array.isArray(arr)) return null;
-    for (const s of arr) {
-      const sname = getSkinName(s);
-      if (sname === skinName.toString()) return s;
-    }
+    for (const s of arr) if (getSkinName(s).toString() === skinName.toString()) return s;
     return null;
   }
 
+  // small helper to get PlayerOnline (tries game vars, scene vars, gdjs.multiplayer fallback)
+  function getPlayerOnlineValue(runtimeScene){
+    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("PlayerOnline")) { const n = gv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n)) return n; } } catch(e){}
+    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("PlayerOnline")) { const n = sv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n)) return n; } } catch(e){}
+    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.getCurrentPlayerNumber === 'function'){ const pn = gdjs.multiplayer.getCurrentPlayerNumber(); if (typeof pn === 'number') return pn === 1 ? 1 : 2; } } catch(e){}
+    return 0;
+  }
+
+  // UI logic: create buttons but show/hide according to PlayerOnline WITHOUT changing what those buttons do
+  let globalManifest = null;
+  let modalOwner = null, modalRepo = null, modalBranch = null;
+
+  // Keep the exact original variable behavior on download/apply/reset functions:
+  // When target === "BF" -> set SelectedSkin & gd_selected_skin
+  // When target === "Opponent" -> set SelectedDadSkin & gd_selected_dad_skin
+
+  async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
+    if (downloadAndSaveOnly._busy) return;
+    downloadAndSaveOnly._busy = true;
+
+    // try to build zipPath properly (supports filename-only in manifest)
+    let zipPath = buildFilePathFromSkin(skinObj, "zip") || (skinObj.zip || "");
+    if (!zipPath) {
+      const found = findSkinInManifest(globalManifest, modName, getSkinName(skinObj));
+      if (found) zipPath = buildFilePathFromSkin(found, "zip") || (found.zip || "");
+    }
+    if (!zipPath) { downloadAndSaveOnly._busy = false; return; }
+
+    const loadingModal = showLoadingModal();
+    try {
+      const cdnBase = { owner: modalOwner||"LucyYuih", repo: modalRepo||"gdev-custom-skins", branch: modalBranch||"main" };
+      const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+
+      // just check availability (like original did)
+      await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+
+      // Build selection object exactly like original
+      const selName = getSkinName(skinObj);
+      const sel = { mod: modName, name: selName, zip: zipPath || null };
+      if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
+      else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+
+      // Preserve original behavior: set SelectedSkin or SelectedDadSkin and localStorage keys
+      const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
+      const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
+      const gv = runtimeScene.getGame().getVariables();
+      if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
+      else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
+      try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
+      log("[skin-loader] Downloaded+Saved " + varName + ":", JSON.stringify(sel));
+    } catch(e){
+      console.error("Download/save failed:", e);
+    } finally {
+      hideLoadingModal();
+      downloadAndSaveOnly._busy = false;
+    }
+  }
+
+  async function applyNow(modName, skinObj, target){
+    if (applyNow._busy) return;
+    applyNow._busy = true;
+
+    let zipPath = buildFilePathFromSkin(skinObj, "zip") || (skinObj.zip || "");
+    if (!zipPath) {
+      const found = findSkinInManifest(globalManifest, modName, getSkinName(skinObj));
+      if (found) zipPath = buildFilePathFromSkin(found, "zip") || (found.zip || "");
+    }
+    if (!zipPath) { applyNow._busy = false; return; }
+
+    const loadingModal = showLoadingModal();
+    try {
+      const cdnBase = { owner: modalOwner||"LucyYuih", repo: modalRepo||"gdev-custom-skins", branch: modalBranch||"main" };
+      const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+      const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+
+      const selName = getSkinName(skinObj);
+      const sel = { mod: modName, name: selName, zip: zipPath || null };
+      if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
+      else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+      
+      // ORIGINAL behavior: write SelectedSkin or SelectedDadSkin and storage keys
+      const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
+      const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
+      const gv = runtimeScene.getGame().getVariables();
+      if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
+      else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
+      try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
+      log("[skin-loader] Saved " + varName + ":", JSON.stringify(sel));
+
+      // apply via GD_SKIN_PLAYER (same as original)
+      if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
+        try {
+          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel" });
+          await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { 
+            targetName: target === "BF" ? "BF" : "BFPixel",
+            targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim"
+          });
+        } catch(e){
+          warn("apply via player failed", e);
+        }
+      }
+    } catch(e){
+      console.error("applyNow failed:", e);
+    } finally {
+      hideLoadingModal();
+      applyNow._busy = false;
+    }
+  }
+
+  async function resetAndRedownload(modName, skinObj, auto=false){
+    if (resetAndRedownload._busy) return;
+    resetAndRedownload._busy = true;
+
+    let zipPath = buildFilePathFromSkin(skinObj, "zip") || (skinObj.zip || "");
+    if (!zipPath) {
+      const found = findSkinInManifest(globalManifest, modName, getSkinName(skinObj));
+      if (found) zipPath = buildFilePathFromSkin(found, "zip") || (found.zip || "");
+    }
+    if (!zipPath) { resetAndRedownload._busy = false; return; }
+
+    const loadingModal = showLoadingModal();
+    try {
+      const cdnBase = { owner: modalOwner||"LucyYuih", repo: modalRepo||"gdev-custom-skins", branch: modalBranch||"main" };
+      const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+
+      try {
+        // Clear SelectedSkin/SelectedDadSkin if they reference this skin (preserve original logic)
+        try {
+          const gv = runtimeScene.getGame().getVariables();
+          if (gv.has("SelectedSkin")) {
+            const cur = gv.get("SelectedSkin").getAsString();
+            if (cur && cur.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) gv.get("SelectedSkin").setString("");
+          }
+          if (gv.has("SelectedDadSkin")) {
+            const cur = gv.get("SelectedDadSkin").getAsString();
+            if (cur && cur.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) gv.get("SelectedDadSkin").setString("");
+          }
+        } catch(e2){}
+        
+        try {
+          const ls1 = localStorage.getItem("gd_selected_skin");
+          if (ls1 && ls1.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) localStorage.removeItem("gd_selected_skin");
+          const ls2 = localStorage.getItem("gd_selected_dad_skin");
+          if (ls2 && ls2.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) localStorage.removeItem("gd_selected_dad_skin");
+        } catch(e2){}
+
+        if (window.GD_SKIN_PLAYER) {
+          try {
+            if (typeof window.GD_SKIN_PLAYER.uninstallPackage === "function") {
+              await window.GD_SKIN_PLAYER.uninstallPackage(modName, (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj));
+              log("Called GD_SKIN_PLAYER.uninstallPackage");
+            } else if (typeof window.GD_SKIN_PLAYER.removePackageByUrl === "function") {
+              await window.GD_SKIN_PLAYER.removePackageByUrl(cdnCandidate);
+              log("Called GD_SKIN_PLAYER.removePackageByUrl");
+            } else if (typeof window.GD_SKIN_PLAYER.clearCache === "function") {
+              await window.GD_SKIN_PLAYER.clearCache();
+              log("Called GD_SKIN_PLAYER.clearCache");
+            }
+          } catch(e3){
+            warn("player cache clear attempt failed", e3);
+          }
+        }
+      } catch(eClear){
+        warn("Reset: local cache removal failed", eClear);
+      }
+
+      const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+
+      const selName = (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj);
+      const sel = { mod: modName, name: selName, zip: zipPath || null };
+      if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
+      else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
+      
+      // Save to SelectedSkin (original behavior) — choose BF variable for reset (original script did this)
+      try {
+        const gv = runtimeScene.getGame().getVariables();
+        if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
+        else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(sel));
+      } catch(e2){}
+      try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e2){}
+      log("Reset: saved SelectedSkin after redownload", sel);
+
+      if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
+        try {
+          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: "BF" });
+          await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: "BF" });
+        } catch(e){
+          warn("Reset apply via player failed", e);
+        }
+      }
+    } catch(e){
+      console.error("resetAndRedownload failed:", e);
+    } finally {
+      hideLoadingModal();
+      resetAndRedownload._busy = false;
+    }
+  }
+
+  // UI logic: create the modal, populate the mod list, handle skin selection
+  let styleEl = null;
+  let prevOverflow = null;
+  let thumbsCache = {};
+  let currentModName = null;
+
   async function openSkinSelector(manifest){
+    globalManifest = manifest || { "": [] };
     let baseOwner=null, baseRepo=null, baseBranch=null;
     if (manifest && typeof manifest._base === "string" && manifest._base.includes("/")) {
-      try {
-        const base = manifest._base.trim();
-        const [ownerRepo, branch] = base.split("@");
-        const [owner, repo] = ownerRepo.split("/");
-        baseOwner = owner; baseRepo = repo; baseBranch = branch || "main";
-      } catch(e){}
+      try { const base = manifest._base.trim(); const [ownerRepo, branch] = base.split("@"); const [owner, repo] = ownerRepo.split("/"); baseOwner = owner; baseRepo = repo; baseBranch = branch || "main"; } catch(e){}
     }
 
     const ui = createModal(baseOwner||"LucyYuih", baseRepo||"gdev-custom-skins", baseBranch||"main");
-    const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl, controlsEl } = ui;
-    let currentMod = null; let thumbsCache = {}; let downloading = false;
+    const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: s, controlsEl } = ui;
+    let currentMod = null; let downloading = false;
+    
+    // Variáveis globais atualizadas
+    styleEl = s;
+    modalOwner = ownerIn.value || baseOwner; modalRepo = repoIn.value || baseRepo; modalBranch = branchIn.value || baseBranch || "main";
 
-    const prevOverflow = document.documentElement.style.overflow;
+    prevOverflow = document.documentElement.style.overflow;
     try { document.documentElement.style.overflow = 'hidden'; } catch(e){}
 
-    [leftList, skinListWrap, right, left].forEach(el => {
-      try {
-        if (!el) return;
-        el.addEventListener('touchstart', ()=>{}, {passive:true});
-        el.addEventListener('touchmove', ()=>{}, {passive:true});
-      } catch(e){}
-    });
+    [leftList, skinListWrap, right, left].forEach(el => { try { if (!el) return; el.addEventListener('touchstart', ()=>{}, {passive:true}); el.addEventListener('touchmove', ()=>{}, {passive:true}); } catch(e){} });
 
     const resetSelectedBtn = document.createElement("button");
     resetSelectedBtn.className = "skin-btn";
@@ -2058,7 +2250,7 @@ gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
         if (!selStr) return;
         const parsed = JSON.parse(selStr);
         if (!parsed || (!parsed.zip && !parsed.zip_cdn)) return;
-        await resetAndRedownload(parsed.mod || parsed.modName || "", { name: parsed.name || (parsed.path ? parsed.path.split('/').pop() : ""), zip: parsed.zip || parsed.zip_cdn }, true);
+        await resetAndRedownload(parsed.mod || parsed.modName || "", { name: parsed.name || "", zip: parsed.zip || parsed.zip_cdn }, true);
       } catch(e){
         console.error("Reset Selected failed:", e);
       }
@@ -2081,21 +2273,37 @@ gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
     let leftHidden = false;
     function setLeftHidden(hide){
       leftHidden = !!hide;
-      if (window.innerWidth <= 720) {
-        left.style.display = hide ? 'none' : 'flex';
-      } else {
-        left.style.display = 'block';
-      }
+      if (window.innerWidth <= 720) left.style.display = hide ? 'none' : 'flex';
+      else left.style.display = 'block';
     }
     toggleBtn.onclick = ()=> setLeftHidden(!leftHidden);
     window.addEventListener('resize', ()=> { if (window.innerWidth > 720) left.style.display = 'block'; else if (leftHidden) left.style.display='none'; });
 
-    closeBtn.onclick = () => { if (downloading) return; cleanupAndRemove(); };
+    const cleanupAndRemove = () => {
+      try {
+        for (const k in thumbsCache) unloadModThumbs(k);
+        if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+        try { document.head.removeChild(styleEl); } catch(e){}
+        hideLoadingModal();
+      } catch(e){ console.error("cleanup failed", e); }
+      try { document.documentElement.style.overflow = prevOverflow || ""; } catch(e){}
+      window.removeEventListener('keydown', onKeyDown);
+      try { window.removeEventListener('resize', ()=>{}); } catch(e){}
+    };
 
+    closeBtn.onclick = () => { if (downloading) return; cleanupAndRemove(); };
     function onKeyDown(e){ if (e.key === 'Escape') { closeBtn.click(); } }
     window.addEventListener('keydown', onKeyDown);
 
     function unloadModThumbs(modName){ const arr = thumbsCache[modName]; if (!arr) return; for (const it of arr) { if (it.blobUrl) try{URL.revokeObjectURL(it.blobUrl)}catch(e){} } delete thumbsCache[modName]; log("Unloaded thumbs for",modName); }
+
+    function createApplyButtonsForItem(){
+      const playerOnline = getPlayerOnlineValue(runtimeScene);
+      // playerOnline 1 => only BF; 2 => only Opponent; 0 => both
+      const showBF = (playerOnline === 0 || playerOnline === 1);
+      const showOpp = (playerOnline === 0 || playerOnline === 2);
+      return { showBF, showOpp, playerOnline };
+    }
 
     async function selectMod(modName){
       if (downloading) return;
@@ -2108,21 +2316,26 @@ gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
 
       thumbsCache[modName]=[];
       const cdnBase={ owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
+
       for (const sk of skins){
         const card=document.createElement("div"); card.className="skin-card";
         const img=document.createElement("img"); img.alt=getSkinName(sk); img.src=""; img.draggable = false;
         const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=getSkinName(sk);
         const footer = document.createElement("div"); footer.className="card-footer";
         
+        const { showBF, showOpp } = createApplyButtonsForItem();
+
         const applyBtnBF = document.createElement("button"); 
         applyBtnBF.className = "skin-btn bf"; 
         applyBtnBF.textContent = "BF";
         applyBtnBF.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "BF"); };
+        if (!showBF) applyBtnBF.style.display = "none";
 
         const applyBtnOpp = document.createElement("button"); 
         applyBtnOpp.className = "skin-btn opponent"; 
         applyBtnOpp.textContent = "Opponent";
         applyBtnOpp.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "Opponent"); };
+        if (!showOpp) applyBtnOpp.style.display = "none";
 
         const resetBtn = document.createElement("button"); 
         resetBtn.className = "skin-btn"; 
@@ -2135,7 +2348,8 @@ gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
         footer.appendChild(resetBtn);
         card.appendChild(img); card.appendChild(lbl); card.appendChild(footer);
         
-        card.onclick = ()=> downloadAndSaveOnly(modName, sk, false);
+        // default click on card -> download+save for the slot this player controls (preserve original default logic)
+        card.onclick = ()=> downloadAndSaveOnly(modName, sk, false, (getPlayerOnlineValue(runtimeScene) === 2 ? "Opponent" : "BF"));
         card.addEventListener('touchstart', ()=>{}, {passive:true});
         list.appendChild(card);
         thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card, applyBtnBF, applyBtnOpp, resetBtn });
@@ -2143,10 +2357,11 @@ gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
 
       for (const item of thumbsCache[modName]){
         const sk = item.skin; 
-        let thumbPath = buildFilePathFromSkin(sk, "thumb") || "";
+        // build thumb path using helper (supports filename-only)
+        let thumbPath = buildFilePathFromSkin(sk, "thumb") || (sk.thumb || "");
         if (!thumbPath) { item.imgEl.style.background="#222"; continue; }
         try {
-          const candidate = (thumbPath.startsWith("http://")||thumbPath.startsWith("https://")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
+          let candidate = (thumbPath.startsWith("http://")||thumbPath.startsWith("https://")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
           const blob = await fetchCdnFirst(candidate || thumbPath, "blob", cdnBase);
           const url = URL.createObjectURL(blob);
           item.blobUrl = url; item.imgEl.src = url;
@@ -2154,221 +2369,153 @@ gdjs.InicioCode.userFunc0x1b08038(runtimeScene);
       }
     }
 
-    async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
-      if (downloading) return;
-      let zipPath = buildFilePathFromSkin(skinObj, "zip") || "";
-      if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, getSkinName(skinObj));
-        if (found) zipPath = buildFilePathFromSkin(found, "zip") || "";
-      }
-      if (!zipPath) return;
-
-      downloading = true;
-      const loadingModal = showLoadingModal();
-      try {
-        const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
-        const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-        
-        await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-        
-        const selName = getSkinName(skinObj);
-        const sel = { mod: modName, name: selName, path: skinObj.path || null, zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || null };
-        if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
-        else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-        
-        const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
-        const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
-        
-        const gv = runtimeScene.getGame().getVariables();
-        if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
-        else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
-        try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
-        
-        console.log("[skin-loader] Downloaded+Saved " + varName + ":", JSON.stringify(sel));
-      } catch(e){
-        console.error("Download/save failed:", e);
-      } finally {
-        hideLoadingModal();
-        downloading = false;
-      }
-    }
-
-    async function applyNow(modName, skinObj, target){
-      if (downloading) return;
-      let zipPath = buildFilePathFromSkin(skinObj, "zip") || "";
-      if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, getSkinName(skinObj));
-        if (found) zipPath = buildFilePathFromSkin(found, "zip") || "";
-      }
-      if (!zipPath) return;
-
-      downloading = true;
-      const loadingModal = showLoadingModal();
-      try {
-        const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
-        const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-        const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
-        const selName = getSkinName(skinObj);
-        const sel = { mod: modName, name: selName, path: skinObj.path || null, zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || null };
-        if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
-        else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-        
-        const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
-        const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
-        
-        const gv = runtimeScene.getGame().getVariables();
-        if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
-        else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
-        try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
-        
-        console.log("[skin-loader] Saved " + varName + ":", JSON.stringify(sel));
-
-        if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
-          try {
-            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel" });
-            await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { 
-              targetName: target === "BF" ? "BF" : "BFPixel",
-              targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim"
-            });
-          } catch(e){
-            warn("apply via player failed", e);
-          }
-        }
-      } catch(e){
-        console.error("applyNow failed:", e);
-      } finally {
-        hideLoadingModal();
-        downloading = false;
-      }
-    }
-
-    async function resetAndRedownload(modName, skinObj, auto=false){
-      if (downloading) return;
-      // skinObj may be older format or new; try to get zip path
-      let zipPath = "";
-      if (typeof skinObj === "string") {
-        zipPath = skinObj;
-      } else {
-        zipPath = buildFilePathFromSkin(skinObj, "zip") || skinObj.zip || "";
-      }
-      if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj));
-        if (found) zipPath = buildFilePathFromSkin(found, "zip") || "";
-      }
-      if (!zipPath) return;
-
-      downloading = true;
-      const loadingModal = showLoadingModal();
-      try {
-        const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
-        const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-
-        try {
-          try {
-            const gv = runtimeScene.getGame().getVariables();
-            if (gv.has("SelectedSkin")) {
-              const cur = gv.get("SelectedSkin").getAsString();
-              if (cur && cur.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) gv.get("SelectedSkin").setString("");
-            }
-            if (gv.has("SelectedDadSkin")) {
-              const cur = gv.get("SelectedDadSkin").getAsString();
-              if (cur && cur.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) gv.get("SelectedDadSkin").setString("");
-            }
-          } catch(e2){}
-          
-          try {
-            const ls1 = localStorage.getItem("gd_selected_skin");
-            if (ls1 && ls1.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) localStorage.removeItem("gd_selected_skin");
-            const ls2 = localStorage.getItem("gd_selected_dad_skin");
-            if (ls2 && ls2.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) localStorage.removeItem("gd_selected_dad_skin");
-          } catch(e2){}
-
-          if (window.GD_SKIN_PLAYER) {
-            try {
-              if (typeof window.GD_SKIN_PLAYER.uninstallPackage === "function") {
-                await window.GD_SKIN_PLAYER.uninstallPackage(modName, (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj));
-                log("Called GD_SKIN_PLAYER.uninstallPackage");
-              } else if (typeof window.GD_SKIN_PLAYER.removePackageByUrl === "function") {
-                await window.GD_SKIN_PLAYER.removePackageByUrl(cdnCandidate);
-                log("Called GD_SKIN_PLAYER.removePackageByUrl");
-              } else if (typeof window.GD_SKIN_PLAYER.clearCache === "function") {
-                await window.GD_SKIN_PLAYER.clearCache();
-                log("Called GD_SKIN_PLAYER.clearCache");
-              }
-            } catch(e3){
-              warn("player cache clear attempt failed", e3);
-            }
-          }
-        } catch(eClear){
-          warn("Reset: local cache removal failed", eClear);
-        }
-
-        const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
-        const selName = (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj);
-        const sel = { mod: modName, name: selName, zip: zipPath || null };
-        if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
-        else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-        
-        try {
-          const gv = runtimeScene.getGame().getVariables();
-          if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
-          else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(sel));
-        } catch(e2){}
-        try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e2){}
-        log("Reset: saved SelectedSkin after redownload", sel);
-
-        if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
-          try {
-            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: "BF" });
-            await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: "BF" });
-          } catch(e){
-            warn("Reset apply via player failed", e);
-          }
-        }
-      } catch(e){
-        console.error("resetAndRedownload failed:", e);
-      } finally {
-        hideLoadingModal();
-        downloading = false;
-      }
-    }
-
-    try {
-      const gv = runtimeScene.getGame().getVariables();
-      let selStr = null;
-      if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString();
-      if ((!selStr || selStr.trim()==="") && window.localStorage) selStr = localStorage.getItem("gd_selected_skin");
-      if (selStr) {
-        try {
-          const parsed = JSON.parse(selStr);
-          log("Loader: SelectedSkin detected (not auto-applying).", parsed);
-        } catch(e){ warn("Loader read SelectedSkin failed", e); }
-      }
-    } catch(e){ warn("Loader selectedskin check failed", e); }
-
-    function cleanupAndRemove(){
-      try {
-        for (const k in thumbsCache) unloadModThumbs(k);
-        const m = document.querySelector(".skin-modal");
-        if (m) document.body.removeChild(m);
-        try { document.head.removeChild(styleEl); } catch(e){}
-        hideLoadingModal();
-      } catch(e){ console.error("cleanup failed", e); }
-      try { document.documentElement.style.overflow = prevOverflow || ""; } catch(e){}
-      window.removeEventListener('keydown', onKeyDown);
-      try { window.removeEventListener('resize', ()=>{}); } catch(e){}
-    }
+    // A função cleanupAndRemove original foi movida para dentro de openSkinSelector
+    // para ter acesso às variáveis locais.
 
     return { close: cleanupAndRemove, unloadModThumbs };
   }
 
-  try {
+  // ---------- watcher (observes other player's var changes and applies pack locally) ----------
+  let _skinWatcherInterval = null;
+  let _skinWatcherLast = { SelectedSkin: null, SelectedDadSkin: null };
+
+  async function applySelectionString(runtimeScene, selStr, opts = {}){ 
+    if (!selStr || !selStr.trim()) return null;
+    let parsed = null;
+    try { parsed = JSON.parse(selStr); } catch(e){ return null; }
+    const candidates = [];
+    if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
+    if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); candidates.push(parsed.zip.replace(/ /g,"%20")); candidates.push("resources/" + parsed.zip.replace(/ /g,"%20")); }
+    for (const c of candidates){
+      try {
+        log("watcher fetch try ->", c);
+        const r = await fetch(c);
+        if (!r.ok) throw new Error("Fetch failed " + r.status);
+        const arr = await r.arrayBuffer();
+        const pkg = await (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" ? window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arr) : Promise.reject(new Error("GD_SKIN_PLAYER missing")));
+        if (pkg) return window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, opts);
+      } catch(e){ warn("watcher apply candidate failed", e); }
+    }
+    return null;
+  }
+
+  async function skinWatcherTick(runtimeScene){
+    try{
+      const gv = runtimeScene.getGame().getVariables(); if (!gv) return;
+      if (!gv.has('SelectedSkin')) gv.pushNew('SelectedSkin').setString('');
+      if (!gv.has('SelectedDadSkin')) gv.pushNew('SelectedDadSkin').setString('');
+
+      const cur = { SelectedSkin: gv.get('SelectedSkin').getAsString(), SelectedDadSkin: gv.get('SelectedDadSkin').getAsString() };
+      const playerOnline = getPlayerOnlineValue(runtimeScene);
+
+      // If SelectedSkin changed and this client is NOT player 1, download+apply host's BF skin locally
+      if ((cur.SelectedSkin || '') !== (_skinWatcherLast.SelectedSkin || '')){
+        if (playerOnline !== 1){
+          const sel = cur.SelectedSkin || '';
+          if (sel && sel.trim() !== ''){
+            log("Watcher: SelectedSkin changed by host -> applying host's BF skin locally");
+            try { await applySelectionString(runtimeScene, sel, { targetName: "BF", targetAnimVar: "BFAnim" }); } catch(e){ warn("Watcher apply host BF failed", e); }
+          }
+        }
+      }
+
+      // If SelectedDadSkin changed and this client is NOT player 2, download+apply opponent skin locally
+      if ((cur.SelectedDadSkin || '') !== (_skinWatcherLast.SelectedDadSkin || '')){
+        if (playerOnline !== 2){
+          const sel = cur.SelectedDadSkin || '';
+          if (sel && sel.trim() !== ''){
+            log("Watcher: SelectedDadSkin changed by player2 -> applying opponent skin locally");
+            try { await applySelectionString(runtimeScene, sel, { targetName: "BFPixel", targetAnimVar: "OPPAnim" }); } catch(e){ warn("Watcher apply opponent failed", e); }
+          }
+        }
+      }
+
+      _skinWatcherLast.SelectedSkin = cur.SelectedSkin;
+      _skinWatcherLast.SelectedDadSkin = cur.SelectedDadSkin;
+    } catch(e){ warn("skinWatcherTick error:", e); }
+  }
+
+  function startSkinWatcher(runtimeScene){
+    if (_skinWatcherInterval) return;
+    _skinWatcherInterval = setInterval(()=> skinWatcherTick(runtimeScene).catch(e=>warn("skinWatcherTick outer:",e)), 700);
+    skinWatcherTick(runtimeScene).catch(e=>warn("skinWatcherTick initial:",e));
+    log("Skin watcher started.");
+  }
+  function stopSkinWatcher(){ if (_skinWatcherInterval){ clearInterval(_skinWatcherInterval); _skinWatcherInterval = null; log("Skin watcher stopped."); } }
+
+  // ---------- NOVO: Função para carregar o manifest com fallback para localStorage ----------
+  // O repositório e branch padrão são 'LucyYuih/gdev-custom-skins' e 'main', inferidos do código original.
+  const GITHUB_RAW_URL = `https://raw.githubusercontent.com/LucyYuih/gdev-custom-skins/main/${MANIFEST_NAME}`;
+  const LOCAL_STORAGE_KEY = "skin_loader_manifest";
+
+  async function loadManifestWithFallback(){
     let manifest = null;
-    try { manifest = await fetchCdnFirst(MANIFEST_NAME, "json", null); } catch(e){ manifest = null; }
-    if (!manifest) { try { manifest = await fetchCdnFirst("resources/" + MANIFEST_NAME, "json", null); } catch(e){ manifest = null; } }
-    if (!manifest) { console.warn("manifestskins.json not found; opening UI empty. Consider generating manifest with _base owner/repo@branch."); manifest = { "": [] }; }
+
+    // 1. Tenta ler do GitHub API (usando o link raw)
+    try {
+      log("Tentando carregar manifest do GitHub:", GITHUB_RAW_URL);
+      const response = await fetch(GITHUB_RAW_URL);
+      
+      if (!response.ok) {
+        // Se falhar (incluindo rate limit, 404, etc.), lança erro para ir para o catch
+        throw new Error(`Falha ao carregar do GitHub. Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // 2. Sucesso: Salva no localStorage e usa o manifest
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+        log("Manifest carregado do GitHub e salvo no localStorage.");
+      } catch(e) {
+        warn("Falha ao salvar manifest no localStorage:", e);
+      }
+      manifest = data;
+
+    } catch(e) {
+      warn("Falha ao carregar manifest do GitHub:", e.message);
+      
+      // 3. Falha: Tenta ler do localStorage
+      try {
+        const storedManifest = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (storedManifest) {
+          manifest = JSON.parse(storedManifest);
+          log("Manifest carregado com sucesso do localStorage como fallback.");
+        } else {
+          throw new Error("localStorage vazio.");
+        }
+      } catch(e) {
+        warn("Falha ao carregar manifest do localStorage:", e.message);
+        
+        // 4. Falha no localStorage: Tenta o fallback original (CDN/Local)
+        log("Tentando fallback original (CDN/Local)...");
+        try { 
+          manifest = await fetchCdnFirst(MANIFEST_NAME, "json", null); 
+        } catch(e){ 
+          manifest = null; 
+        }
+        if (!manifest) { 
+          try { 
+            manifest = await fetchCdnFirst("resources/" + MANIFEST_NAME, "json", null); 
+          } catch(e){ 
+            manifest = null; 
+          } 
+        }
+      }
+    }
+
+    if (!manifest) { 
+      console.warn("manifestskins.json não encontrado em nenhuma fonte; abrindo UI vazia. Consider generating manifest with _base owner/repo@branch."); 
+      manifest = { "": [] }; 
+    }
+    
+    return manifest;
+  }
+  // ---------- FIM NOVO ----------
+
+  // ---------- bootstrap: load manifest, open UI, start watcher ----------
+  try {
+    const manifest = await loadManifestWithFallback();
     await openSkinSelector(manifest);
   } catch(e){
     console.error("Skin loader startup failed:", e);
@@ -2382,7 +2529,7 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1ae5338(runtimeScene);
+gdjs.InicioCode.userFunc0x1ab2210(runtimeScene);
 
 }
 
