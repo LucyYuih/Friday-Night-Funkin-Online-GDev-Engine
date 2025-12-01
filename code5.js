@@ -3040,6 +3040,25 @@ gdjs.PlayCode.eventsList21 = function(runtimeScene, asyncObjectsList) {
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(14).getAsNumber() == 0);
+}
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+isConditionTrue_0 = !(gdjs.evtTools.sound.isSoundOnChannelPaused(runtimeScene, 1));
+}
+if (isConditionTrue_0) {
+{gdjs.evtTools.sound.playSoundOnChannel(runtimeScene, "mods\\LNCT\\songs\\azure-encounter+.aac", 1, true, 0, 1);
+}
+}
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.evtTools.variable.getVariableString(runtimeScene.getScene().getVariables().getFromIndex(52)) == "false";
 if (isConditionTrue_0) {
 {gdjs.evtTools.camera.showLayer(runtimeScene, "Mobile");
@@ -17915,7 +17934,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xf09380 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x12a33d0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18105,7 +18124,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xf09380(runtimeScene);
+gdjs.PlayCode.userFunc0x12a33d0(runtimeScene);
 
 }
 
@@ -18285,7 +18304,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xf091f0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x12a2f60 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18475,7 +18494,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xf091f0(runtimeScene);
+gdjs.PlayCode.userFunc0x12a2f60(runtimeScene);
 
 }
 
@@ -22218,7 +22237,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x2b499b0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x7a1ff8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22237,7 +22256,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x2b49a18 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x7a2098 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22502,7 +22521,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x2b499b0(runtimeScene);
+gdjs.PlayCode.userFunc0x7a1ff8(runtimeScene);
 
 }
 
@@ -22510,7 +22529,7 @@ gdjs.PlayCode.userFunc0x2b499b0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x2b49a18(runtimeScene);
+gdjs.PlayCode.userFunc0x7a2098(runtimeScene);
 
 }
 
@@ -22632,7 +22651,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1a21910 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1d348e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -23500,7 +23519,7 @@ gdjs.PlayCode.eventsList272 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x1a21910(runtimeScene);
+gdjs.PlayCode.userFunc0x1d348e0(runtimeScene);
 
 }
 
@@ -23580,7 +23599,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x17cd4a0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1d34ac8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -24550,7 +24569,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x17cd4a0(runtimeScene);
+gdjs.PlayCode.userFunc0x1d34ac8(runtimeScene);
 
 }
 
