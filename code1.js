@@ -339,15 +339,13 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1976850 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
-// PlayerUniversal username-keyed save — Export/Import UI
-// UPDATED: Import places values into PlayerUniversal children and then
-// sets Global variable "PlayerOnSave" = 1 for your GDevelop events to handle saving.
-// - Does NOT write to GD storage anymore on import (you'll do manual save when PlayerOnSave == 1)
-// - Saves only PlayerUniversal.{BestScore, Pfcs, Points}
-// - Uses gdjs.playerAuthentication.getUsername() and getUserToken() if available
+// PlayerUniversal save module (fix numeric types)
+// - Import applies values to PlayerUniversal children and sets PlayerOnSave = 1
+// - Preserves numeric types (no more converting numbers to strings)
+// - Uses gdjs.playerAuthentication for keying (username|token)
 // ===================================================================
 
 (function () {
@@ -359,7 +357,17 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
   const WANT_FIELDS = ["BestScore", "Pfcs", "Points"];
   const NOT_LOGGED_MSG = "Save available only for logged-in players (please log in from the menu)";
 
-  // ---------- Crypto helpers ----------
+  // ---------- Helpers ----------
+  function isNumericString(s){
+    if (typeof s !== 'string') return false;
+    // allows integers and decimals, optional leading +/-, optional spaces
+    return /^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(s);
+  }
+  function toNumberSafe(v){
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
   function strToU8(s){ return new TextEncoder().encode(s); }
   function u8ToStr(u){ return new TextDecoder().decode(u); }
   function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
@@ -390,6 +398,7 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
     return r === 0;
   }
 
+  // ---------- Crypto ----------
   async function deriveKeys(password, salt){
     const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
     const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
@@ -404,8 +413,6 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
     const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8);
     return new Uint8Array(sig);
   }
-
-  // ---------- Encrypt / Decrypt ----------
   async function encryptPayload(password, jsonText){
     const salt = randomBytes(SALT_BYTES);
     const iv = randomBytes(IV_BYTES);
@@ -417,7 +424,6 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
     const out = `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
     return out;
   }
-
   async function decryptPayload(password, fileText){
     const parts = fileText.trim().split('.');
     if (parts.length !== 4) throw new Error("Formato inválido");
@@ -453,7 +459,7 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
     return '';
   }
 
-  // ---------- Minimal modal helpers (responsive) ----------
+  // ---------- Modal UI helpers ----------
   let modalRoot = null;
   function ensureModalRoot(){
     if (modalRoot) return modalRoot;
@@ -470,7 +476,6 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
     modalRoot = root;
     return root;
   }
-
   function createModal(titleHtml){
     const root = ensureModalRoot();
     root.innerHTML = '';
@@ -521,7 +526,6 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
     }
     return { root, box, header, body, footer, close, closeBtn };
   }
-
   function createButton(text, primary=false){
     const b = document.createElement('button');
     b.innerText = text;
@@ -548,12 +552,10 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
     return p;
   }
 
-  // ---------- Export UI ----------
+  // ---------- Export UI (same as before) ----------
   async function openExportUI(runtimeScene){
     const modal = createModal('Export save — PlayerUniversal');
     const { body, footer, closeBtn, root } = modal;
-
-    // check auth
     const username = getAuthenticatedUsername();
     if (!username) {
       body.appendChild(createSmallNote(NOT_LOGGED_MSG));
@@ -563,22 +565,17 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
       root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
       return;
     }
-
     body.appendChild(createSmallNote('Exporting save for user: ' + username));
     body.appendChild(createSmallNote('This will use your authenticated account as encryption key on this device.'));
-
     const btnCancel = createButton('Cancel', false);
     const btnExport = createButton('Export', true);
     footer.appendChild(btnCancel);
     footer.appendChild(btnExport);
-
     const status = document.createElement('div');
     status.style.fontSize = '13px';
     status.style.minHeight = '22px';
     body.appendChild(status);
-
     btnCancel.addEventListener('click', ()=>{ try{ root.remove(); }catch(e){} modalRoot=null; });
-
     btnExport.addEventListener('click', async ()=>{
       status.innerText = 'Generating encrypted save...';
       try {
@@ -610,17 +607,14 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
         setTimeout(()=>{ try{ root.remove(); }catch(e){} modalRoot=null; }, 900);
       }
     });
-
     root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
-
     return;
   }
 
-  // ---------- Import UI (APPLIES values and sets PlayerOnSave = 1) ----------
+  // ---------- Import UI (FIXED numeric handling) ----------
   async function openImportUI(runtimeScene){
     const modal = createModal('Import save — PlayerUniversal');
     const { body, footer, closeBtn, root } = modal;
-
     const username = getAuthenticatedUsername();
     if (!username) {
       body.appendChild(createSmallNote(NOT_LOGGED_MSG));
@@ -674,7 +668,6 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
 
     btnImport.addEventListener('click', async ()=>{
       if (!chosenFileText){ status.innerText = 'Choose a file first.'; return; }
-      // lock UI until finished
       status.innerText = 'Importing... please wait.';
       try {
         const token = getAuthenticatedUserToken();
@@ -686,14 +679,14 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
         const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
         if (!gv) throw new Error("Global variable 'PlayerUniversal' not found.");
 
-        // Apply values to PlayerUniversal children (preserving types)
+        // Apply values preserving numeric types where possible
         for (const k of WANT_FIELDS) {
           const v = (payload && (k in payload)) ? payload[k] : null;
           const child = gv.getChild(k);
           if (!child) continue;
 
           if (v === null || v === undefined) {
-            // clear preserving previous type if possible
+            // Clear while preserving existing type if possible
             try {
               const current = (() => { try { return child.toJSObject(); } catch(e){ return null; }})();
               if (typeof current === 'number') child.setNumber(0);
@@ -704,17 +697,42 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
             continue;
           }
 
-          // preserve types
           try {
             if (k === 'Points') {
-              if (typeof v === 'number') child.setNumber(v);
-              else child.setString((typeof v === 'string') ? v : JSON.stringify(v));
+              // Points: prefer numeric if payload is number or numeric-string
+              if (typeof v === 'number') {
+                child.setNumber(v);
+              } else if (typeof v === 'string' && isNumericString(v)) {
+                const nn = toNumberSafe(v);
+                if (nn !== null) child.setNumber(nn);
+                else child.setString(v);
+              } else if (typeof v === 'object') {
+                // object/array -> try to preserve by serializing to string (most safe)
+                try { child.fromJSObject(v); }
+                catch(e){ child.setString(JSON.stringify(v)); }
+              } else {
+                child.setString(String(v));
+              }
             } else {
-              // BestScore and Pfcs: try fromJSObject, fallback to number
-              try { child.fromJSObject(v); }
-              catch(e){
-                const n = (typeof v === 'number') ? v : Number(v);
-                child.setNumber(Number.isFinite(n) ? n : 0);
+              // BestScore and Pfcs: try number/object, else numeric-string conversion
+              if (typeof v === 'number') {
+                child.setNumber(v);
+              } else if (typeof v === 'string' && isNumericString(v)) {
+                const nn = toNumberSafe(v);
+                if (nn !== null) child.setNumber(nn);
+                else child.setString(v);
+              } else if (typeof v === 'object') {
+                try { child.fromJSObject(v); }
+                catch(e){
+                  const nn = toNumberSafe(JSON.stringify(v));
+                  if (nn !== null) child.setNumber(nn);
+                  else child.setString(JSON.stringify(v));
+                }
+              } else {
+                // fallback
+                const nn = toNumberSafe(v);
+                if (nn !== null) child.setNumber(nn);
+                else child.setString(String(v));
               }
             }
           } catch (e) {
@@ -722,40 +740,34 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
           }
         }
 
-        // *** IMPORTANT: only action after applying values is to set PlayerOnSave = 1 ***
+        // Set global PlayerOnSave = 1 (create if needed)
         try {
           const gvars = runtimeScene.getGame().getVariables();
           if (gvars) {
-            // create if not exists and set to 1
             try {
               if (typeof gvars.contains === 'function') {
                 if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
                 else gvars.get('PlayerOnSave').setNumber(1);
               } else {
-                // fallback: get will create if missing in some runtimes
                 const pv = gvars.get('PlayerOnSave');
                 if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
               }
             } catch(e){
-              // final fallback direct
               try { gvars.get('PlayerOnSave').setNumber(1); } catch(e2){ console.warn('Failed to set PlayerOnSave', e2); }
             }
           }
         } catch(e){ console.warn('Could not set PlayerOnSave global variable', e); }
 
-        status.innerText = 'Import applied — PlayerOnSave set to 1. Perform the GD save manually.';
+        status.innerText = 'Import applied — PlayerOnSave set to 1. Perform GD save manually.';
       } catch (err) {
         console.error(err);
         status.innerText = 'Error: ' + (err && err.message ? err.message : String(err));
       } finally {
-        // close after short delay
         setTimeout(()=>{ try{ root.remove(); }catch(e){} modalRoot=null; }, 900);
       }
     });
 
-    // block clicks to canvas
     root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
-
     return;
   }
 
@@ -767,7 +779,7 @@ gdjs.InicioCode.userFunc0xf952c8 = function GDJSInlineCode(runtimeScene) {
     try { return openImportUI(runtimeScene); } catch(e){ console.error(e); alert('Error opening import UI: '+e.message); }
   };
 
-  console.log('PlayerUniversal username-keyed save module (import now sets PlayerOnSave=1) loaded.');
+  console.log('PlayerUniversal save module (numeric-preserving import) loaded.');
 })();
 
 };
@@ -802,7 +814,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0xf952c8(runtimeScene);
+gdjs.InicioCode.userFunc0x1976850(runtimeScene);
 
 }
 
@@ -872,7 +884,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x18bf040 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x18a7098 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -1489,12 +1501,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x18bf040(runtimeScene);
+gdjs.InicioCode.userFunc0x18a7098(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xe52580 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x18255f8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveExportUI(runtimeScene);
 
@@ -1504,12 +1516,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xe52580(runtimeScene);
+gdjs.InicioCode.userFunc0x18255f8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1ba9bb0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x17eddd0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 
@@ -1519,7 +1531,7 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1ba9bb0(runtimeScene);
+gdjs.InicioCode.userFunc0x17eddd0(runtimeScene);
 
 }
 
