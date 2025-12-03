@@ -10,7 +10,7 @@ gdjs.evtsExt__ArrayTools__ObjectConcatenate.idToCallbackMap = new Map();
 gdjs.evtsExt__ArrayTools__ObjectConcatenate.GDObjectObjects1= [];
 
 
-gdjs.evtsExt__ArrayTools__ObjectConcatenate.userFunc0x11f4348 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__ArrayTools__ObjectConcatenate.userFunc0x122ac20 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 /** @type {gdjs.Variable} */
 const array = eventsFunctionContext.getArgument("Array");
@@ -36,7 +36,7 @@ gdjs.evtsExt__ArrayTools__ObjectConcatenate.eventsList0 = function(runtimeScene,
 {
 
 
-gdjs.evtsExt__ArrayTools__ObjectConcatenate.userFunc0x11f4348(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__ArrayTools__ObjectConcatenate.userFunc0x122ac20(runtimeScene, eventsFunctionContext);
 
 }
 

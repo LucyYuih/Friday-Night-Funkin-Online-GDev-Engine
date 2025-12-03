@@ -9,7 +9,7 @@ gdjs.evtsExt__THNK__IsServer = {};
 gdjs.evtsExt__THNK__IsServer.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__THNK__IsServer.userFunc0x1370fb0 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__THNK__IsServer.userFunc0xff6b88 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 eventsFunctionContext.returnValue = !!runtimeScene.thnkServer;
 
@@ -19,7 +19,7 @@ gdjs.evtsExt__THNK__IsServer.eventsList0 = function(runtimeScene, eventsFunction
 {
 
 
-gdjs.evtsExt__THNK__IsServer.userFunc0x1370fb0(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__THNK__IsServer.userFunc0xff6b88(runtimeScene, eventsFunctionContext);
 
 }
 
