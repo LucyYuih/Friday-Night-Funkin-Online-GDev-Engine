@@ -9,7 +9,7 @@ gdjs.evtsExt__THNK__SetServerTickRate = {};
 gdjs.evtsExt__THNK__SetServerTickRate.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__THNK__SetServerTickRate.userFunc0x135c648 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__THNK__SetServerTickRate.userFunc0xf3d2e0 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 THNK.settings.setTickRate(eventsFunctionContext.getArgument("TargetTPS"));
 
@@ -29,7 +29,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.evtsExt__THNK__SetServerTickRate.userFunc0x135c648(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__THNK__SetServerTickRate.userFunc0xf3d2e0(runtimeScene, eventsFunctionContext);
 
 }
 
