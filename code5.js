@@ -17934,7 +17934,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x103f790 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xa8dac0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18117,258 +18117,224 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x2be8608 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1222e58 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===============================================================
 // Auto-run ONE-TIME encryption: encrypt numeric PlayerUniversal children
-// into PlayerUniversal.Encpt.<field>. Runs immediately when this JS
-// event executes (suitable for a "Start of scene" event).
-// Does NOT change numeric children; only writes ciphertext strings.
+// into PlayerUniversal.Encpt.<field>, then set PlayerOnSave = 1.
+// Paste into a JavaScript event that runs once (Start of scene).
 // ===============================================================
-
-(function(runtimeScene){
-  (async function(){
+(function (runtimeScene) {
+  (async function () {
     try {
-      // evita re-execução acidental na mesma sessão/aba
       const RUN_FLAG = '__gd_encrypt_playeruniversal_encpt_done';
-      // chave por usuário+modShort para evitar repetir por jogador
-      function getRunKey(username, modShort){ return `${RUN_FLAG}::${username || 'anon'}::${modShort || 'online'}`; }
-      // ---------- Helpers ----------
+      const FIELDS = ['BestScore', 'Pfcs', 'Points'];
       const PBKDF2_ITERATIONS = 250000;
       const SALT_BYTES = 16;
       const IV_BYTES = 12;
-      const DERIVED_BITS = 512;
-      const FIELDS = ["BestScore","Pfcs","Points"];
+      const DERIVED_BITS = 512; // 64 bytes
 
-      function strToU8(s){ return new TextEncoder().encode(s); }
-      function u8ToStr(u){ return new TextDecoder().decode(u); }
-      function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
-      function abToB64(buf){
+      // --- small helpers ---
+      function strToU8(s) { return new TextEncoder().encode(s); }
+      function u8ToStr(u) { return new TextDecoder().decode(u); }
+      function randomBytes(n) { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
+      function abToB64(buf) {
         let binary = '';
         const bytes = new Uint8Array(buf);
-        for (let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]);
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         return btoa(binary);
       }
-      function concatU8(...arrs){
-        const total = arrs.reduce((s,a)=>s+a.length,0);
+      function concatU8(...arrs) {
+        const total = arrs.reduce((s, a) => s + a.length, 0);
         const out = new Uint8Array(total);
-        let off=0;
-        for (const a of arrs){ out.set(a, off); off+=a.length; }
+        let off = 0;
+        for (const a of arrs) { out.set(a, off); off += a.length; }
         return out;
       }
-      function equalConstTime(a,b){
+      function equalConstTime(a, b) {
         if (!a || !b) return false;
         if (a.length !== b.length) return false;
         let r = 0;
-        for (let i=0;i<a.length;i++) r |= a[i] ^ b[i];
+        for (let i = 0; i < a.length; i++) r |= a[i] ^ b[i];
         return r === 0;
       }
 
-      async function deriveKeys(password, salt){
-        const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-        const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
+      // --- crypto primitives ---
+      async function deriveKeys(password, salt) {
+        const baseKey = await crypto.subtle.importKey('raw', strToU8(password), { name: 'PBKDF2' }, false, ['deriveBits']);
+        const derived = await crypto.subtle.deriveBits(
+          { name: 'PBKDF2', salt: salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+          baseKey,
+          DERIVED_BITS
+        );
         const db = new Uint8Array(derived);
-        const aesBytes = db.slice(0,32);
-        const hmacBytes = db.slice(32,64);
-        const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
-        const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
+        const aesBytes = db.slice(0, 32);
+        const hmacBytes = db.slice(32, 64);
+        const aesKey = await crypto.subtle.importKey('raw', aesBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+        const hmacKey = await crypto.subtle.importKey('raw', hmacBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
         return { aesKey, hmacKey };
       }
-      async function computeHmac(hmacKey, dataU8){
-        const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8);
+      async function computeHmac(hmacKey, dataU8) {
+        const sig = await crypto.subtle.sign('HMAC', hmacKey, dataU8);
         return new Uint8Array(sig);
       }
       async function encryptStringForField(password, plaintextString) {
         const salt = randomBytes(SALT_BYTES);
         const iv = randomBytes(IV_BYTES);
         const { aesKey, hmacKey } = await deriveKeys(password, salt);
-        const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(plaintextString));
+        const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, aesKey, strToU8(plaintextString));
         const cipher = new Uint8Array(cipherBuf);
         const macData = concatU8(salt, iv, cipher);
         const hmac = await computeHmac(hmacKey, macData);
         return `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
       }
 
-      // parse safe to number (returns finite number or null)
-      function parseToNumber(v){
-        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-        if (typeof v === 'string'){
+      // --- parse numeric helper (returns finite number or 0) ---
+      function parseToNumber(v) {
+        if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+        if (typeof v === 'string') {
           const t = v.trim();
-          if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)){
+          if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) {
             const n = Number(t);
-            return Number.isFinite(n) ? n : null;
+            return Number.isFinite(n) ? n : 0;
           }
-          return null;
+          return 0;
         }
-        if (typeof v === 'object' && v !== null){
+        if (typeof v === 'object' && v !== null) {
           try {
-            if ('value' in v && typeof v.value === 'number' && Number.isFinite(v.value)) return v.value;
+            if ('value' in v && typeof v.value === 'number') return v.value;
             const js = JSON.stringify(v);
-            if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(js)) {
-              const n = Number(js);
-              return Number.isFinite(n) ? n : null;
-            }
-          } catch(e){}
+            if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(js)) return Number(js);
+          } catch (e) { /* ignore */ }
         }
-        return null;
+        return 0;
       }
 
-      // ---------- Auth (GDevelop) ----------
-      function getUsername(){
+      // --- GDevelop auth helpers ---
+      function getUsername() {
         try {
           if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
             const u = gdjs.playerAuthentication.getUsername();
             if (u && typeof u === 'string' && u.trim() !== '') return u;
           }
-        } catch(e){}
+        } catch (e) { }
         return '';
       }
-      function getToken(){
+      function getToken() {
         try {
           if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
             return gdjs.playerAuthentication.getUserToken() || '';
           }
-        } catch(e){}
+        } catch (e) { }
         return '';
       }
 
-      // ---------- Start logic ----------
+      // --- run guard ---
       const username = getUsername();
-      if (!username) {
-        console.warn('encryptPlayerUniversalToEncpt auto-run: user not logged in — abort.');
-        return;
-      }
-      const token = getToken();
-      const secret = username + (token ? ('|' + token) : '');
-      // modShort detection (global then scene var)
-      function getModShort(runtimeScene){
+      if (!username) { console.warn('encrypt auto-run: player not logged in — abort.'); return; }
+      if (!crypto || !crypto.subtle) { console.error('encrypt auto-run: crypto.subtle not available in this runtime — abort.'); return; }
+
+      // detect modShort to avoid re-running for different mods if you want
+      function getModShort(runtimeScene) {
         try {
           const gvars = runtimeScene.getGame().getVariables();
-          if (gvars && typeof gvars.contains === 'function' && gvars.contains("ModShortName")) {
-            const gv = gvars.get("ModShortName");
-            if (gv && typeof gv.getAsString === 'function'){ const s=gv.getAsString(); if (s && s.trim()!=='') return s; }
+          if (gvars && typeof gvars.contains === 'function' && gvars.contains('ModShortName')) {
+            const gv = gvars.get('ModShortName');
+            if (gv && typeof gv.getAsString === 'function') return gv.getAsString();
           } else if (gvars && typeof gvars.get === 'function') {
-            try { const gv2 = gvars.get("ModShortName"); if (gv2){ const s=gv2.getAsString?gv2.getAsString():String(gv2); if(s&&s.trim()!=='') return s; } } catch(e){}
+            const gv2 = gvars.get('ModShortName');
+            if (gv2) return gv2.getAsString ? gv2.getAsString() : String(gv2);
           }
-        } catch(e){}
+        } catch (e) { }
         try {
           const svs = runtimeScene.getVariables();
-          if (svs && typeof svs.contains === 'function' && svs.contains("ModShortName")) {
-            const sv = svs.get("ModShortName");
-            if (sv && typeof sv.getAsString === 'function'){ const s2=sv.getAsString(); if (s2 && s2.trim()!=='') return s2; }
+          if (svs && typeof svs.contains === 'function' && svs.contains('ModShortName')) {
+            const sv = svs.get('ModShortName');
+            if (sv && typeof sv.getAsString === 'function') return sv.getAsString();
           } else if (svs && typeof svs.get === 'function') {
-            try { const sv2 = svs.get("ModShortName"); if (sv2){ const s2=sv2.getAsString?sv2.getAsString():String(sv2); if(s2&&s2.trim()!=='') return s2; } } catch(e){}
+            const sv2 = svs.get('ModShortName');
+            if (sv2) return sv2.getAsString ? sv2.getAsString() : String(sv2);
           }
-        } catch(e){}
+        } catch (e) { }
         return 'online';
       }
       const modShort = getModShort(runtimeScene);
-      const runKey = getRunKey(username, modShort);
+      const runKey = `${RUN_FLAG}::${username}::${modShort}`;
       if (!window.__gd_enc_flags) window.__gd_enc_flags = {};
-      if (window.__gd_enc_flags[runKey]) {
-        console.log('encryptPlayerUniversalToEncpt auto-run: already executed for this user+modShort in this session — skipping.');
-        return;
-      }
-      // mark as running to avoid race
-      window.__gd_enc_flags[runKey] = true;
+      if (window.__gd_enc_flags[runKey]) { console.log('encrypt auto-run: already executed for this user+mod in this session — skipping.'); return; }
+      window.__gd_enc_flags[runKey] = true; // mark as running/ran
 
-      // obtain PlayerUniversal var
-      const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-      if (!gv) {
-        console.warn('encryptPlayerUniversalToEncpt auto-run: PlayerUniversal not found — abort.');
-        return;
-      }
-      // ensure Encpt structure exists
-      try { gv.getChild("Encpt"); } catch(e){ /* ignore */ }
+      // --- access PlayerUniversal variable ---
+      const gvars = runtimeScene.getGame().getVariables();
+      if (!gvars) { console.error('encrypt auto-run: game variables not available'); return; }
+      const pu = gvars.get('PlayerUniversal');
+      if (!pu) { console.error('encrypt auto-run: PlayerUniversal variable not found'); return; }
 
-      // For each field: read numeric value from PlayerUniversal child, ensure number, encrypt numeric string, write to Encpt child as string
-      for (const k of FIELDS){
+      // ensure Encpt exists (getChild often creates)
+      try { pu.getChild('Encpt'); } catch (e) { /* ignore */ }
+
+      const token = getToken();
+      const secret = username + (token ? ('|' + token) : '');
+
+      // --- encrypt each field and store ciphertext in PlayerUniversal.Encpt.<field> ---
+      let successCount = 0;
+      for (const k of FIELDS) {
         try {
-          const child = gv.getChild(k);
-          if (!child) continue;
-          // get current value robustly
-          let currentVal = null;
-          try { currentVal = child.toJSObject(); } catch(e){
-            try { currentVal = (typeof child.getAsNumber === 'function') ? child.getAsNumber() : (child.getAsString ? child.getAsString() : null); } catch(e2){ currentVal = null; }
+          const child = pu.getChild(k);
+          if (!child) { console.warn('encrypt auto-run: missing field', k); continue; }
+          // read current value robustly (prefer numeric)
+          let current = null;
+          try { current = child.toJSObject(); } catch (e) {
+            try { current = typeof child.getAsNumber === 'function' ? child.getAsNumber() : (typeof child.getAsString === 'function' ? child.getAsString() : null); } catch (e2) { current = null; }
           }
-          let num = parseToNumber(currentVal);
-          if (num === null) {
-            // fallback: try parse child's string representation
-            try {
-              const s = (typeof child.getAsString === 'function') ? child.getAsString() : String(currentVal);
-              const t = s && typeof s === 'string' ? s.trim() : '';
-              num = (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) ? Number(t) : 0;
-            } catch(e){ num = 0; }
-          }
-          // numeric children must remain numeric — do NOT modify them here
-          // create plaintext for encryption as numeric string
-          const plainForField = String(num);
-
-          // encrypt and store in Encpt child as string
+          const num = parseToNumber(current);
+          const plainForField = String(num); // numeric string
+          // encrypt
+          const ciphertext = await encryptStringForField(secret, plainForField);
+          // store as string in Encpt child
           try {
-            const ciphertext = await encryptStringForField(secret, plainForField);
-            try {
-              gv.getChild("Encpt").getChild(k).setString(ciphertext);
-            } catch(e){
-              // fallback: ensure Encpt child exists then set
-              try { gv.getChild("Encpt").getChild(k).setString(ciphertext); } catch(e2){ console.warn('Failed to set PlayerUniversal.Encpt.'+k, e2); }
-            }
-          } catch(e){ console.error('encrypt failed for field', k, e); }
-        } catch(e){
-          console.error('error processing field', k, e);
+            pu.getChild('Encpt').getChild(k).setString(ciphertext);
+          } catch (e) {
+            try { pu.getChild('Encpt').getChild(k).setString(ciphertext); } catch (e2) { console.warn('encrypt auto-run: failed to set Encpt.' + k, e2); continue; }
+          }
+          console.log('encrypt auto-run: wrote Encpt.' + k + ' (len ' + ciphertext.length + ')');
+          successCount++;
+        } catch (e) {
+          console.error('encrypt auto-run: error encrypting field', k, e);
         }
       }
 
-      // flag completed (keeps in memory so it won't run again)
-      window.__gd_enc_flags[runKey] = true;
-      console.log('encryptPlayerUniversalToEncpt auto-run: done for', username, 'modShort:', modShort);
+      // --- if all or some succeeded, set PlayerOnSave = 1 so you can Save nativamente ---
+      if (successCount > 0) {
+        try {
+          if (typeof gvars.contains === 'function') {
+            if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
+            else gvars.get('PlayerOnSave').setNumber(1);
+          } else {
+            const pv = gvars.get('PlayerOnSave');
+            if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
+          }
+          console.log('encrypt auto-run: PlayerOnSave set to 1 (you can now do native save via GDevelop events).');
+        } catch (e) {
+          console.warn('encrypt auto-run: failed to set PlayerOnSave', e);
+        }
+      } else {
+        console.warn('encrypt auto-run: no fields encrypted (nothing written to Encpt). PlayerOnSave NOT set.');
+      }
 
-      // optional: set a global variable so your GDevelop events can react (uncomment if desired)
-      // try { const gvars = runtimeScene.getGame().getVariables(); if (gvars) gvars.get('PlayerEncptDone').setNumber(1); } catch(e){}
-
-    } catch(err){
-      console.error('encryptPlayerUniversalToEncpt auto-run: unexpected error', err);
+    } catch (err) {
+      console.error('encrypt auto-run: unexpected error', err);
     }
   })();
 })(runtimeScene);
 
 };
-gdjs.PlayCode.asyncCallback24095476 = function (runtimeScene, asyncObjectsList) {
-asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
-{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "BestScore", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("BestScore").getAsString());
-}
-{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Pfcs", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Pfcs").getAsString());
-}
-{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Points", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Points").getAsString());
-}
-{gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, "Inicio", true);
-}
-gdjs.PlayCode.localVariables.length = 0;
-}
-gdjs.PlayCode.idToCallbackMap.set(24095476, gdjs.PlayCode.asyncCallback24095476);
 gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 
 {
 
 
-{
-const parentAsyncObjectsList = asyncObjectsList;
-{
-const asyncObjectsList = gdjs.LongLivedObjectsList.from(parentAsyncObjectsList);
-asyncObjectsList.backupLocalVariablesContainers(gdjs.PlayCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(runtimeScene.getScene().getVariables().getFromIndex(41).getAsNumber()), (runtimeScene) => (gdjs.PlayCode.asyncCallback24095476(runtimeScene, asyncObjectsList)), 24095476, asyncObjectsList);
-}
-}
-
-}
-
-
-};gdjs.PlayCode.eventsList222 = function(runtimeScene, asyncObjectsList) {
-
-{
-
-
-gdjs.PlayCode.userFunc0x103f790(runtimeScene);
+gdjs.PlayCode.userFunc0xa8dac0(runtimeScene);
 
 }
 
@@ -18444,7 +18410,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x2be8608(runtimeScene);
+gdjs.PlayCode.userFunc0x1222e58(runtimeScene);
 
 }
 
@@ -18452,15 +18418,6 @@ gdjs.PlayCode.userFunc0x2be8608(runtimeScene);
 {
 
 
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(14).getAsNumber() == 1);
-}
-if (isConditionTrue_0) {
-
-{ //Subevents
-gdjs.PlayCode.eventsList221(runtimeScene, asyncObjectsList);} //End of subevents
-}
 
 }
 
@@ -18469,11 +18426,11 @@ gdjs.PlayCode.eventsList221(runtimeScene, asyncObjectsList);} //End of subevents
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 
 { //Subevents
-gdjs.PlayCode.eventsList222(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.PlayCode.eventsList221(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(36455548, gdjs.PlayCode.asyncCallback36455548);
-gdjs.PlayCode.eventsList223 = function(runtimeScene) {
+gdjs.PlayCode.eventsList222 = function(runtimeScene) {
 
 {
 
@@ -18499,7 +18456,7 @@ gdjs.copyArray(runtimeScene.getObjects("LifeBar"), gdjs.PlayCode.GDLifeBarObject
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(36468244, gdjs.PlayCode.asyncCallback36468244);
-gdjs.PlayCode.eventsList224 = function(runtimeScene) {
+gdjs.PlayCode.eventsList223 = function(runtimeScene) {
 
 {
 
@@ -18515,7 +18472,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(runt
 }
 
 
-};gdjs.PlayCode.eventsList225 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList224 = function(runtimeScene) {
 
 {
 
@@ -18529,7 +18486,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList222(runtimeScene);} //End of subevents
 }
 
 }
@@ -18547,13 +18504,13 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList224(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 }
 
 
-};gdjs.PlayCode.userFunc0x1cae438 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1b1fee0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18647,7 +18604,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(36474244, gdjs.PlayCode.asyncCallback36474244);
-gdjs.PlayCode.eventsList226 = function(runtimeScene, asyncObjectsList) {
+gdjs.PlayCode.eventsList225 = function(runtimeScene, asyncObjectsList) {
 
 {
 
@@ -18669,7 +18626,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(36474148, gdjs.PlayCode.asyncCallback36474148);
-gdjs.PlayCode.eventsList227 = function(runtimeScene, asyncObjectsList) {
+gdjs.PlayCode.eventsList226 = function(runtimeScene, asyncObjectsList) {
 
 {
 
@@ -18693,7 +18650,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(36481428, gdjs.PlayCode.asyncCallback36481428);
-gdjs.PlayCode.eventsList228 = function(runtimeScene, asyncObjectsList) {
+gdjs.PlayCode.eventsList227 = function(runtimeScene, asyncObjectsList) {
 
 {
 
@@ -18710,7 +18667,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.leaderboards.saveConne
 }
 
 
-};gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
+};gdjs.PlayCode.eventsList228 = function(runtimeScene, asyncObjectsList) {
 
 {
 
@@ -18730,264 +18687,230 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 }
 
 
-};gdjs.PlayCode.userFunc0x18cbf70 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xa8d6c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===============================================================
 // Auto-run ONE-TIME encryption: encrypt numeric PlayerUniversal children
-// into PlayerUniversal.Encpt.<field>. Runs immediately when this JS
-// event executes (suitable for a "Start of scene" event).
-// Does NOT change numeric children; only writes ciphertext strings.
+// into PlayerUniversal.Encpt.<field>, then set PlayerOnSave = 1.
+// Paste into a JavaScript event that runs once (Start of scene).
 // ===============================================================
-
-(function(runtimeScene){
-  (async function(){
+(function (runtimeScene) {
+  (async function () {
     try {
-      // evita re-execução acidental na mesma sessão/aba
       const RUN_FLAG = '__gd_encrypt_playeruniversal_encpt_done';
-      // chave por usuário+modShort para evitar repetir por jogador
-      function getRunKey(username, modShort){ return `${RUN_FLAG}::${username || 'anon'}::${modShort || 'online'}`; }
-      // ---------- Helpers ----------
+      const FIELDS = ['BestScore', 'Pfcs', 'Points'];
       const PBKDF2_ITERATIONS = 250000;
       const SALT_BYTES = 16;
       const IV_BYTES = 12;
-      const DERIVED_BITS = 512;
-      const FIELDS = ["BestScore","Pfcs","Points"];
+      const DERIVED_BITS = 512; // 64 bytes
 
-      function strToU8(s){ return new TextEncoder().encode(s); }
-      function u8ToStr(u){ return new TextDecoder().decode(u); }
-      function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
-      function abToB64(buf){
+      // --- small helpers ---
+      function strToU8(s) { return new TextEncoder().encode(s); }
+      function u8ToStr(u) { return new TextDecoder().decode(u); }
+      function randomBytes(n) { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
+      function abToB64(buf) {
         let binary = '';
         const bytes = new Uint8Array(buf);
-        for (let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]);
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         return btoa(binary);
       }
-      function concatU8(...arrs){
-        const total = arrs.reduce((s,a)=>s+a.length,0);
+      function concatU8(...arrs) {
+        const total = arrs.reduce((s, a) => s + a.length, 0);
         const out = new Uint8Array(total);
-        let off=0;
-        for (const a of arrs){ out.set(a, off); off+=a.length; }
+        let off = 0;
+        for (const a of arrs) { out.set(a, off); off += a.length; }
         return out;
       }
-      function equalConstTime(a,b){
+      function equalConstTime(a, b) {
         if (!a || !b) return false;
         if (a.length !== b.length) return false;
         let r = 0;
-        for (let i=0;i<a.length;i++) r |= a[i] ^ b[i];
+        for (let i = 0; i < a.length; i++) r |= a[i] ^ b[i];
         return r === 0;
       }
 
-      async function deriveKeys(password, salt){
-        const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-        const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
+      // --- crypto primitives ---
+      async function deriveKeys(password, salt) {
+        const baseKey = await crypto.subtle.importKey('raw', strToU8(password), { name: 'PBKDF2' }, false, ['deriveBits']);
+        const derived = await crypto.subtle.deriveBits(
+          { name: 'PBKDF2', salt: salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+          baseKey,
+          DERIVED_BITS
+        );
         const db = new Uint8Array(derived);
-        const aesBytes = db.slice(0,32);
-        const hmacBytes = db.slice(32,64);
-        const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
-        const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
+        const aesBytes = db.slice(0, 32);
+        const hmacBytes = db.slice(32, 64);
+        const aesKey = await crypto.subtle.importKey('raw', aesBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+        const hmacKey = await crypto.subtle.importKey('raw', hmacBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
         return { aesKey, hmacKey };
       }
-      async function computeHmac(hmacKey, dataU8){
-        const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8);
+      async function computeHmac(hmacKey, dataU8) {
+        const sig = await crypto.subtle.sign('HMAC', hmacKey, dataU8);
         return new Uint8Array(sig);
       }
       async function encryptStringForField(password, plaintextString) {
         const salt = randomBytes(SALT_BYTES);
         const iv = randomBytes(IV_BYTES);
         const { aesKey, hmacKey } = await deriveKeys(password, salt);
-        const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(plaintextString));
+        const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, aesKey, strToU8(plaintextString));
         const cipher = new Uint8Array(cipherBuf);
         const macData = concatU8(salt, iv, cipher);
         const hmac = await computeHmac(hmacKey, macData);
         return `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
       }
 
-      // parse safe to number (returns finite number or null)
-      function parseToNumber(v){
-        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-        if (typeof v === 'string'){
+      // --- parse numeric helper (returns finite number or 0) ---
+      function parseToNumber(v) {
+        if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+        if (typeof v === 'string') {
           const t = v.trim();
-          if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)){
+          if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) {
             const n = Number(t);
-            return Number.isFinite(n) ? n : null;
+            return Number.isFinite(n) ? n : 0;
           }
-          return null;
+          return 0;
         }
-        if (typeof v === 'object' && v !== null){
+        if (typeof v === 'object' && v !== null) {
           try {
-            if ('value' in v && typeof v.value === 'number' && Number.isFinite(v.value)) return v.value;
+            if ('value' in v && typeof v.value === 'number') return v.value;
             const js = JSON.stringify(v);
-            if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(js)) {
-              const n = Number(js);
-              return Number.isFinite(n) ? n : null;
-            }
-          } catch(e){}
+            if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(js)) return Number(js);
+          } catch (e) { /* ignore */ }
         }
-        return null;
+        return 0;
       }
 
-      // ---------- Auth (GDevelop) ----------
-      function getUsername(){
+      // --- GDevelop auth helpers ---
+      function getUsername() {
         try {
           if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
             const u = gdjs.playerAuthentication.getUsername();
             if (u && typeof u === 'string' && u.trim() !== '') return u;
           }
-        } catch(e){}
+        } catch (e) { }
         return '';
       }
-      function getToken(){
+      function getToken() {
         try {
           if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
             return gdjs.playerAuthentication.getUserToken() || '';
           }
-        } catch(e){}
+        } catch (e) { }
         return '';
       }
 
-      // ---------- Start logic ----------
+      // --- run guard ---
       const username = getUsername();
-      if (!username) {
-        console.warn('encryptPlayerUniversalToEncpt auto-run: user not logged in — abort.');
-        return;
-      }
-      const token = getToken();
-      const secret = username + (token ? ('|' + token) : '');
-      // modShort detection (global then scene var)
-      function getModShort(runtimeScene){
+      if (!username) { console.warn('encrypt auto-run: player not logged in — abort.'); return; }
+      if (!crypto || !crypto.subtle) { console.error('encrypt auto-run: crypto.subtle not available in this runtime — abort.'); return; }
+
+      // detect modShort to avoid re-running for different mods if you want
+      function getModShort(runtimeScene) {
         try {
           const gvars = runtimeScene.getGame().getVariables();
-          if (gvars && typeof gvars.contains === 'function' && gvars.contains("ModShortName")) {
-            const gv = gvars.get("ModShortName");
-            if (gv && typeof gv.getAsString === 'function'){ const s=gv.getAsString(); if (s && s.trim()!=='') return s; }
+          if (gvars && typeof gvars.contains === 'function' && gvars.contains('ModShortName')) {
+            const gv = gvars.get('ModShortName');
+            if (gv && typeof gv.getAsString === 'function') return gv.getAsString();
           } else if (gvars && typeof gvars.get === 'function') {
-            try { const gv2 = gvars.get("ModShortName"); if (gv2){ const s=gv2.getAsString?gv2.getAsString():String(gv2); if(s&&s.trim()!=='') return s; } } catch(e){}
+            const gv2 = gvars.get('ModShortName');
+            if (gv2) return gv2.getAsString ? gv2.getAsString() : String(gv2);
           }
-        } catch(e){}
+        } catch (e) { }
         try {
           const svs = runtimeScene.getVariables();
-          if (svs && typeof svs.contains === 'function' && svs.contains("ModShortName")) {
-            const sv = svs.get("ModShortName");
-            if (sv && typeof sv.getAsString === 'function'){ const s2=sv.getAsString(); if (s2 && s2.trim()!=='') return s2; }
+          if (svs && typeof svs.contains === 'function' && svs.contains('ModShortName')) {
+            const sv = svs.get('ModShortName');
+            if (sv && typeof sv.getAsString === 'function') return sv.getAsString();
           } else if (svs && typeof svs.get === 'function') {
-            try { const sv2 = svs.get("ModShortName"); if (sv2){ const s2=sv2.getAsString?sv2.getAsString():String(sv2); if(s2&&s2.trim()!=='') return s2; } } catch(e){}
+            const sv2 = svs.get('ModShortName');
+            if (sv2) return sv2.getAsString ? sv2.getAsString() : String(sv2);
           }
-        } catch(e){}
+        } catch (e) { }
         return 'online';
       }
       const modShort = getModShort(runtimeScene);
-      const runKey = getRunKey(username, modShort);
+      const runKey = `${RUN_FLAG}::${username}::${modShort}`;
       if (!window.__gd_enc_flags) window.__gd_enc_flags = {};
-      if (window.__gd_enc_flags[runKey]) {
-        console.log('encryptPlayerUniversalToEncpt auto-run: already executed for this user+modShort in this session — skipping.');
-        return;
-      }
-      // mark as running to avoid race
-      window.__gd_enc_flags[runKey] = true;
+      if (window.__gd_enc_flags[runKey]) { console.log('encrypt auto-run: already executed for this user+mod in this session — skipping.'); return; }
+      window.__gd_enc_flags[runKey] = true; // mark as running/ran
 
-      // obtain PlayerUniversal var
-      const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-      if (!gv) {
-        console.warn('encryptPlayerUniversalToEncpt auto-run: PlayerUniversal not found — abort.');
-        return;
-      }
-      // ensure Encpt structure exists
-      try { gv.getChild("Encpt"); } catch(e){ /* ignore */ }
+      // --- access PlayerUniversal variable ---
+      const gvars = runtimeScene.getGame().getVariables();
+      if (!gvars) { console.error('encrypt auto-run: game variables not available'); return; }
+      const pu = gvars.get('PlayerUniversal');
+      if (!pu) { console.error('encrypt auto-run: PlayerUniversal variable not found'); return; }
 
-      // For each field: read numeric value from PlayerUniversal child, ensure number, encrypt numeric string, write to Encpt child as string
-      for (const k of FIELDS){
+      // ensure Encpt exists (getChild often creates)
+      try { pu.getChild('Encpt'); } catch (e) { /* ignore */ }
+
+      const token = getToken();
+      const secret = username + (token ? ('|' + token) : '');
+
+      // --- encrypt each field and store ciphertext in PlayerUniversal.Encpt.<field> ---
+      let successCount = 0;
+      for (const k of FIELDS) {
         try {
-          const child = gv.getChild(k);
-          if (!child) continue;
-          // get current value robustly
-          let currentVal = null;
-          try { currentVal = child.toJSObject(); } catch(e){
-            try { currentVal = (typeof child.getAsNumber === 'function') ? child.getAsNumber() : (child.getAsString ? child.getAsString() : null); } catch(e2){ currentVal = null; }
+          const child = pu.getChild(k);
+          if (!child) { console.warn('encrypt auto-run: missing field', k); continue; }
+          // read current value robustly (prefer numeric)
+          let current = null;
+          try { current = child.toJSObject(); } catch (e) {
+            try { current = typeof child.getAsNumber === 'function' ? child.getAsNumber() : (typeof child.getAsString === 'function' ? child.getAsString() : null); } catch (e2) { current = null; }
           }
-          let num = parseToNumber(currentVal);
-          if (num === null) {
-            // fallback: try parse child's string representation
-            try {
-              const s = (typeof child.getAsString === 'function') ? child.getAsString() : String(currentVal);
-              const t = s && typeof s === 'string' ? s.trim() : '';
-              num = (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) ? Number(t) : 0;
-            } catch(e){ num = 0; }
-          }
-          // numeric children must remain numeric — do NOT modify them here
-          // create plaintext for encryption as numeric string
-          const plainForField = String(num);
-
-          // encrypt and store in Encpt child as string
+          const num = parseToNumber(current);
+          const plainForField = String(num); // numeric string
+          // encrypt
+          const ciphertext = await encryptStringForField(secret, plainForField);
+          // store as string in Encpt child
           try {
-            const ciphertext = await encryptStringForField(secret, plainForField);
-            try {
-              gv.getChild("Encpt").getChild(k).setString(ciphertext);
-            } catch(e){
-              // fallback: ensure Encpt child exists then set
-              try { gv.getChild("Encpt").getChild(k).setString(ciphertext); } catch(e2){ console.warn('Failed to set PlayerUniversal.Encpt.'+k, e2); }
-            }
-          } catch(e){ console.error('encrypt failed for field', k, e); }
-        } catch(e){
-          console.error('error processing field', k, e);
+            pu.getChild('Encpt').getChild(k).setString(ciphertext);
+          } catch (e) {
+            try { pu.getChild('Encpt').getChild(k).setString(ciphertext); } catch (e2) { console.warn('encrypt auto-run: failed to set Encpt.' + k, e2); continue; }
+          }
+          console.log('encrypt auto-run: wrote Encpt.' + k + ' (len ' + ciphertext.length + ')');
+          successCount++;
+        } catch (e) {
+          console.error('encrypt auto-run: error encrypting field', k, e);
         }
       }
 
-      // flag completed (keeps in memory so it won't run again)
-      window.__gd_enc_flags[runKey] = true;
-      console.log('encryptPlayerUniversalToEncpt auto-run: done for', username, 'modShort:', modShort);
+      // --- if all or some succeeded, set PlayerOnSave = 1 so you can Save nativamente ---
+      if (successCount > 0) {
+        try {
+          if (typeof gvars.contains === 'function') {
+            if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
+            else gvars.get('PlayerOnSave').setNumber(1);
+          } else {
+            const pv = gvars.get('PlayerOnSave');
+            if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
+          }
+          console.log('encrypt auto-run: PlayerOnSave set to 1 (you can now do native save via GDevelop events).');
+        } catch (e) {
+          console.warn('encrypt auto-run: failed to set PlayerOnSave', e);
+        }
+      } else {
+        console.warn('encrypt auto-run: no fields encrypted (nothing written to Encpt). PlayerOnSave NOT set.');
+      }
 
-      // optional: set a global variable so your GDevelop events can react (uncomment if desired)
-      // try { const gvars = runtimeScene.getGame().getVariables(); if (gvars) gvars.get('PlayerEncptDone').setNumber(1); } catch(e){}
-
-    } catch(err){
-      console.error('encryptPlayerUniversalToEncpt auto-run: unexpected error', err);
+    } catch (err) {
+      console.error('encrypt auto-run: unexpected error', err);
     }
   })();
 })(runtimeScene);
 
 };
-gdjs.PlayCode.asyncCallback23723156 = function (runtimeScene, asyncObjectsList) {
-asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
-{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "BestScore", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("BestScore").getAsString());
-}
-{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Pfcs", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Pfcs").getAsString());
-}
-{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Points", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Points").getAsString());
-}
-{gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, "Inicio", true);
-}
-gdjs.PlayCode.localVariables.length = 0;
-}
-gdjs.PlayCode.idToCallbackMap.set(23723156, gdjs.PlayCode.asyncCallback23723156);
-gdjs.PlayCode.eventsList230 = function(runtimeScene, asyncObjectsList) {
+gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 
 {
 
 
-{
-const parentAsyncObjectsList = asyncObjectsList;
-{
-const asyncObjectsList = gdjs.LongLivedObjectsList.from(parentAsyncObjectsList);
-asyncObjectsList.backupLocalVariablesContainers(gdjs.PlayCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(10), (runtimeScene) => (gdjs.PlayCode.asyncCallback23723156(runtimeScene, asyncObjectsList)), 23723156, asyncObjectsList);
-}
-}
-
-}
-
-
-};gdjs.PlayCode.eventsList231 = function(runtimeScene, asyncObjectsList) {
-
-{
-
-
-gdjs.PlayCode.userFunc0x1cae438(runtimeScene);
+gdjs.PlayCode.userFunc0x1b1fee0(runtimeScene);
 
 }
 
@@ -19009,7 +18932,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList226(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.PlayCode.eventsList225(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 }
@@ -19032,7 +18955,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.PlayCode.eventsList226(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 }
@@ -19054,7 +18977,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList229(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 }
@@ -19063,23 +18986,7 @@ gdjs.PlayCode.eventsList229(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x18cbf70(runtimeScene);
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(14).getAsNumber() == 1);
-}
-if (isConditionTrue_0) {
-
-{ //Subevents
-gdjs.PlayCode.eventsList230(runtimeScene, asyncObjectsList);} //End of subevents
-}
+gdjs.PlayCode.userFunc0xa8d6c8(runtimeScene);
 
 }
 
@@ -19088,11 +18995,11 @@ gdjs.PlayCode.eventsList230(runtimeScene, asyncObjectsList);} //End of subevents
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 
 { //Subevents
-gdjs.PlayCode.eventsList231(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.PlayCode.eventsList229(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(36470052, gdjs.PlayCode.asyncCallback36470052);
-gdjs.PlayCode.eventsList232 = function(runtimeScene) {
+gdjs.PlayCode.eventsList230 = function(runtimeScene) {
 
 {
 
@@ -19108,6 +19015,35 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(runt
 }
 
 
+};gdjs.PlayCode.asyncCallback23723156 = function (runtimeScene, asyncObjectsList) {
+asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
+{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "BestScore", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("BestScore").getAsString());
+}
+{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Pfcs", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Pfcs").getAsString());
+}
+{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Points", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Points").getAsString());
+}
+{gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, "Inicio", true);
+}
+gdjs.PlayCode.localVariables.length = 0;
+}
+gdjs.PlayCode.idToCallbackMap.set(23723156, gdjs.PlayCode.asyncCallback23723156);
+gdjs.PlayCode.eventsList231 = function(runtimeScene) {
+
+{
+
+
+{
+{
+const asyncObjectsList = new gdjs.LongLivedObjectsList();
+asyncObjectsList.backupLocalVariablesContainers(gdjs.PlayCode.localVariables);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(runtimeScene.getScene().getVariables().getFromIndex(41).getAsNumber()), (runtimeScene) => (gdjs.PlayCode.asyncCallback23723156(runtimeScene, asyncObjectsList)), 23723156, asyncObjectsList);
+}
+}
+
+}
+
+
 };gdjs.PlayCode.asyncCallback36482164 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 {gdjs.evtTools.variable.setVariableBoolean(runtimeScene.getScene().getVariables().getFromIndex(51), true);
@@ -19117,7 +19053,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(36482164, gdjs.PlayCode.asyncCallback36482164);
-gdjs.PlayCode.eventsList233 = function(runtimeScene) {
+gdjs.PlayCode.eventsList232 = function(runtimeScene) {
 
 {
 
@@ -19133,7 +19069,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(1), 
 }
 
 
-};gdjs.PlayCode.eventsList234 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList233 = function(runtimeScene) {
 
 {
 
@@ -19192,7 +19128,7 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList225(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList224(runtimeScene);} //End of subevents
 }
 
 }
@@ -19225,7 +19161,35 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList232(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList230(runtimeScene);} //End of subevents
+}
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(14).getAsNumber() == 1);
+}
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(92).getAsNumber() == 1);
+}
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(16341748);
+}
+}
+}
+if (isConditionTrue_0) {
+{runtimeScene.getGame().getVariables().getFromIndex(92).setNumber(0);
+}
+
+{ //Subevents
+gdjs.PlayCode.eventsList231(runtimeScene);} //End of subevents
 }
 
 }
@@ -19245,7 +19209,7 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList233(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList232(runtimeScene);} //End of subevents
 }
 
 }
@@ -19271,7 +19235,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.PlayCode.eventsList235 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList234 = function(runtimeScene) {
 
 {
 
@@ -19393,33 +19357,33 @@ gdjs.copyArray(runtimeScene.getObjects("gf"), gdjs.PlayCode.GDgfObjects1);
 }
 
 
+};gdjs.PlayCode.eventsList235 = function(runtimeScene) {
+
+{
+
+
+
+}
+
+
+{
+
+
+
+}
+
+
+{
+
+
+gdjs.PlayCode.eventsList234(runtimeScene);
+}
+
+
 };gdjs.PlayCode.eventsList236 = function(runtimeScene) {
 
-{
-
-
-
-}
-
-
-{
-
-
-
-}
-
-
-{
-
-
-gdjs.PlayCode.eventsList235(runtimeScene);
-}
-
-
-};gdjs.PlayCode.eventsList237 = function(runtimeScene) {
-
 };gdjs.PlayCode.mapOfGDgdjs_9546PlayCode_9546GDLongNoteObjects4Objects = Hashtable.newFrom({"LongNote": gdjs.PlayCode.GDLongNoteObjects4});
-gdjs.PlayCode.eventsList238 = function(runtimeScene) {
+gdjs.PlayCode.eventsList237 = function(runtimeScene) {
 
 {
 
@@ -19468,7 +19432,7 @@ gdjs.copyArray(gdjs.PlayCode.GDLongNoteObjects4, gdjs.PlayCode.GDLongNoteObjects
 
 
 };gdjs.PlayCode.mapOfGDgdjs_9546PlayCode_9546GDLongNoteObjects4Objects = Hashtable.newFrom({"LongNote": gdjs.PlayCode.GDLongNoteObjects4});
-gdjs.PlayCode.eventsList239 = function(runtimeScene) {
+gdjs.PlayCode.eventsList238 = function(runtimeScene) {
 
 {
 
@@ -19517,7 +19481,7 @@ gdjs.copyArray(gdjs.PlayCode.GDLongNoteObjects4, gdjs.PlayCode.GDLongNoteObjects
 
 
 };gdjs.PlayCode.mapOfGDgdjs_9546PlayCode_9546GDLongNoteObjects4Objects = Hashtable.newFrom({"LongNote": gdjs.PlayCode.GDLongNoteObjects4});
-gdjs.PlayCode.eventsList240 = function(runtimeScene) {
+gdjs.PlayCode.eventsList239 = function(runtimeScene) {
 
 {
 
@@ -19566,7 +19530,7 @@ gdjs.copyArray(gdjs.PlayCode.GDLongNoteObjects4, gdjs.PlayCode.GDLongNoteObjects
 
 
 };gdjs.PlayCode.mapOfGDgdjs_9546PlayCode_9546GDLongNoteObjects3Objects = Hashtable.newFrom({"LongNote": gdjs.PlayCode.GDLongNoteObjects3});
-gdjs.PlayCode.eventsList241 = function(runtimeScene) {
+gdjs.PlayCode.eventsList240 = function(runtimeScene) {
 
 {
 
@@ -19614,7 +19578,7 @@ gdjs.copyArray(gdjs.PlayCode.GDLongNoteObjects3, gdjs.PlayCode.GDLongNoteObjects
 }
 
 
-};gdjs.PlayCode.eventsList242 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList241 = function(runtimeScene) {
 
 {
 
@@ -19673,7 +19637,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList238(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList237(runtimeScene);} //Subevents end.
 }
 }
 
@@ -19737,7 +19701,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList239(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList238(runtimeScene);} //Subevents end.
 }
 }
 
@@ -19801,7 +19765,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList240(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList239(runtimeScene);} //Subevents end.
 }
 }
 
@@ -19865,14 +19829,14 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList241(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList240(runtimeScene);} //Subevents end.
 }
 }
 
 }
 
 
-};gdjs.PlayCode.eventsList243 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList242 = function(runtimeScene) {
 
 {
 
@@ -19998,7 +19962,7 @@ gdjs.copyArray(gdjs.PlayCode.GDBfRightNoteStaticObjects3, gdjs.PlayCode.GDBfRigh
 }
 
 
-};gdjs.PlayCode.eventsList244 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList243 = function(runtimeScene) {
 
 {
 
@@ -20120,7 +20084,7 @@ gdjs.copyArray(runtimeScene.getObjects("holdCoverRed"), gdjs.PlayCode.GDholdCove
 }
 
 
-};gdjs.PlayCode.eventsList245 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList244 = function(runtimeScene) {
 
 {
 
@@ -20226,7 +20190,7 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList243(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList242(runtimeScene);} //End of subevents
 }
 
 }
@@ -20242,13 +20206,13 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList244(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList243(runtimeScene);} //End of subevents
 }
 
 }
 
 
-};gdjs.PlayCode.eventsList246 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList245 = function(runtimeScene) {
 
 {
 
@@ -20896,7 +20860,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList245(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList244(runtimeScene);} //Subevents end.
 }
 }
 
@@ -20904,7 +20868,7 @@ gdjs.PlayCode.eventsList245(runtimeScene);} //Subevents end.
 
 
 };gdjs.PlayCode.mapOfGDgdjs_9546PlayCode_9546GDLongNoteOppObjects5Objects = Hashtable.newFrom({"LongNoteOpp": gdjs.PlayCode.GDLongNoteOppObjects5});
-gdjs.PlayCode.eventsList247 = function(runtimeScene) {
+gdjs.PlayCode.eventsList246 = function(runtimeScene) {
 
 {
 
@@ -20991,7 +20955,7 @@ gdjs.copyArray(gdjs.PlayCode.GDLongNoteOppObjects5, gdjs.PlayCode.GDLongNoteOppO
 
 
 };gdjs.PlayCode.mapOfGDgdjs_9546PlayCode_9546GDLongNoteOppObjects5Objects = Hashtable.newFrom({"LongNoteOpp": gdjs.PlayCode.GDLongNoteOppObjects5});
-gdjs.PlayCode.eventsList248 = function(runtimeScene) {
+gdjs.PlayCode.eventsList247 = function(runtimeScene) {
 
 {
 
@@ -21078,7 +21042,7 @@ gdjs.copyArray(gdjs.PlayCode.GDLongNoteOppObjects5, gdjs.PlayCode.GDLongNoteOppO
 
 
 };gdjs.PlayCode.mapOfGDgdjs_9546PlayCode_9546GDLongNoteOppObjects5Objects = Hashtable.newFrom({"LongNoteOpp": gdjs.PlayCode.GDLongNoteOppObjects5});
-gdjs.PlayCode.eventsList249 = function(runtimeScene) {
+gdjs.PlayCode.eventsList248 = function(runtimeScene) {
 
 {
 
@@ -21165,7 +21129,7 @@ gdjs.copyArray(gdjs.PlayCode.GDLongNoteOppObjects5, gdjs.PlayCode.GDLongNoteOppO
 
 
 };gdjs.PlayCode.mapOfGDgdjs_9546PlayCode_9546GDLongNoteOppObjects4Objects = Hashtable.newFrom({"LongNoteOpp": gdjs.PlayCode.GDLongNoteOppObjects4});
-gdjs.PlayCode.eventsList250 = function(runtimeScene) {
+gdjs.PlayCode.eventsList249 = function(runtimeScene) {
 
 {
 
@@ -21251,7 +21215,7 @@ gdjs.copyArray(gdjs.PlayCode.GDLongNoteOppObjects4, gdjs.PlayCode.GDLongNoteOppO
 }
 
 
-};gdjs.PlayCode.eventsList251 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList250 = function(runtimeScene) {
 
 {
 
@@ -21305,7 +21269,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList247(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList246(runtimeScene);} //Subevents end.
 }
 }
 
@@ -21364,7 +21328,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList248(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList247(runtimeScene);} //Subevents end.
 }
 }
 
@@ -21424,7 +21388,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList249(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList248(runtimeScene);} //Subevents end.
 }
 }
 
@@ -21483,14 +21447,14 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList250(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList249(runtimeScene);} //Subevents end.
 }
 }
 
 }
 
 
-};gdjs.PlayCode.eventsList252 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList251 = function(runtimeScene) {
 
 {
 
@@ -21616,7 +21580,7 @@ gdjs.copyArray(gdjs.PlayCode.GDOppRightNoteStaticObjects4, gdjs.PlayCode.GDOppRi
 }
 
 
-};gdjs.PlayCode.eventsList253 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList252 = function(runtimeScene) {
 
 {
 
@@ -21675,13 +21639,13 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList252(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList251(runtimeScene);} //End of subevents
 }
 
 }
 
 
-};gdjs.PlayCode.eventsList254 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList253 = function(runtimeScene) {
 
 {
 
@@ -22147,21 +22111,23 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.PlayCode.eventsList253(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList252(runtimeScene);} //Subevents end.
 }
 }
 
 }
 
 
-};gdjs.PlayCode.eventsList255 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList254 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayCode.eventsList254(runtimeScene);
+gdjs.PlayCode.eventsList253(runtimeScene);
 }
 
+
+};gdjs.PlayCode.eventsList255 = function(runtimeScene) {
 
 };gdjs.PlayCode.eventsList256 = function(runtimeScene) {
 
@@ -22169,19 +22135,17 @@ gdjs.PlayCode.eventsList254(runtimeScene);
 
 };gdjs.PlayCode.eventsList258 = function(runtimeScene) {
 
-};gdjs.PlayCode.eventsList259 = function(runtimeScene) {
-
 {
 
 
-gdjs.PlayCode.eventsList251(runtimeScene);
+gdjs.PlayCode.eventsList250(runtimeScene);
 }
 
 
 {
 
 
-gdjs.PlayCode.eventsList255(runtimeScene);
+gdjs.PlayCode.eventsList254(runtimeScene);
 }
 
 
@@ -22288,6 +22252,8 @@ if (isConditionTrue_0) {
 }
 
 
+};gdjs.PlayCode.eventsList259 = function(runtimeScene) {
+
 };gdjs.PlayCode.eventsList260 = function(runtimeScene) {
 
 };gdjs.PlayCode.eventsList261 = function(runtimeScene) {
@@ -22297,8 +22263,6 @@ if (isConditionTrue_0) {
 };gdjs.PlayCode.eventsList263 = function(runtimeScene) {
 
 };gdjs.PlayCode.eventsList264 = function(runtimeScene) {
-
-};gdjs.PlayCode.eventsList265 = function(runtimeScene) {
 
 {
 
@@ -22407,21 +22371,21 @@ for(var i = 0, len = gdjs.PlayCode.GDholdCoverRedObjects3.length ;i < len;++i) {
 {
 
 
-gdjs.PlayCode.eventsList242(runtimeScene);
+gdjs.PlayCode.eventsList241(runtimeScene);
 }
 
 
 {
 
 
-gdjs.PlayCode.eventsList246(runtimeScene);
+gdjs.PlayCode.eventsList245(runtimeScene);
 }
 
 
 {
 
 
-gdjs.PlayCode.eventsList259(runtimeScene);
+gdjs.PlayCode.eventsList258(runtimeScene);
 }
 
 
@@ -22600,7 +22564,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.PlayCode.eventsList266 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList265 = function(runtimeScene) {
 
 {
 
@@ -22675,7 +22639,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayCode.eventsList267 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList266 = function(runtimeScene) {
 
 {
 
@@ -22718,7 +22682,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("NotesSplash"), gdjs.PlayCode.GDNotes
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(36619164, gdjs.PlayCode.asyncCallback36619164);
-gdjs.PlayCode.eventsList268 = function(runtimeScene) {
+gdjs.PlayCode.eventsList267 = function(runtimeScene) {
 
 {
 
@@ -22735,7 +22699,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x1247ba0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x8912b8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22754,7 +22718,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x184f320 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x891358 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22984,7 +22948,7 @@ gdjs.PlayCode.userFunc0x184f320 = function GDJSInlineCode(runtimeScene) {
 })(runtimeScene);
 
 };
-gdjs.PlayCode.eventsList269 = function(runtimeScene) {
+gdjs.PlayCode.eventsList268 = function(runtimeScene) {
 
 {
 
@@ -23014,12 +22978,12 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.PlayCode.eventsList270 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList269 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayCode.userFunc0x1247ba0(runtimeScene);
+gdjs.PlayCode.userFunc0x8912b8(runtimeScene);
 
 }
 
@@ -23027,7 +22991,7 @@ gdjs.PlayCode.userFunc0x1247ba0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x184f320(runtimeScene);
+gdjs.PlayCode.userFunc0x891358(runtimeScene);
 
 }
 
@@ -23062,7 +23026,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList269(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList268(runtimeScene);} //End of subevents
 }
 
 }
@@ -23079,7 +23043,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(35127388, gdjs.PlayCode.asyncCallback35127388);
-gdjs.PlayCode.eventsList271 = function(runtimeScene) {
+gdjs.PlayCode.eventsList270 = function(runtimeScene) {
 
 {
 
@@ -23106,7 +23070,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(35130956, gdjs.PlayCode.asyncCallback35130956);
-gdjs.PlayCode.eventsList272 = function(runtimeScene) {
+gdjs.PlayCode.eventsList271 = function(runtimeScene) {
 
 {
 
@@ -23133,7 +23097,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(35125708, gdjs.PlayCode.asyncCallback35125708);
-gdjs.PlayCode.eventsList273 = function(runtimeScene) {
+gdjs.PlayCode.eventsList272 = function(runtimeScene) {
 
 {
 
@@ -23149,7 +23113,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x187fd88 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x7a2448 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -24012,17 +23976,17 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 })();
 
 };
-gdjs.PlayCode.eventsList274 = function(runtimeScene) {
+gdjs.PlayCode.eventsList273 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayCode.userFunc0x187fd88(runtimeScene);
+gdjs.PlayCode.userFunc0x7a2448(runtimeScene);
 
 }
 
 
-};gdjs.PlayCode.eventsList275 = function(runtimeScene, asyncObjectsList) {
+};gdjs.PlayCode.eventsList274 = function(runtimeScene, asyncObjectsList) {
 
 {
 
@@ -24052,11 +24016,11 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList275(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.PlayCode.eventsList274(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(35144820, gdjs.PlayCode.asyncCallback35144820);
-gdjs.PlayCode.eventsList276 = function(runtimeScene, asyncObjectsList) {
+gdjs.PlayCode.eventsList275 = function(runtimeScene, asyncObjectsList) {
 
 {
 
@@ -24077,11 +24041,11 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(runt
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.PlayCode.localVariables);
 
 { //Subevents
-gdjs.PlayCode.eventsList276(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.PlayCode.eventsList275(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.PlayCode.localVariables.length = 0;
 }
 gdjs.PlayCode.idToCallbackMap.set(35144252, gdjs.PlayCode.asyncCallback35144252);
-gdjs.PlayCode.eventsList277 = function(runtimeScene) {
+gdjs.PlayCode.eventsList276 = function(runtimeScene) {
 
 {
 
@@ -24097,7 +24061,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x17ebb20 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1c548e8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -25050,7 +25014,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 })(runtimeScene);
 
 };
-gdjs.PlayCode.eventsList278 = function(runtimeScene) {
+gdjs.PlayCode.eventsList277 = function(runtimeScene) {
 
 {
 
@@ -25067,12 +25031,12 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x17ebb20(runtimeScene);
+gdjs.PlayCode.userFunc0x1c548e8(runtimeScene);
 
 }
 
 
-};gdjs.PlayCode.eventsList279 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList278 = function(runtimeScene) {
 
 {
 
@@ -25088,7 +25052,7 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList271(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList270(runtimeScene);} //End of subevents
 }
 
 }
@@ -25109,7 +25073,7 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList272(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList271(runtimeScene);} //End of subevents
 }
 
 }
@@ -25130,7 +25094,7 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList273(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList272(runtimeScene);} //End of subevents
 }
 
 }
@@ -25145,7 +25109,7 @@ isConditionTrue_0 = gdjs.evtTools.runtimeScene.sceneJustBegins(runtimeScene);
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList274(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList273(runtimeScene);} //End of subevents
 }
 
 }
@@ -25184,7 +25148,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList277(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList276(runtimeScene);} //End of subevents
 }
 
 }
@@ -25205,7 +25169,7 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.PlayCode.eventsList278(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList277(runtimeScene);} //End of subevents
 }
 
 }
@@ -25228,7 +25192,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.PlayCode.eventsList280 = function(runtimeScene) {
+};gdjs.PlayCode.eventsList279 = function(runtimeScene) {
 
 {
 
@@ -25385,7 +25349,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList270(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList269(runtimeScene);} //End of subevents
 }
 
 }
@@ -25437,11 +25401,27 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.eventsList279(runtimeScene);
+gdjs.PlayCode.eventsList278(runtimeScene);
 }
 
 
+};gdjs.PlayCode.eventsList280 = function(runtimeScene) {
+
 };gdjs.PlayCode.eventsList281 = function(runtimeScene) {
+
+{
+
+
+gdjs.PlayCode.eventsList280(runtimeScene);
+}
+
+
+{
+
+
+
+}
+
 
 };gdjs.PlayCode.eventsList282 = function(runtimeScene) {
 
@@ -25452,23 +25432,7 @@ gdjs.PlayCode.eventsList281(runtimeScene);
 }
 
 
-{
-
-
-
-}
-
-
 };gdjs.PlayCode.eventsList283 = function(runtimeScene) {
-
-{
-
-
-gdjs.PlayCode.eventsList282(runtimeScene);
-}
-
-
-};gdjs.PlayCode.eventsList284 = function(runtimeScene) {
 
 {
 
@@ -26332,7 +26296,7 @@ gdjs.PlayCode.eventsList216(runtimeScene);
 {
 
 
-gdjs.PlayCode.eventsList234(runtimeScene);
+gdjs.PlayCode.eventsList233(runtimeScene);
 }
 
 
@@ -26346,7 +26310,14 @@ gdjs.PlayCode.eventsList234(runtimeScene);
 {
 
 
-gdjs.PlayCode.eventsList236(runtimeScene);
+gdjs.PlayCode.eventsList235(runtimeScene);
+}
+
+
+{
+
+
+gdjs.PlayCode.eventsList264(runtimeScene);
 }
 
 
@@ -26354,13 +26325,6 @@ gdjs.PlayCode.eventsList236(runtimeScene);
 
 
 gdjs.PlayCode.eventsList265(runtimeScene);
-}
-
-
-{
-
-
-gdjs.PlayCode.eventsList266(runtimeScene);
 }
 
 
@@ -26464,7 +26428,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.PlayCode.eventsList267(runtimeScene);} //End of subevents
+gdjs.PlayCode.eventsList266(runtimeScene);} //End of subevents
 }
 
 }
@@ -26573,7 +26537,7 @@ gdjs.PlayCode.GDNotesSplashObjects2.length = k;
 if (isConditionTrue_0) {
 
 { //Subevents: 
-gdjs.PlayCode.eventsList268(runtimeScene);} //Subevents end.
+gdjs.PlayCode.eventsList267(runtimeScene);} //Subevents end.
 }
 }
 
@@ -26749,14 +26713,14 @@ gdjs.copyArray(runtimeScene.getObjects("OppIcon"), gdjs.PlayCode.GDOppIconObject
 {
 
 
-gdjs.PlayCode.eventsList280(runtimeScene);
+gdjs.PlayCode.eventsList279(runtimeScene);
 }
 
 
 {
 
 
-gdjs.PlayCode.eventsList283(runtimeScene);
+gdjs.PlayCode.eventsList282(runtimeScene);
 }
 
 
@@ -27254,7 +27218,7 @@ gdjs.PlayCode.GDStatistics2Objects6.length = 0;
 gdjs.PlayCode.GDStatistics2Objects7.length = 0;
 gdjs.PlayCode.GDStatistics2Objects8.length = 0;
 
-gdjs.PlayCode.eventsList284(runtimeScene);
+gdjs.PlayCode.eventsList283(runtimeScene);
 gdjs.PlayCode.GDBackObjects1.length = 0;
 gdjs.PlayCode.GDBackObjects2.length = 0;
 gdjs.PlayCode.GDBackObjects3.length = 0;

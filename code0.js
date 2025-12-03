@@ -530,7 +530,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3)
 
 };gdjs.MenuCode.eventsList2 = function(runtimeScene) {
 
-};gdjs.MenuCode.userFunc0x17dd088 = function GDJSInlineCode(runtimeScene) {
+};gdjs.MenuCode.userFunc0x17f5990 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===============================================================
 // Auto-run ONE-TIME decryptor: read PlayerUniversal.Encpt.<field>,
@@ -785,7 +785,7 @@ if (true)
 {
 
 
-gdjs.MenuCode.userFunc0x17dd088(runtimeScene);
+gdjs.MenuCode.userFunc0x17f5990(runtimeScene);
 
 }
 

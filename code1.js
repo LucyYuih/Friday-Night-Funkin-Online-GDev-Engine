@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x180ba60 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1c55070 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal save module
@@ -857,7 +857,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x180ba60(runtimeScene);
+gdjs.InicioCode.userFunc0x1c55070(runtimeScene);
 
 }
 
@@ -918,7 +918,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x180b610 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1c55298 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===============================================================
 // Auto-run ONE-TIME decryptor: read PlayerUniversal.Encpt.<field>,
@@ -1148,12 +1148,12 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x180b610(runtimeScene);
+gdjs.InicioCode.userFunc0x1c55298(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1817d30 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x175c940 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -2500,12 +2500,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1817d30(runtimeScene);
+gdjs.InicioCode.userFunc0x175c940(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1817f58 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x2a290b8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -3122,12 +3122,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1817f58(runtimeScene);
+gdjs.InicioCode.userFunc0x2a290b8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x18178e0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x2b964f0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveExportUI(runtimeScene);
 
@@ -3137,12 +3137,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x18178e0(runtimeScene);
+gdjs.InicioCode.userFunc0x2b964f0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x18176b8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x184ef00 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 
@@ -3152,7 +3152,7 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x18176b8(runtimeScene);
+gdjs.InicioCode.userFunc0x184ef00(runtimeScene);
 
 }
 
