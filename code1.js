@@ -339,63 +339,29 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x1895270 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x12f84b8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
-// PlayerUniversal save module
+// PlayerUniversal export/import UI — lightweight key derivation (SHA-256)
+// - Exposes window.openPlayerSaveExportUI(runtimeScene) and window.openPlayerSaveImportUI(runtimeScene)
+// - Encrypt format: salt.iv.cipher (base64 parts, dot separated)
+// - Import writes numeric children + ciphertexts into PlayerUniversal.Encpt.<field>
+// - After import finishes sets PlayerOnSave = 1
 // ===================================================================
-
-(function () {
-  // ---------- Config ----------
-  const PBKDF2_ITERATIONS = 1500;
+(function(){
   const SALT_BYTES = 16;
   const IV_BYTES = 12;
-  const DERIVED_BITS = 512; // 64 bytes -> 32 AES + 32 HMAC
-  const WANT_FIELDS = ["BestScore", "Pfcs", "Points"];
+  const WANT_FIELDS = ["BestScore","Pfcs","Points"];
   const NOT_LOGGED_MSG = "Save available only for logged-in players (please log in from the menu)";
-
-  // ---------- Helpers ----------
-  function trimStr(s){ return typeof s === 'string' ? s.trim() : s; }
-  function isNumericString(s){
-    if (typeof s !== 'string') return false;
-    return /^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(s);
-  }
-  function parseToNumber(v){
-    // returns a finite number or null if cannot parse
-    if (typeof v === 'number') {
-      return Number.isFinite(v) ? v : null;
-    }
-    if (typeof v === 'string') {
-      const t = v.trim();
-      if (isNumericString(t)) {
-        const n = Number(t);
-        return Number.isFinite(n) ? n : null;
-      }
-      return null;
-    }
-    if (typeof v === 'object' && v !== null) {
-      try {
-        // try common patterns: {value: 123} or JSON stringify then parse number
-        if ('value' in v && typeof v.value === 'number' && Number.isFinite(v.value)) return v.value;
-        const js = JSON.stringify(v);
-        if (isNumericString(js)) {
-          const n = Number(js);
-          return Number.isFinite(n) ? n : null;
-        }
-      } catch(e){}
-    }
-    // fallback null
-    return null;
-  }
 
   function strToU8(s){ return new TextEncoder().encode(s); }
   function u8ToStr(u){ return new TextDecoder().decode(u); }
   function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
   function abToB64(buf){
-    let binary = '';
     const bytes = new Uint8Array(buf);
-    for (let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
+    let s = '';
+    for (let i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
   }
   function b64ToU8(b64){
     const binary = atob(b64);
@@ -403,426 +369,187 @@ gdjs.InicioCode.userFunc0x1895270 = function GDJSInlineCode(runtimeScene) {
     for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
     return bytes;
   }
-  function concatU8(...arrs){
-    const total = arrs.reduce((s,a)=>s+a.length,0);
-    const out = new Uint8Array(total);
-    let off=0;
-    for (const a of arrs){ out.set(a, off); off+=a.length; }
-    return out;
-  }
-  function equalConstTime(a,b){
-    if (!a || !b) return false;
-    if (a.length !== b.length) return false;
-    let r = 0;
-    for (let i=0;i<a.length;i++) r |= a[i] ^ b[i];
-    return r === 0;
+
+  async function deriveKeySHA256(password, saltU8){
+    // simple/fast derivation: SHA-256(password + salt) -> 32 bytes key for AES-GCM
+    const combined = new Uint8Array(password.length + saltU8.length);
+    combined.set(strToU8(password), 0);
+    combined.set(saltU8, strToU8(password).length);
+    const hash = await crypto.subtle.digest('SHA-256', combined);
+    return await crypto.subtle.importKey('raw', hash, { name: 'AES-GCM' }, false, ['encrypt','decrypt']);
   }
 
-  // ---------- Crypto core ----------
-  async function deriveKeys(password, salt){
-    const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-    const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
-    const db = new Uint8Array(derived);
-    const aesBytes = db.slice(0,32);
-    const hmacBytes = db.slice(32,64);
-    const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
-    const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
-    return { aesKey, hmacKey };
-  }
-  async function computeHmac(hmacKey, dataU8){
-    const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8);
-    return new Uint8Array(sig);
-  }
-  async function encryptStringForField(password, plaintextString) {
+  async function encryptString(password, plaintext){
     const salt = randomBytes(SALT_BYTES);
     const iv = randomBytes(IV_BYTES);
-    const { aesKey, hmacKey } = await deriveKeys(password, salt);
-    const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(plaintextString));
-    const cipher = new Uint8Array(cipherBuf);
-    const macData = concatU8(salt, iv, cipher);
-    const hmac = await computeHmac(hmacKey, macData);
-    return `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
+    const aesKey = await deriveKeySHA256(password, salt);
+    const cipherBuf = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, aesKey, strToU8(plaintext));
+    return `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipherBuf)}`;
   }
-  async function decryptFilePayload(password, fileText){
-    const parts = fileText.trim().split('.');
-    if (parts.length !== 4) throw new Error("Invalid file format");
+  async function decryptString(password, ciphertextDot){
+    const parts = ciphertextDot.split('.');
+    if (parts.length !== 3) throw new Error('Invalid ciphertext format');
     const salt = b64ToU8(parts[0]);
     const iv = b64ToU8(parts[1]);
     const cipher = b64ToU8(parts[2]);
-    const hmac = b64ToU8(parts[3]);
-    const { aesKey, hmacKey } = await deriveKeys(password, salt);
-    const macData = concatU8(salt, iv, cipher);
-    const expected = await computeHmac(hmacKey, macData);
-    if (!equalConstTime(expected, hmac)) throw new Error("Integrity/HMAC check failed (wrong key or file modified).");
-    const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv: iv}, aesKey, cipher);
+    const aesKey = await deriveKeySHA256(password, salt);
+    const plainBuf = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, aesKey, cipher);
     return u8ToStr(new Uint8Array(plainBuf));
   }
 
-  // ---------- Auth helpers (GDevelop) ----------
-  function getAuthenticatedUsername() {
-    try {
-      if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
-        const u = gdjs.playerAuthentication.getUsername();
-        if (u && typeof u === 'string' && u.trim() !== '') return u;
-      }
-    } catch(e){}
-    return '';
+  // --- Auth helpers (GDevelop) ---
+  function getAuthUsername(){
+    try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
+        const u = gdjs.playerAuthentication.getUsername(); if (u && u.trim()) return u;
+    } } catch(e){} return '';
   }
-  function getAuthenticatedUserToken() {
-    try {
-      if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
+  function getAuthToken(){
+    try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
         return gdjs.playerAuthentication.getUserToken() || '';
-      }
-    } catch(e){}
-    return '';
+    } } catch(e){} return '';
   }
 
-  // ---------- Minimal modal helpers (responsive) ----------
-  let modalRoot = null;
-  function ensureModalRoot(){
-    if (modalRoot) return modalRoot;
-    const root = document.createElement('div');
-    root.id = 'gd-save-modal-root';
-    root.style.position = 'fixed';
-    root.style.top = '0';
-    root.style.left = '0';
-    root.style.width = '100vw';
-    root.style.height = '100vh';
-    root.style.zIndex = '2147483647';
-    root.style.display = 'none';
-    document.body.appendChild(root);
-    modalRoot = root;
-    return root;
+  // --- minimal modal UI (same layout approach as before) ---
+  let rootModal = null;
+  function ensureRoot(){
+    if (rootModal) return rootModal;
+    const r = document.createElement('div');
+    r.id = 'gd-save-modal-root';
+    r.style.position='fixed'; r.style.left='0'; r.style.top='0'; r.style.width='100vw'; r.style.height='100vh';
+    r.style.zIndex='2147483647'; r.style.display='none';
+    document.body.appendChild(r);
+    rootModal = r; return r;
   }
-  function createModal(titleHtml){
-    const root = ensureModalRoot();
-    root.innerHTML = '';
-    root.style.display = 'flex';
-    root.style.alignItems = 'center';
-    root.style.justifyContent = 'center';
-    root.style.background = 'rgba(0,0,0,0.45)';
-    root.style.backdropFilter = 'blur(2px)';
-    root.style.pointerEvents = 'auto';
-    const box = document.createElement('div');
-    box.style.width = 'min(92vw,760px)';
-    box.style.maxHeight = '90vh';
-    box.style.overflow = 'auto';
-    box.style.borderRadius = '12px';
-    box.style.background = 'linear-gradient(180deg, #0f1724, #071022)';
-    box.style.boxShadow = '0 8px 40px rgba(0,0,0,0.6)';
-    box.style.padding = '18px';
-    box.style.color = '#e6eef8';
-    box.style.display = 'flex';
-    box.style.flexDirection = 'column';
-    box.style.gap = '12px';
-    const header = document.createElement('div');
-    header.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="font-size:18px;font-weight:600">${titleHtml}</div>
-      <button id="gd-save-close-btn" aria-label="Fechar" title="Fechar"
-        style="background:transparent;border:none;color:inherit;font-size:20px;cursor:pointer;padding:6px;border-radius:8px;">
-        ✕
-      </button>
-    </div>`;
+  function createModal(title){
+    const root = ensureRoot(); root.innerHTML=''; root.style.display='flex';
+    root.style.alignItems='center'; root.style.justifyContent='center';
+    root.style.background='rgba(0,0,0,0.45)'; root.style.pointerEvents='auto';
+    const box = document.createElement('div'); box.style.width='min(92vw,760px)'; box.style.maxHeight='90vh';
+    box.style.overflow='auto'; box.style.borderRadius='12px'; box.style.padding='18px'; box.style.color='#e6eef8';
+    box.style.background='#0b1220'; box.style.display='flex'; box.style.flexDirection='column'; box.style.gap='12px';
+    const header = document.createElement('div'); header.style.display='flex'; header.style.justifyContent='space-between';
+    header.innerHTML = `<div style="font-weight:600">${title}</div><button id="close">✕</button>`;
     box.appendChild(header);
-    const body = document.createElement('div');
-    body.style.display = 'flex';
-    body.style.flexDirection = 'column';
-    body.style.gap = '10px';
+    const body = document.createElement('div'); body.style.display='flex'; body.style.flexDirection='column'; body.style.gap='10px';
     box.appendChild(body);
-    const footer = document.createElement('div');
-    footer.style.display = 'flex';
-    footer.style.gap = '8px';
-    footer.style.justifyContent = 'flex-end';
+    const footer = document.createElement('div'); footer.style.display='flex'; footer.style.justifyContent='flex-end'; footer.style.gap='8px';
     box.appendChild(footer);
     root.appendChild(box);
-    const closeBtn = header.querySelector('#gd-save-close-btn');
-    function close(){
-      root.style.display = 'none';
-      root.innerHTML = '';
-      try { root.remove(); } catch(e){}
-      modalRoot = null;
-    }
-    return { root, box, header, body, footer, close, closeBtn };
+    return { root, box, header, body, footer, closeBtn: header.querySelector('#close'), close: ()=>{ try{ root.remove(); }catch(e){} rootModal=null;} };
   }
-  function createButton(text, primary=false){
-    const b = document.createElement('button');
-    b.innerText = text;
-    b.style.padding = '10px 14px';
-    b.style.borderRadius = '9px';
-    b.style.border = 'none';
-    b.style.cursor = 'pointer';
-    b.style.fontSize = '14px';
-    b.style.fontWeight = '600';
-    if (primary){
-      b.style.background = 'linear-gradient(90deg,#2563eb,#7c3aed)';
-      b.style.color = '#fff';
-    } else {
-      b.style.background = 'rgba(255,255,255,0.03)';
-      b.style.color = '#e6eef8';
-    }
-    return b;
-  }
-  function createSmallNote(txt){
-    const p = document.createElement('div');
-    p.style.fontSize = '12px';
-    p.style.opacity = '0.9';
-    p.innerText = txt;
-    return p;
-  }
+  function createBtn(txt, primary){ const b = document.createElement('button'); b.innerText = txt; b.style.padding='8px 12px'; b.style.borderRadius='8px'; b.style.border='none'; b.style.cursor='pointer'; b.style.fontWeight='600'; if (primary){ b.style.background='#2563eb'; b.style.color='#fff'; } else { b.style.background='rgba(255,255,255,0.03)'; b.style.color='#e6eef8'; } return b; }
 
-  // ---------- Export UI ----------
+  // --- Export UI ---
   async function openExportUI(runtimeScene){
     const modal = createModal('Export save — PlayerUniversal');
-    const { body, footer, closeBtn, root } = modal;
-    const username = getAuthenticatedUsername();
-    if (!username) {
-      body.appendChild(createSmallNote(NOT_LOGGED_MSG));
-      const btnClose = createButton('Close', true);
-      footer.appendChild(btnClose);
-      btnClose.addEventListener('click', ()=>{ try{ root.remove(); }catch(e){} modalRoot=null; });
-      root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
-      return;
-    }
-    body.appendChild(createSmallNote('Exporting save for user: ' + username));
-    body.appendChild(createSmallNote('This will use your authenticated account as encryption key on this device.'));
-
-    const btnCancel = createButton('Cancel', false);
-    const btnExport = createButton('Export', true);
-    footer.appendChild(btnCancel);
-    footer.appendChild(btnExport);
-
-    const status = document.createElement('div');
-    status.style.fontSize = '13px';
-    status.style.minHeight = '22px';
-    body.appendChild(status);
-
-    btnCancel.addEventListener('click', ()=>{ try{ root.remove(); }catch(e){} modalRoot=null; });
-
-    btnExport.addEventListener('click', async ()=>{
-      status.innerText = 'Generating encrypted save...';
+    const { body, footer, close } = modal;
+    const username = getAuthUsername();
+    if (!username) { body.appendChild(document.createTextNode(NOT_LOGGED_MSG)); footer.appendChild(createBtn('Close', true)).onclick = close; return; }
+    body.appendChild(document.createTextNode('Exporting save for user: ' + username));
+    const btnCancel = createBtn('Cancel', false); const btnExport = createBtn('Export', true);
+    footer.appendChild(btnCancel); footer.appendChild(btnExport);
+    const status = document.createElement('div'); status.style.minHeight='20px'; body.appendChild(status);
+    btnCancel.onclick = close;
+    btnExport.onclick = async ()=>{
+      status.innerText = 'Generating...';
       try {
-        const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-        if (!gv) throw new Error("Global variable 'PlayerUniversal' not found.");
+        const pu = runtimeScene.getGame().getVariables().get('PlayerUniversal');
+        if (!pu) throw new Error('PlayerUniversal not found');
         const payload = {};
         for (const k of WANT_FIELDS){
-          const child = gv.getChild(k);
-          try { payload[k] = child ? child.toJSObject() : null; } catch(e){ payload[k] = null; }
+          try { payload[k] = pu.getChild(k).toJSObject(); } catch(e){ payload[k] = null; }
         }
-        const json = JSON.stringify({ version: 1, payload: payload });
-        const token = getAuthenticatedUserToken();
+        const json = JSON.stringify({version:1,payload});
+        const token = getAuthToken();
         const secret = username + (token ? ('|' + token) : '');
-
-        // encrypt file
-        const salt = randomBytes(SALT_BYTES);
-        const iv = randomBytes(IV_BYTES);
-        const { aesKey, hmacKey } = await deriveKeys(secret, salt);
-        const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(json));
-        const cipher = new Uint8Array(cipherBuf);
-        const macData = concatU8(salt, iv, cipher);
-        const hmac = await computeHmac(hmacKey, macData);
-        const out = `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
-        const blob = new Blob([out], { type: "application/octet-stream" });
+        const out = await encryptString(secret, json);
+        const blob = new Blob([out], { type:'application/octet-stream' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'PlayerUniversal.save';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
+        const a = document.createElement('a'); a.href = url; a.download = 'PlayerUniversal.save'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
         status.innerText = 'Export completed.';
-      } catch (err) {
-        console.error(err);
-        status.innerText = 'Error: ' + (err && err.message ? err.message : String(err));
-      } finally {
-        setTimeout(()=>{ try{ root.remove(); }catch(e){} modalRoot=null; }, 900);
-      }
-    });
-
-    root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
-
-    return;
+      } catch(err){ status.innerText = 'Error: ' + (err.message || err); console.error(err); }
+      setTimeout(close,900);
+    };
   }
 
-  // ---------- Import UI (final behavior) ----------
+  // --- Import UI ---
   async function openImportUI(runtimeScene){
     const modal = createModal('Import save — PlayerUniversal');
-    const { body, footer, closeBtn, root } = modal;
-    const username = getAuthenticatedUsername();
-    if (!username) {
-      body.appendChild(createSmallNote(NOT_LOGGED_MSG));
-      const btnClose = createButton('Close', true);
-      footer.appendChild(btnClose);
-      btnClose.addEventListener('click', ()=>{ try{ root.remove(); }catch(e){} modalRoot=null; });
-      root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
-      return;
-    }
+    const { body, footer, close } = modal;
+    const username = getAuthUsername();
+    if (!username) { body.appendChild(document.createTextNode(NOT_LOGGED_MSG)); footer.appendChild(createBtn('Close', true)).onclick = close; return; }
+    body.appendChild(document.createTextNode('Importing for user: ' + username));
+    const fileBtn = createBtn('Choose file', false);
+    const fileName = document.createElement('div'); fileName.style.opacity='0.9';
+    body.appendChild(fileBtn); body.appendChild(fileName);
+    const hidden = document.createElement('input'); hidden.type='file'; hidden.accept='.save,application/octet-stream,text/plain'; hidden.style.display='none'; document.body.appendChild(hidden);
+    hidden.addEventListener('change', ()=>{ const f = hidden.files[0]; if (!f) { fileName.innerText='No file'; return; } fileName.innerText = `${f.name} • ${Math.round(f.size/1024)} KB`; const r = new FileReader(); r.onload = ()=> hidden._text = r.result; r.readAsText(f); });
+    fileBtn.onclick = ()=> hidden.click();
 
-    body.appendChild(createSmallNote('Importing for user: ' + username));
-    body.appendChild(createSmallNote('Select a .save file exported by this game for this account.'));
-
-    // file selector
-    const fileRow = document.createElement('div');
-    fileRow.style.display='flex'; fileRow.style.flexDirection='column'; fileRow.style.gap='6px';
-    const fileLabel = document.createElement('label'); fileLabel.innerText = 'File (.save)';
-    fileLabel.style.fontSize='13px';
-    const fileBtn = createButton('Choose file', false);
-    const fileName = document.createElement('div'); fileName.style.fontSize='13px'; fileName.style.opacity='0.9';
-    fileRow.appendChild(fileLabel); fileRow.appendChild(fileBtn); fileRow.appendChild(fileName);
-    body.appendChild(fileRow);
-    const hiddenFile = document.createElement('input');
-    hiddenFile.type = 'file';
-    hiddenFile.accept = '.save,application/octet-stream,text/plain';
-    hiddenFile.style.display = 'none';
-    document.body.appendChild(hiddenFile);
-
-    const status = document.createElement('div');
-    status.style.fontSize = '13px';
-    status.style.minHeight = '22px';
-    body.appendChild(status);
-
-    const btnCancel = createButton('Cancel', false);
-    const btnImport = createButton('Import', true);
+    const status = document.createElement('div'); status.style.minHeight='20px'; body.appendChild(status);
+    const btnCancel = createBtn('Cancel', false); const btnImport = createBtn('Import', true);
     footer.appendChild(btnCancel); footer.appendChild(btnImport);
+    btnCancel.onclick = close;
 
-    let chosenFileText = null;
-    fileBtn.addEventListener('click', ()=> hiddenFile.click());
-    hiddenFile.addEventListener('change', (e)=>{
-      const f = e.target.files[0];
-      if (!f){ fileName.innerText = 'No file selected'; chosenFileText = null; return; }
-      fileName.innerText = `${f.name} • ${Math.round(f.size/1024)} KB`;
-      const reader = new FileReader();
-      reader.onload = ()=> { chosenFileText = String(reader.result); status.innerText = 'File loaded.'; };
-      reader.onerror = ()=> { chosenFileText = null; status.innerText = 'Failed to read file.'; };
-      reader.readAsText(f);
-    });
-
-    btnCancel.addEventListener('click', ()=>{ try{ root.remove(); }catch(e){} modalRoot=null; });
-
-    btnImport.addEventListener('click', async ()=>{
-      if (!chosenFileText){ status.innerText = 'Choose a file first.'; return; }
-      status.innerText = 'Importing... please wait.';
+    btnImport.onclick = async ()=>{
+      if (!hidden._text){ status.innerText = 'Choose file first'; return; }
+      status.innerText = 'Importing...';
       try {
-        const token = getAuthenticatedUserToken();
-        const secret = username + (token ? ('|' + token) : '');
-        // decrypt payload
-        const plain = await decryptFilePayload(secret, chosenFileText);
+        const token = getAuthToken(); const secret = username + (token ? ('|' + token) : '');
+        const plain = await decryptString(secret, hidden._text);
         const parsed = JSON.parse(plain);
         const payload = parsed.payload || parsed;
-        const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-        if (!gv) throw new Error("Global variable 'PlayerUniversal' not found.");
+        const pu = runtimeScene.getGame().getVariables().get('PlayerUniversal');
+        if (!pu) throw new Error('PlayerUniversal not found');
 
-        // Ensure Encpt structure exists (getChild will create if needed in some runtimes)
-        try { gv.getChild("Encpt"); } catch(e){ /* ignore */ }
+        // Ensure Encpt exists
+        try { pu.getChild('Encpt'); } catch(e){}
 
-        for (const k of WANT_FIELDS) {
+        for (const k of WANT_FIELDS){
           const v = (payload && (k in payload)) ? payload[k] : null;
-          const child = gv.getChild(k);
+          const child = pu.getChild(k);
           if (!child) continue;
-
-          // --- Force PlayerUniversal child to be NUMBER ---
-          let num = parseToNumber(v);
-          if (num === null) {
-            // if payload null/undefined or unparsable, fallback to 0
-            num = 0;
-          }
-          try { child.setNumber(num); } catch(e) { try { child.setNumber(Number(num) || 0); } catch(e2){} }
-
-          // --- Produce ciphertext from the numeric string representation and store in Encpt.<k> as STRING ---
-          try {
-            const plainForField = String(num); // ensure numeric string
-            const ciphertext = await encryptStringForField(secret, plainForField);
-            try {
-              gv.getChild("Encpt").getChild(k).setString(ciphertext);
-            } catch(e){
-              // fallback create/get then set
-              try { gv.getChild("Encpt").getChild(k).setString(ciphertext); } catch(e2){ console.warn('Failed to set Encpt.'+k, e2); }
+          // Force numeric value in PlayerUniversal child
+          let num = 0;
+          if (v !== null && v !== undefined){
+            if (typeof v === 'number') num = Number.isFinite(v) ? v : 0;
+            else if (typeof v === 'string' && /^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(v)) num = Number(v);
+            else if (typeof v === 'object') {
+              try { const js = JSON.stringify(v); if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(js)) num = Number(js); }
+              catch(e){}
             }
-          } catch(e){ console.error('Per-field encryption failed for', k, e); }
+          }
+          try { child.setNumber(num); } catch(e){ try { child.setNumber(Number(num) || 0); } catch(e){} }
+          // create ciphertext for Encpt using numeric string
+          try {
+            const ciphertext = await encryptString(secret, String(num));
+            pu.getChild('Encpt').getChild(k).setString(ciphertext);
+          } catch(e){ console.warn('Encpt write failed for',k,e); }
         }
 
-        // After applying all numeric children and storing ciphertexts, set PlayerOnSave = 1
+        // set PlayerOnSave = 1
         try {
           const gvars = runtimeScene.getGame().getVariables();
           if (gvars) {
-            try {
-              if (typeof gvars.contains === 'function') {
-                if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
-                else gvars.get('PlayerOnSave').setNumber(1);
-              } else {
-                const pv = gvars.get('PlayerOnSave');
-                if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
-              }
-            } catch(e){
-              try { gvars.get('PlayerOnSave').setNumber(1); } catch(e2){ console.warn('Failed to set PlayerOnSave', e2); }
+            if (typeof gvars.contains === 'function') {
+              if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
+              else gvars.get('PlayerOnSave').setNumber(1);
+            } else {
+              const pv = gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
             }
           }
-        } catch(e){ console.warn('Could not set PlayerOnSave global variable', e); }
+        } catch(e){ console.warn('Failed to set PlayerOnSave', e); }
 
-        status.innerText = 'Import applied — numeric children set and ciphertext saved in Encpt; PlayerOnSave = 1.';
-      } catch (err) {
-        console.error(err);
-        status.innerText = 'Error: ' + (err && err.message ? err.message : String(err));
-      } finally {
-        setTimeout(()=>{ try{ root.remove(); }catch(e){} modalRoot=null; }, 900);
-      }
-    });
-
-    root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
-
-    return;
+        status.innerText = 'Import applied — PlayerOnSave = 1';
+      } catch(err){ status.innerText = 'Error: ' + (err.message || err); console.error(err); }
+      setTimeout(close,900);
+    };
   }
 
-  // ---------- One-time encryption util ----------
-  // Call: window.encryptPlayerUniversalToEncptOnce(runtimeScene)
-  (function exposeOneTime(){
-    async function oneTime(runtimeScene){
-      const username = getAuthenticatedUsername();
-      if (!username) { console.warn('encryptPlayerUniversalToEncptOnce: user not logged in'); return false; }
-      const token = getAuthenticatedUserToken();
-      const secret = username + (token ? ('|' + token) : '');
+  window.openPlayerSaveExportUI = function(runtimeScene){ try { return openExportUI(runtimeScene); } catch(e){ console.error(e); alert('Error opening export UI: '+e.message); } };
+  window.openPlayerSaveImportUI = function(runtimeScene){ try { return openImportUI(runtimeScene); } catch(e){ console.error(e); alert('Error opening import UI: '+e.message); } };
 
-      const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-      if (!gv) { console.warn('encryptPlayerUniversalToEncptOnce: PlayerUniversal not found'); return false; }
-
-      // ensure Encpt
-      try { gv.getChild("Encpt"); } catch(e){ /* ignore */ }
-
-      for (const k of WANT_FIELDS) {
-        const child = gv.getChild(k);
-        if (!child) continue;
-        let current;
-        try { current = child.toJSObject(); } catch(e){
-          try { current = child.getAsNumber ? child.getAsNumber() : (child.getAsString ? child.getAsString() : null); } catch(e2){ current = null; }
-        }
-        // Ensure we use numeric value (since PlayerUniversal children must be numbers)
-        let num = parseToNumber(current);
-        if (num === null) num = 0;
-        const plainForField = String(num);
-        try {
-          const ciphertext = await encryptStringForField(secret, plainForField);
-          try { gv.getChild("Encpt").getChild(k).setString(ciphertext); }
-          catch(e){ try { gv.getChild("Encpt").getChild(k).setString(ciphertext); } catch(e2){ console.warn('Failed to set Encpt.'+k, e2); } }
-        } catch(e){ console.error('encryptPlayerUniversalToEncptOnce: failed for', k, e); }
-      }
-      console.log('encryptPlayerUniversalToEncptOnce: done');
-      return true;
-    }
-
-    window.encryptPlayerUniversalToEncptOnce = async function(runtimeScene){
-      return oneTime(runtimeScene);
-    };
-  })();
-
-  // Expose UI calls
-  window.openPlayerSaveExportUI = function(runtimeScene){
-    try { return openExportUI(runtimeScene); } catch(e){ console.error(e); alert('Error opening export UI: '+e.message); }
-  };
-  window.openPlayerSaveImportUI = function(runtimeScene){
-    try { return openImportUI(runtimeScene); } catch(e){ console.error(e); alert('Error opening import UI: '+e.message); }
-  };
-
-  console.log('PlayerUniversal final module loaded (numeric-preserving PlayerUniversal, ciphertext in Encpt).');
+  console.log('PlayerUniversal lightweight export/import module loaded.');
 })();
 
 };
@@ -857,7 +584,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x1895270(runtimeScene);
+gdjs.InicioCode.userFunc0x12f84b8(runtimeScene);
 
 }
 
@@ -918,229 +645,88 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1e541c8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x12f8808 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// ===============================================================
-// Auto-run ONE-TIME decryptor: read PlayerUniversal.Encpt.<field>,
-// decrypt each field and write numeric value into PlayerUniversal.<field>
-// Runs once when this JS event executes (suitable for Start of scene).
-// After successful application, sets Global variable PlayerOnSave = 1.
-// ===============================================================
-
+// ================================================================
+// Auto-run ONE-TIME decryptor (SHA-256 derivation)
+// - Reads PlayerUniversal.Encpt.<fields> and writes numeric values to PlayerUniversal.<fields>
+// - Sets PlayerOnSave = 1 if any applied
+// ================================================================
 (function(runtimeScene){
   (async function(){
+    const LOCK_KEY = '__gd_decrypt_once_sha256_lock';
+    if (window[LOCK_KEY]) { console.log('decryptOnce already running — skip'); return; }
+    window[LOCK_KEY] = true;
     try {
-      // run-flag key helpers
-      const RUN_FLAG = '__gd_decrypt_playeruniversal_encpt_done';
-      function getRunKey(username, modShort){ return `${RUN_FLAG}::${username || 'anon'}::${modShort || 'online'}`; }
+      if (!('crypto' in window) || !crypto.subtle) { console.error('crypto.subtle not available'); return; }
+      const FIELDS = ['BestScore','Pfcs','Points'];
+      const strToU8 = (s)=>new TextEncoder().encode(s);
+      const u8ToStr = (u)=>new TextDecoder().decode(u);
+      const b64ToU8 = (b64)=>{ const binary=atob(b64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
 
-      // ---------- Crypto & helpers ----------
-      const PBKDF2_ITERATIONS = 150000;
-      const DERIVED_BITS = 512;
-      const SALT_IV_CIPHER_HMAC_PARTS = 4;
-
-      function strToU8(s){ return new TextEncoder().encode(s); }
-      function u8ToStr(u){ return new TextDecoder().decode(u); }
-      function b64ToU8(b64){
-        const binary = atob(b64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-        return bytes;
+      async function deriveKey(password, saltU8){
+        const combined = new Uint8Array(strToU8(password).length + saltU8.length);
+        combined.set(strToU8(password),0); combined.set(saltU8, strToU8(password).length);
+        const hash = await crypto.subtle.digest('SHA-256', combined);
+        return await crypto.subtle.importKey('raw', hash, { name: 'AES-GCM' }, false, ['encrypt','decrypt']);
       }
-      function concatU8(...arrs){
-        const total = arrs.reduce((s,a)=>s+a.length,0);
-        const out = new Uint8Array(total);
-        let off=0;
-        for (const a of arrs){ out.set(a, off); off+=a.length; }
-        return out;
-      }
-      function equalConstTime(a,b){
-        if (!a || !b) return false;
-        if (a.length !== b.length) return false;
-        let r = 0;
-        for (let i=0;i<a.length;i++) r |= a[i] ^ b[i];
-        return r === 0;
-      }
-
-      async function deriveKeys(password, saltU8){
-        const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-        const derived = await crypto.subtle.deriveBits(
-          { name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256" },
-          baseKey,
-          DERIVED_BITS
-        );
-        const db = new Uint8Array(derived);
-        const aesBytes = db.slice(0,32);
-        const hmacBytes = db.slice(32,64);
-        const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
-        const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
-        return { aesKey, hmacKey };
-      }
-
-      async function computeHmac(hmacKey, dataU8){
-        const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8);
-        return new Uint8Array(sig);
-      }
-
-      async function decryptFieldString(password, ciphertextDotString){
-        if (typeof ciphertextDotString !== 'string') throw new Error('ciphertext not a string');
-        const parts = ciphertextDotString.trim().split('.');
-        if (parts.length !== SALT_IV_CIPHER_HMAC_PARTS) throw new Error('ciphertext format invalid');
+      async function decryptWith(password, ciphertextDot){
+        const parts = ciphertextDot.split('.');
+        if (parts.length !== 3) throw new Error('Invalid ciphertext format');
         const salt = b64ToU8(parts[0]);
         const iv = b64ToU8(parts[1]);
         const cipher = b64ToU8(parts[2]);
-        const hmac = b64ToU8(parts[3]);
-
-        const { aesKey, hmacKey } = await deriveKeys(password, salt);
-        const macData = concatU8(salt, iv, cipher);
-        const expected = await computeHmac(hmacKey, macData);
-        if (!equalConstTime(expected, hmac)) throw new Error('HMAC mismatch (wrong key or modified ciphertext)');
-
-        const plainBuf = await crypto.subtle.decrypt({ name:"AES-GCM", iv: iv }, aesKey, cipher);
+        const key = await deriveKey(password, salt);
+        const plainBuf = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, cipher);
         return u8ToStr(new Uint8Array(plainBuf));
       }
 
-      // parse numeric helper
-      function parseToNumber(v){
-        if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-        if (typeof v === 'string') {
-          const t = v.trim();
-          if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) {
-            const n = Number(t);
-            return Number.isFinite(n) ? n : 0;
-          }
-          return 0;
-        }
-        // object fallback: try value property or stringify
-        if (typeof v === 'object' && v !== null) {
-          try {
-            if ('value' in v && typeof v.value === 'number' && Number.isFinite(v.value)) return v.value;
-            const js = JSON.stringify(v);
-            const t = js.trim();
-            if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) return Number(t);
-          } catch(e){}
-        }
-        return 0;
-      }
+      function getUser(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername==='function') return gdjs.playerAuthentication.getUsername(); }catch(e){} return ''; }
+      function getToken(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken==='function') return gdjs.playerAuthentication.getUserToken()||'';}catch(e){} return ''; }
 
-      // ---------- Auth & run-key ----------
-      function getUsername(){
-        try {
-          if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
-            const u = gdjs.playerAuthentication.getUsername();
-            if (u && typeof u === 'string' && u.trim() !== '') return u;
-          }
-        } catch(e){}
-        return '';
-      }
-      function getToken(){
-        try {
-          if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
-            return gdjs.playerAuthentication.getUserToken() || '';
-          }
-        } catch(e){}
-        return '';
-      }
-      function getModShort(runtimeScene){
-        try {
-          const gvars = runtimeScene.getGame().getVariables();
-          if (gvars && typeof gvars.contains === 'function' && gvars.contains("ModShortName")) {
-            const gv = gvars.get("ModShortName");
-            if (gv && typeof gv.getAsString === 'function'){ const s=gv.getAsString(); if (s && s.trim()!=='') return s; }
-          } else if (gvars && typeof gvars.get === 'function') {
-            try { const gv2 = gvars.get("ModShortName"); if (gv2){ const s=gv2.getAsString?gv2.getAsString():String(gv2); if(s&&s.trim()!=='') return s; } } catch(e){}
-          }
-        } catch(e){}
-        try {
-          const svs = runtimeScene.getVariables();
-          if (svs && typeof svs.contains === 'function' && svs.contains("ModShortName")) {
-            const sv = svs.get("ModShortName");
-            if (sv && typeof sv.getAsString === 'function'){ const s2=sv.getAsString(); if (s2 && s2.trim()!=='') return s2; }
-          } else if (svs && typeof svs.get === 'function') {
-            try { const sv2 = svs.get("ModShortName"); if (sv2){ const s2=sv2.getAsString?sv2.getAsString():String(sv2); if(s2&&s2.trim()!=='') return s2; } } catch(e){}
-          }
-        } catch(e){}
-        return 'online';
-      }
-
-      const username = getUsername();
-      if (!username) { console.warn('decryptPlayerUniversalEncpt auto-run: user not logged in — abort'); return; }
+      const username = getUser();
+      if (!username) { console.warn('User not logged in — abort'); return; }
       const token = getToken();
       const secret = username + (token ? ('|' + token) : '');
-      const modShort = getModShort(runtimeScene);
-      const runKey = getRunKey(username, modShort);
 
-      if (!window.__gd_dec_flags) window.__gd_dec_flags = {};
-      if (window.__gd_dec_flags[runKey]) {
-        console.log('decryptPlayerUniversalEncpt auto-run: already executed for this user+modShort in this session — skipping.');
-        return;
-      }
-      window.__gd_dec_flags[runKey] = true; // mark early to avoid races
+      const gvars = runtimeScene.getGame().getVariables();
+      const pu = gvars ? gvars.get('PlayerUniversal') : null;
+      if (!pu) { console.error('PlayerUniversal missing'); return; }
 
-      // ---------- Get PlayerUniversal variable and Encpt children ----------
-      const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-      if (!gv) { console.warn('decryptPlayerUniversalEncpt auto-run: PlayerUniversal not found — abort'); return; }
+      // ensure Encpt exists
+      try { pu.getChild('Encpt'); } catch(e){ console.log('No Encpt found'); return; }
+      const encpt = pu.getChild('Encpt');
 
-      // if Encpt missing -> nothing to do
-      let encptVar = null;
-      try { encptVar = gv.getChild("Encpt"); } catch(e){ encptVar = null; }
-      if (!encptVar) { console.log('decryptPlayerUniversalEncpt auto-run: no PlayerUniversal.Encpt found — nothing to decrypt'); return; }
-
-      const FIELDS = ["BestScore","Pfcs","Points"];
-      let anyApplied = false;
-
-      for (const k of FIELDS){
+      let any = false;
+      for (let i=0;i<FIELDS.length;i++){
+        const k = FIELDS[i];
         try {
-          const encChild = encptVar.getChild ? encptVar.getChild(k) : gv.getChild("Encpt").getChild(k);
-          if (!encChild) { console.log('decrypt: Encpt child missing for', k); continue; }
-          const ciphertext = encChild.getAsString ? encChild.getAsString() : (encChild.toString ? encChild.toString() : null);
-          if (!ciphertext || typeof ciphertext !== 'string') { console.log('decrypt: no ciphertext for', k); continue; }
-
-          // decrypt (may throw)
+          const encChild = encpt.getChild(k);
+          if (!encChild) { console.log('No Encpt child for',k); continue; }
+          const cs = encChild.getAsString ? encChild.getAsString() : (encChild && encChild.toString ? encChild.toString() : null);
+          if (!cs) { console.log('Empty Encpt for',k); continue; }
           let plain;
-          try {
-            plain = await decryptFieldString(secret, ciphertext);
-          } catch(e){
-            console.error('decrypt: failed to decrypt field', k, e);
-            continue;
+          try { plain = await decryptWith(secret, cs); } catch(e){ console.warn('Decrypt failed for',k,e); continue; }
+          // parse number
+          const t = (typeof plain === 'string') ? plain.trim() : String(plain);
+          const num = (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) ? Number(t) : 0;
+          const child = pu.getChild(k);
+          if (child && typeof child.setNumber === 'function') {
+            child.setNumber(num); any = true; console.log('Applied',k,num);
           }
-
-          // parse numeric and write to PlayerUniversal child as number
-          const numeric = parseToNumber(plain);
-          const child = gv.getChild(k);
-          if (!child) { console.warn('decrypt: PlayerUniversal child missing for', k); continue; }
-          try { child.setNumber(numeric); anyApplied = true; } catch(e){ 
-            try { child.setNumber(Number(numeric) || 0); anyApplied = true; } catch(e2){ console.error('decrypt: failed to set number for', k, e2); }
-          }
-          console.log(`decrypt: applied ${k} = ${numeric}`);
-        } catch(e){
-          console.error('decrypt: unexpected error for field', k, e);
-        }
+        } catch(e){ console.error('Error decrypt field',k,e); }
+        await new Promise(r=>setTimeout(r,8));
       }
 
-      // After successful apply, set PlayerOnSave = 1 for your manual GD save (only if we applied something)
-      if (anyApplied) {
-        try {
-          const gvars = runtimeScene.getGame().getVariables();
-          if (gvars) {
-            if (typeof gvars.contains === 'function') {
-              if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
-              else gvars.get('PlayerOnSave').setNumber(1);
-            } else {
-              const pv = gvars.get('PlayerOnSave');
-              if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
-            }
-          }
-        } catch(e){ console.warn('decrypt: failed to set PlayerOnSave', e); }
-      }
+      if (any){
+        try { if (typeof gvars.contains === 'function'){ if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1); else gvars.get('PlayerOnSave').setNumber(1); } else { const pv=gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber==='function') pv.setNumber(1); } } catch(e){}
+        console.log('decryptOnce: applied values and set PlayerOnSave = 1');
+      } else console.log('decryptOnce: nothing applied');
 
-      console.log('decryptPlayerUniversalEncpt auto-run: finished for', username, 'modShort:', modShort);
-    } catch(err){
-      console.error('decryptPlayerUniversalEncpt auto-run: unexpected error', err);
-    }
+    } catch(err){ console.error('decryptOnce unexpected', err); }
+    finally { try{ delete window[LOCK_KEY]; }catch(e){} }
   })();
 })(runtimeScene);
-
 
 };
 gdjs.InicioCode.eventsList3 = function(runtimeScene) {
@@ -1148,12 +734,12 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1e541c8(runtimeScene);
+gdjs.InicioCode.userFunc0x12f8808(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xa9cc78 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1256fc0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -2500,12 +2086,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xa9cc78(runtimeScene);
+gdjs.InicioCode.userFunc0x1256fc0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1d4dc98 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x12f9b50 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -3122,12 +2708,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1d4dc98(runtimeScene);
+gdjs.InicioCode.userFunc0x12f9b50(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x13646d0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x17f1e18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveExportUI(runtimeScene);
 
@@ -3137,12 +2723,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x13646d0(runtimeScene);
+gdjs.InicioCode.userFunc0x17f1e18(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x185ba40 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x17f2118 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 
@@ -3152,7 +2738,7 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x185ba40(runtimeScene);
+gdjs.InicioCode.userFunc0x17f2118(runtimeScene);
 
 }
 

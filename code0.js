@@ -530,229 +530,88 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3)
 
 };gdjs.MenuCode.eventsList2 = function(runtimeScene) {
 
-};gdjs.MenuCode.userFunc0x18fe178 = function GDJSInlineCode(runtimeScene) {
+};gdjs.MenuCode.userFunc0x1b997f0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// ===============================================================
-// Auto-run ONE-TIME decryptor: read PlayerUniversal.Encpt.<field>,
-// decrypt each field and write numeric value into PlayerUniversal.<field>
-// Runs once when this JS event executes (suitable for Start of scene).
-// After successful application, sets Global variable PlayerOnSave = 1.
-// ===============================================================
-
+// ================================================================
+// Auto-run ONE-TIME decryptor (SHA-256 derivation)
+// - Reads PlayerUniversal.Encpt.<fields> and writes numeric values to PlayerUniversal.<fields>
+// - Sets PlayerOnSave = 1 if any applied
+// ================================================================
 (function(runtimeScene){
   (async function(){
+    const LOCK_KEY = '__gd_decrypt_once_sha256_lock';
+    if (window[LOCK_KEY]) { console.log('decryptOnce already running — skip'); return; }
+    window[LOCK_KEY] = true;
     try {
-      // run-flag key helpers
-      const RUN_FLAG = '__gd_decrypt_playeruniversal_encpt_done';
-      function getRunKey(username, modShort){ return `${RUN_FLAG}::${username || 'anon'}::${modShort || 'online'}`; }
+      if (!('crypto' in window) || !crypto.subtle) { console.error('crypto.subtle not available'); return; }
+      const FIELDS = ['BestScore','Pfcs','Points'];
+      const strToU8 = (s)=>new TextEncoder().encode(s);
+      const u8ToStr = (u)=>new TextDecoder().decode(u);
+      const b64ToU8 = (b64)=>{ const binary=atob(b64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
 
-      // ---------- Crypto & helpers ----------
-      const PBKDF2_ITERATIONS = 1500;
-      const DERIVED_BITS = 512;
-      const SALT_IV_CIPHER_HMAC_PARTS = 4;
-
-      function strToU8(s){ return new TextEncoder().encode(s); }
-      function u8ToStr(u){ return new TextDecoder().decode(u); }
-      function b64ToU8(b64){
-        const binary = atob(b64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-        return bytes;
+      async function deriveKey(password, saltU8){
+        const combined = new Uint8Array(strToU8(password).length + saltU8.length);
+        combined.set(strToU8(password),0); combined.set(saltU8, strToU8(password).length);
+        const hash = await crypto.subtle.digest('SHA-256', combined);
+        return await crypto.subtle.importKey('raw', hash, { name: 'AES-GCM' }, false, ['encrypt','decrypt']);
       }
-      function concatU8(...arrs){
-        const total = arrs.reduce((s,a)=>s+a.length,0);
-        const out = new Uint8Array(total);
-        let off=0;
-        for (const a of arrs){ out.set(a, off); off+=a.length; }
-        return out;
-      }
-      function equalConstTime(a,b){
-        if (!a || !b) return false;
-        if (a.length !== b.length) return false;
-        let r = 0;
-        for (let i=0;i<a.length;i++) r |= a[i] ^ b[i];
-        return r === 0;
-      }
-
-      async function deriveKeys(password, saltU8){
-        const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-        const derived = await crypto.subtle.deriveBits(
-          { name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256" },
-          baseKey,
-          DERIVED_BITS
-        );
-        const db = new Uint8Array(derived);
-        const aesBytes = db.slice(0,32);
-        const hmacBytes = db.slice(32,64);
-        const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
-        const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
-        return { aesKey, hmacKey };
-      }
-
-      async function computeHmac(hmacKey, dataU8){
-        const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8);
-        return new Uint8Array(sig);
-      }
-
-      async function decryptFieldString(password, ciphertextDotString){
-        if (typeof ciphertextDotString !== 'string') throw new Error('ciphertext not a string');
-        const parts = ciphertextDotString.trim().split('.');
-        if (parts.length !== SALT_IV_CIPHER_HMAC_PARTS) throw new Error('ciphertext format invalid');
+      async function decryptWith(password, ciphertextDot){
+        const parts = ciphertextDot.split('.');
+        if (parts.length !== 3) throw new Error('Invalid ciphertext format');
         const salt = b64ToU8(parts[0]);
         const iv = b64ToU8(parts[1]);
         const cipher = b64ToU8(parts[2]);
-        const hmac = b64ToU8(parts[3]);
-
-        const { aesKey, hmacKey } = await deriveKeys(password, salt);
-        const macData = concatU8(salt, iv, cipher);
-        const expected = await computeHmac(hmacKey, macData);
-        if (!equalConstTime(expected, hmac)) throw new Error('HMAC mismatch (wrong key or modified ciphertext)');
-
-        const plainBuf = await crypto.subtle.decrypt({ name:"AES-GCM", iv: iv }, aesKey, cipher);
+        const key = await deriveKey(password, salt);
+        const plainBuf = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, cipher);
         return u8ToStr(new Uint8Array(plainBuf));
       }
 
-      // parse numeric helper
-      function parseToNumber(v){
-        if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-        if (typeof v === 'string') {
-          const t = v.trim();
-          if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) {
-            const n = Number(t);
-            return Number.isFinite(n) ? n : 0;
-          }
-          return 0;
-        }
-        // object fallback: try value property or stringify
-        if (typeof v === 'object' && v !== null) {
-          try {
-            if ('value' in v && typeof v.value === 'number' && Number.isFinite(v.value)) return v.value;
-            const js = JSON.stringify(v);
-            const t = js.trim();
-            if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) return Number(t);
-          } catch(e){}
-        }
-        return 0;
-      }
+      function getUser(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername==='function') return gdjs.playerAuthentication.getUsername(); }catch(e){} return ''; }
+      function getToken(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken==='function') return gdjs.playerAuthentication.getUserToken()||'';}catch(e){} return ''; }
 
-      // ---------- Auth & run-key ----------
-      function getUsername(){
-        try {
-          if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
-            const u = gdjs.playerAuthentication.getUsername();
-            if (u && typeof u === 'string' && u.trim() !== '') return u;
-          }
-        } catch(e){}
-        return '';
-      }
-      function getToken(){
-        try {
-          if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
-            return gdjs.playerAuthentication.getUserToken() || '';
-          }
-        } catch(e){}
-        return '';
-      }
-      function getModShort(runtimeScene){
-        try {
-          const gvars = runtimeScene.getGame().getVariables();
-          if (gvars && typeof gvars.contains === 'function' && gvars.contains("ModShortName")) {
-            const gv = gvars.get("ModShortName");
-            if (gv && typeof gv.getAsString === 'function'){ const s=gv.getAsString(); if (s && s.trim()!=='') return s; }
-          } else if (gvars && typeof gvars.get === 'function') {
-            try { const gv2 = gvars.get("ModShortName"); if (gv2){ const s=gv2.getAsString?gv2.getAsString():String(gv2); if(s&&s.trim()!=='') return s; } } catch(e){}
-          }
-        } catch(e){}
-        try {
-          const svs = runtimeScene.getVariables();
-          if (svs && typeof svs.contains === 'function' && svs.contains("ModShortName")) {
-            const sv = svs.get("ModShortName");
-            if (sv && typeof sv.getAsString === 'function'){ const s2=sv.getAsString(); if (s2 && s2.trim()!=='') return s2; }
-          } else if (svs && typeof svs.get === 'function') {
-            try { const sv2 = svs.get("ModShortName"); if (sv2){ const s2=sv2.getAsString?sv2.getAsString():String(sv2); if(s2&&s2.trim()!=='') return s2; } } catch(e){}
-          }
-        } catch(e){}
-        return 'online';
-      }
-
-      const username = getUsername();
-      if (!username) { console.warn('decryptPlayerUniversalEncpt auto-run: user not logged in — abort'); return; }
+      const username = getUser();
+      if (!username) { console.warn('User not logged in — abort'); return; }
       const token = getToken();
       const secret = username + (token ? ('|' + token) : '');
-      const modShort = getModShort(runtimeScene);
-      const runKey = getRunKey(username, modShort);
 
-      if (!window.__gd_dec_flags) window.__gd_dec_flags = {};
-      if (window.__gd_dec_flags[runKey]) {
-        console.log('decryptPlayerUniversalEncpt auto-run: already executed for this user+modShort in this session — skipping.');
-        return;
-      }
-      window.__gd_dec_flags[runKey] = true; // mark early to avoid races
+      const gvars = runtimeScene.getGame().getVariables();
+      const pu = gvars ? gvars.get('PlayerUniversal') : null;
+      if (!pu) { console.error('PlayerUniversal missing'); return; }
 
-      // ---------- Get PlayerUniversal variable and Encpt children ----------
-      const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-      if (!gv) { console.warn('decryptPlayerUniversalEncpt auto-run: PlayerUniversal not found — abort'); return; }
+      // ensure Encpt exists
+      try { pu.getChild('Encpt'); } catch(e){ console.log('No Encpt found'); return; }
+      const encpt = pu.getChild('Encpt');
 
-      // if Encpt missing -> nothing to do
-      let encptVar = null;
-      try { encptVar = gv.getChild("Encpt"); } catch(e){ encptVar = null; }
-      if (!encptVar) { console.log('decryptPlayerUniversalEncpt auto-run: no PlayerUniversal.Encpt found — nothing to decrypt'); return; }
-
-      const FIELDS = ["BestScore","Pfcs","Points"];
-      let anyApplied = false;
-
-      for (const k of FIELDS){
+      let any = false;
+      for (let i=0;i<FIELDS.length;i++){
+        const k = FIELDS[i];
         try {
-          const encChild = encptVar.getChild ? encptVar.getChild(k) : gv.getChild("Encpt").getChild(k);
-          if (!encChild) { console.log('decrypt: Encpt child missing for', k); continue; }
-          const ciphertext = encChild.getAsString ? encChild.getAsString() : (encChild.toString ? encChild.toString() : null);
-          if (!ciphertext || typeof ciphertext !== 'string') { console.log('decrypt: no ciphertext for', k); continue; }
-
-          // decrypt (may throw)
+          const encChild = encpt.getChild(k);
+          if (!encChild) { console.log('No Encpt child for',k); continue; }
+          const cs = encChild.getAsString ? encChild.getAsString() : (encChild && encChild.toString ? encChild.toString() : null);
+          if (!cs) { console.log('Empty Encpt for',k); continue; }
           let plain;
-          try {
-            plain = await decryptFieldString(secret, ciphertext);
-          } catch(e){
-            console.error('decrypt: failed to decrypt field', k, e);
-            continue;
+          try { plain = await decryptWith(secret, cs); } catch(e){ console.warn('Decrypt failed for',k,e); continue; }
+          // parse number
+          const t = (typeof plain === 'string') ? plain.trim() : String(plain);
+          const num = (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) ? Number(t) : 0;
+          const child = pu.getChild(k);
+          if (child && typeof child.setNumber === 'function') {
+            child.setNumber(num); any = true; console.log('Applied',k,num);
           }
-
-          // parse numeric and write to PlayerUniversal child as number
-          const numeric = parseToNumber(plain);
-          const child = gv.getChild(k);
-          if (!child) { console.warn('decrypt: PlayerUniversal child missing for', k); continue; }
-          try { child.setNumber(numeric); anyApplied = true; } catch(e){ 
-            try { child.setNumber(Number(numeric) || 0); anyApplied = true; } catch(e2){ console.error('decrypt: failed to set number for', k, e2); }
-          }
-          console.log(`decrypt: applied ${k} = ${numeric}`);
-        } catch(e){
-          console.error('decrypt: unexpected error for field', k, e);
-        }
+        } catch(e){ console.error('Error decrypt field',k,e); }
+        await new Promise(r=>setTimeout(r,8));
       }
 
-      // After successful apply, set PlayerOnSave = 1 for your manual GD save (only if we applied something)
-      if (anyApplied) {
-        try {
-          const gvars = runtimeScene.getGame().getVariables();
-          if (gvars) {
-            if (typeof gvars.contains === 'function') {
-              if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
-              else gvars.get('PlayerOnSave').setNumber(1);
-            } else {
-              const pv = gvars.get('PlayerOnSave');
-              if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
-            }
-          }
-        } catch(e){ console.warn('decrypt: failed to set PlayerOnSave', e); }
-      }
+      if (any){
+        try { if (typeof gvars.contains === 'function'){ if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1); else gvars.get('PlayerOnSave').setNumber(1); } else { const pv=gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber==='function') pv.setNumber(1); } } catch(e){}
+        console.log('decryptOnce: applied values and set PlayerOnSave = 1');
+      } else console.log('decryptOnce: nothing applied');
 
-      console.log('decryptPlayerUniversalEncpt auto-run: finished for', username, 'modShort:', modShort);
-    } catch(err){
-      console.error('decryptPlayerUniversalEncpt auto-run: unexpected error', err);
-    }
+    } catch(err){ console.error('decryptOnce unexpected', err); }
+    finally { try{ delete window[LOCK_KEY]; }catch(e){} }
   })();
 })(runtimeScene);
-
 
 };
 gdjs.MenuCode.eventsList3 = function(runtimeScene) {
@@ -785,7 +644,7 @@ if (true)
 {
 
 
-gdjs.MenuCode.userFunc0x18fe178(runtimeScene);
+gdjs.MenuCode.userFunc0x1b997f0(runtimeScene);
 
 }
 

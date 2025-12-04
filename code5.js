@@ -17934,7 +17934,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1cebb40 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1379768 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18117,207 +18117,78 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xf921f0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x19f0198 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ================================================================
-// encryptPlayerUniversalOnce(runtimeScene)
-// - Safe single-run per invocation (no concurrent runs)
-// - Does NOT persist a "already ran" flag (so it can be called again later)
-// - Ensures unlock even on errors (no freezes/crashes due to stale locks)
-// - Use in a Start-of-scene JS event (it auto-runs) OR call window.encryptPlayerUniversalOnce(runtimeScene)
+// Exposed function: await window.encryptPlayerUniversalOnce(runtimeScene)
+// - Single-call, safe lock/unlock, SHA-256 derivation
+// - Writes PlayerUniversal.Encpt.<field> ciphertexts and sets PlayerOnSave=1 on success
 // ================================================================
-(function(runtimeScene) {
-  // Expose the function so you can call it manually if you want:
-  window.encryptPlayerUniversalOnce = window.encryptPlayerUniversalOnce || (async function(rs) {
-    // session-wide lock key
-    const LOCK_KEY = '__gd_encrypt_once_lock';
-
-    // If already running, skip immediately
-    if (window[LOCK_KEY]) {
-      console.log('[encryptOnce] Already running — skipping this invocation.');
-      return { ok: false, reason: 'already-running' };
-    }
-
-    // Mark lock immediately (prevents concurrent attempts)
-    window[LOCK_KEY] = true;
-
-    // Config: tune iterations for target platforms
-    const PBKDF2_ITERATIONS = 1500; // safe default; reduce if necessary on low-end devices
-    const SALT_BYTES = 16;
-    const IV_BYTES = 12;
-    const DERIVED_BITS = 512; // 64 bytes = 32 AES + 32 HMAC
-    const FIELDS = ['BestScore','Pfcs','Points'];
-
-    // Small helpers
-    const strToU8 = (s) => new TextEncoder().encode(s);
-    const u8ToStr = (u) => new TextDecoder().decode(u);
-    const randomBytes = (n) => { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; };
-    const abToB64 = (buf) => { let binary = ''; const bytes = new Uint8Array(buf); for (let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]); return btoa(binary); };
-    const b64ToU8 = (b64) => { const binary = atob(b64); const bytes = new Uint8Array(binary.length); for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
-    const concatU8 = (...arrs) => { const total = arrs.reduce((s,a)=>s+a.length,0); const out = new Uint8Array(total); let off=0; for (const a of arrs){ out.set(a, off); off+=a.length; } return out; };
-
-    // crypto primitives
-    async function deriveMasterKeys(password, saltU8){
-      const baseKey = await crypto.subtle.importKey('raw', strToU8(password), { name: 'PBKDF2' }, false, ['deriveBits']);
-      const derived = await crypto.subtle.deriveBits(
-        { name:'PBKDF2', salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:'SHA-256' },
-        baseKey,
-        DERIVED_BITS
-      );
-      const db = new Uint8Array(derived);
-      const aesBytes = db.slice(0,32);
-      const hmacBytes = db.slice(32,64);
-      const aesKey = await crypto.subtle.importKey('raw', aesBytes, { name:'AES-GCM' }, false, ['encrypt','decrypt']);
-      const hmacKey = await crypto.subtle.importKey('raw', hmacBytes, { name:'HMAC', hash:'SHA-256' }, false, ['sign','verify']);
-      return { aesKey, hmacKey };
-    }
-    async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign('HMAC', hmacKey, dataU8); return new Uint8Array(sig); }
-    async function encryptWithKeys(aesKey, hmacKey, saltU8, plaintext){
-      const iv = randomBytes(IV_BYTES);
-      const cipherBuf = await crypto.subtle.encrypt({ name:'AES-GCM', iv: iv }, aesKey, strToU8(plaintext));
-      const cipherU8 = new Uint8Array(cipherBuf);
-      const macData = concatU8(saltU8, iv, cipherU8);
-      const hmac = await computeHmac(hmacKey, macData);
-      return `${abToB64(saltU8.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipherU8.buffer)}.${abToB64(hmac.buffer)}`;
-    }
-
-    // parse numeric safely -> number (fallback 0)
-    function parseToNumberOrZero(v){
-      if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-      if (typeof v === 'string') {
-        const t = v.trim();
-        if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) { const n = Number(t); return Number.isFinite(n) ? n : 0; }
-        return 0;
-      }
-      if (v && typeof v === 'object') {
-        try { if ('value' in v && typeof v.value === 'number') return v.value; const js = JSON.stringify(v); if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(js)) return Number(js); } catch(e){}
-      }
-      return 0;
-    }
-
-    // GDevelop auth helpers
-    function getUsername(){
-      try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
-        const u = gdjs.playerAuthentication.getUsername(); if (u && typeof u === 'string' && u.trim() !== '') return u;
-      }} catch(e) {}
-      return '';
-    }
-    function getToken(){
-      try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
-        return gdjs.playerAuthentication.getUserToken() || '';
-      }} catch(e) {}
-      return '';
-    }
-
-    // Begin critical section
+(function(){
+  window.encryptPlayerUniversalOnce = window.encryptPlayerUniversalOnce || (async function(runtimeScene){
+    const LOCK = '__gd_encrypt_once_manual_lock';
+    if (window[LOCK]) { console.log('[encryptOnce] already running'); return {ok:false,reason:'already'}; }
+    window[LOCK] = true;
     try {
-      // Basic env checks
-      if (typeof window === 'undefined' || !('crypto' in window) || !crypto.subtle) {
-        console.error('[encryptOnce] crypto.subtle not available — aborting.');
-        return { ok: false, reason: 'no-crypto' };
+      if (!('crypto' in window) || !crypto.subtle) return {ok:false,reason:'no-crypto'};
+      const FIELDS = ['BestScore','Pfcs','Points'];
+      const SALT_BYTES = 16, IV_BYTES = 12;
+
+      const strToU8 = (s)=>new TextEncoder().encode(s);
+      const u8ToStr = (u)=>new TextDecoder().decode(u);
+      const randomBytes = (n)=>{ const b=new Uint8Array(n); crypto.getRandomValues(b); return b; };
+      const abToB64 = (buf)=>{ const bytes=new Uint8Array(buf); let s=''; for(let i=0;i<bytes.length;i++) s+=String.fromCharCode(bytes[i]); return btoa(s); };
+      const b64ToU8 = (b64)=>{ const binary=atob(b64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
+
+      async function deriveKey(password, saltU8){
+        const comb = new Uint8Array(strToU8(password).length + saltU8.length); comb.set(strToU8(password),0); comb.set(saltU8, strToU8(password).length);
+        const hash = await crypto.subtle.digest('SHA-256', comb);
+        return await crypto.subtle.importKey('raw', hash, { name:'AES-GCM' }, false, ['encrypt','decrypt']);
+      }
+      async function encryptWith(keyPass, saltU8, plaintext){
+        const iv = randomBytes(IV_BYTES);
+        const key = await deriveKey(keyPass, saltU8);
+        const cipher = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, strToU8(plaintext));
+        return `${abToB64(saltU8.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher)}`;
       }
 
-      const username = getUsername();
-      if (!username) {
-        console.warn('[encryptOnce] user not logged in — aborting.');
-        return { ok: false, reason: 'not-logged' };
-      }
-      const token = getToken();
-      const secret = username + (token ? ('|' + token) : '');
+      function getUser(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername==='function') return gdjs.playerAuthentication.getUsername(); }catch(e){} return ''; }
+      function getToken(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken==='function') return gdjs.playerAuthentication.getUserToken()||'';}catch(e){} return ''; }
 
-      // Get PlayerUniversal
-      let gvars;
-      try { gvars = runtimeScene.getGame().getVariables(); } catch(e){ gvars = null; }
-      if (!gvars) { console.error('[encryptOnce] cannot access game variables'); return { ok: false, reason: 'no-vars' }; }
-      const pu = gvars.get('PlayerUniversal');
-      if (!pu) { console.error('[encryptOnce] PlayerUniversal not found'); return { ok: false, reason: 'no-playeruniversal' }; }
+      const username = getUser(); if (!username) return {ok:false,reason:'not-logged'};
+      const token = getToken(); const secret = username + (token ? ('|' + token) : '');
 
-      // Ensure Encpt exists (getChild often creates)
-      try { pu.getChild('Encpt'); } catch(e){}
+      const gvars = runtimeScene.getGame().getVariables(); if (!gvars) return {ok:false,reason:'no-vars'};
+      const pu = gvars.get('PlayerUniversal'); if (!pu) return {ok:false,reason:'no-pu'};
 
-      // Use persistent salt if exists, otherwise create ephemeral for this run.
-      // IMPORTANT: we do NOT write a persistent "done" flag here so the function can be run again later.
+      // salt persisted or ephemeral
       let saltB64 = '';
-      try {
-        const sVar = pu.getChild('Encpt').getChild('__salt');
-        if (sVar && typeof sVar.getAsString === 'function') saltB64 = sVar.getAsString();
-        if (!saltB64) {
-          // try to persist salt; if write fails, still continue with ephemeral (not fatal)
-          const newSalt = randomBytes(SALT_BYTES);
-          saltB64 = abToB64(newSalt.buffer);
-          try { pu.getChild('Encpt').getChild('__salt').setString(saltB64); }
-          catch(e){ /* non-fatal: proceed with ephemeral saltB64 for this run */ }
-        }
-      } catch(e){
-        // if any error reading/creating salt, create ephemeral salt for this run
-        try { saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); } catch(x){ console.error('[encryptOnce] failed to generate salt', x); return { ok:false, reason:'salt-fail' }; }
-      }
+      try { const sVar = pu.getChild('Encpt').getChild('__salt'); if (sVar && typeof sVar.getAsString === 'function') saltB64 = sVar.getAsString(); if (!saltB64) { saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); try { pu.getChild('Encpt').getChild('__salt').setString(saltB64); } catch(e){} } } catch(e){ saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); }
 
-      // derive master keys once for this invocation
       const saltU8 = b64ToU8(saltB64);
-      let masterKeys;
-      try { masterKeys = await deriveMasterKeys(secret, saltU8); }
-      catch(e){ console.error('[encryptOnce] key derivation failed', e); return { ok:false, reason:'derive-fail' }; }
-
-      // encrypt fields sequentially; yield between items
-      let anySuccess = false;
-      for (let i=0; i<FIELDS.length; ++i) {
+      let any = false;
+      for (let i=0;i<FIELDS.length;i++){
         const k = FIELDS[i];
         try {
-          const child = pu.getChild(k);
-          if (!child) { console.warn('[encryptOnce] missing child', k); continue; }
-          let currentVal;
-          try { currentVal = child.toJSObject(); } catch(e) { currentVal = (typeof child.getAsNumber === 'function') ? child.getAsNumber() : (typeof child.getAsString === 'function' ? child.getAsString() : null); }
-          const num = parseToNumberOrZero(currentVal);
-          const plaintext = String(num);
-          const ciphertext = await encryptWithKeys(masterKeys.aesKey, masterKeys.hmacKey, saltU8, plaintext);
-          // write ciphertext to Encpt.<k>
-          try { pu.getChild('Encpt').getChild(k).setString(ciphertext); anySuccess = true; }
-          catch(e){ console.warn('[encryptOnce] failed to write Encpt.'+k, e); }
-        } catch(e){ console.error('[encryptOnce] error processing field', k, e); }
-        // yield to avoid blocking UI
-        await new Promise(r => setTimeout(r, 8));
+          const ch = pu.getChild(k);
+          if (!ch) continue;
+          let cur; try { cur = ch.toJSObject(); } catch(e){ cur = (typeof ch.getAsNumber === 'function') ? ch.getAsNumber() : (typeof ch.getAsString === 'function' ? ch.getAsString() : null); }
+          const num = (typeof cur === 'number') ? (Number.isFinite(cur)?cur:0) : (typeof cur === 'string' && /^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(cur) ? Number(cur) : 0);
+          const ct = await encryptWith(secret, saltU8, String(num));
+          try { pu.getChild('Encpt').getChild(k).setString(ct); any = true; } catch(e){ console.warn('write Encpt fail',k,e); }
+        } catch(e){ console.error('field encrypt error',k,e); }
+        await new Promise(r=>setTimeout(r,8));
       }
 
-      // If any success, mark PlayerOnSave = 1 so your GD events can Save
-      if (anySuccess) {
-        try {
-          if (typeof gvars.contains === 'function') {
-            if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
-            else gvars.get('PlayerOnSave').setNumber(1);
-          } else {
-            const pv = gvars.get('PlayerOnSave');
-            if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
-          }
-        } catch(e){ console.warn('[encryptOnce] failed to set PlayerOnSave', e); }
-        console.log('[encryptOnce] finished successfully; PlayerOnSave = 1');
-        return { ok: true, encrypted: true };
-      } else {
-        console.log('[encryptOnce] finished: no fields encrypted');
-        return { ok: true, encrypted: false };
-      }
-    } catch(err) {
-      console.error('[encryptOnce] unexpected error', err);
-      return { ok: false, reason: 'unexpected', error: String(err) };
-    } finally {
-      // ALWAYS release lock so future invocations can run
-      try { window[LOCK_KEY] = false; delete window[LOCK_KEY]; } catch(e){}
-    }
+      if (any){
+        try { if (typeof gvars.contains === 'function'){ if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1); else gvars.get('PlayerOnSave').setNumber(1); } else { const pv=gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber==='function') pv.setNumber(1); } } catch(e){}
+        return { ok:true, encrypted:true };
+      } else return { ok:true, encrypted:false };
+
+    } catch(err){ console.error('encryptOne manual unexpected', err); return { ok:false, reason:'error', error:String(err) }; }
+    finally { try{ delete window[LOCK]; }catch(e){} }
   });
-
-  // Auto-run once when this JS event executes (Start of scene)
-  (async function autoRun() {
-    try {
-      // call the exposed function with the runtimeScene passed to this wrapper
-      if (typeof window.encryptPlayerUniversalOnce === 'function') {
-        await window.encryptPlayerUniversalOnce(runtimeScene);
-      }
-    } catch(e){
-      console.error('[encryptOnce:autoRun] error', e);
-    }
-  })();
-
-})(runtimeScene);
+})();
 
 };
 gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
@@ -18325,7 +18196,7 @@ gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x1cebb40(runtimeScene);
+gdjs.PlayCode.userFunc0x1379768(runtimeScene);
 
 }
 
@@ -18401,7 +18272,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xf921f0(runtimeScene);
+gdjs.PlayCode.userFunc0x19f0198(runtimeScene);
 
 }
 
@@ -18501,7 +18372,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x10824c8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xef1e30 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18684,207 +18555,78 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x186d700 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x19561d0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ================================================================
-// encryptPlayerUniversalOnce(runtimeScene)
-// - Safe single-run per invocation (no concurrent runs)
-// - Does NOT persist a "already ran" flag (so it can be called again later)
-// - Ensures unlock even on errors (no freezes/crashes due to stale locks)
-// - Use in a Start-of-scene JS event (it auto-runs) OR call window.encryptPlayerUniversalOnce(runtimeScene)
+// Exposed function: await window.encryptPlayerUniversalOnce(runtimeScene)
+// - Single-call, safe lock/unlock, SHA-256 derivation
+// - Writes PlayerUniversal.Encpt.<field> ciphertexts and sets PlayerOnSave=1 on success
 // ================================================================
-(function(runtimeScene) {
-  // Expose the function so you can call it manually if you want:
-  window.encryptPlayerUniversalOnce = window.encryptPlayerUniversalOnce || (async function(rs) {
-    // session-wide lock key
-    const LOCK_KEY = '__gd_encrypt_once_lock';
-
-    // If already running, skip immediately
-    if (window[LOCK_KEY]) {
-      console.log('[encryptOnce] Already running — skipping this invocation.');
-      return { ok: false, reason: 'already-running' };
-    }
-
-    // Mark lock immediately (prevents concurrent attempts)
-    window[LOCK_KEY] = true;
-
-    // Config: tune iterations for target platforms
-    const PBKDF2_ITERATIONS = 1500; // safe default; reduce if necessary on low-end devices
-    const SALT_BYTES = 16;
-    const IV_BYTES = 12;
-    const DERIVED_BITS = 512; // 64 bytes = 32 AES + 32 HMAC
-    const FIELDS = ['BestScore','Pfcs','Points'];
-
-    // Small helpers
-    const strToU8 = (s) => new TextEncoder().encode(s);
-    const u8ToStr = (u) => new TextDecoder().decode(u);
-    const randomBytes = (n) => { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; };
-    const abToB64 = (buf) => { let binary = ''; const bytes = new Uint8Array(buf); for (let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]); return btoa(binary); };
-    const b64ToU8 = (b64) => { const binary = atob(b64); const bytes = new Uint8Array(binary.length); for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
-    const concatU8 = (...arrs) => { const total = arrs.reduce((s,a)=>s+a.length,0); const out = new Uint8Array(total); let off=0; for (const a of arrs){ out.set(a, off); off+=a.length; } return out; };
-
-    // crypto primitives
-    async function deriveMasterKeys(password, saltU8){
-      const baseKey = await crypto.subtle.importKey('raw', strToU8(password), { name: 'PBKDF2' }, false, ['deriveBits']);
-      const derived = await crypto.subtle.deriveBits(
-        { name:'PBKDF2', salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:'SHA-256' },
-        baseKey,
-        DERIVED_BITS
-      );
-      const db = new Uint8Array(derived);
-      const aesBytes = db.slice(0,32);
-      const hmacBytes = db.slice(32,64);
-      const aesKey = await crypto.subtle.importKey('raw', aesBytes, { name:'AES-GCM' }, false, ['encrypt','decrypt']);
-      const hmacKey = await crypto.subtle.importKey('raw', hmacBytes, { name:'HMAC', hash:'SHA-256' }, false, ['sign','verify']);
-      return { aesKey, hmacKey };
-    }
-    async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign('HMAC', hmacKey, dataU8); return new Uint8Array(sig); }
-    async function encryptWithKeys(aesKey, hmacKey, saltU8, plaintext){
-      const iv = randomBytes(IV_BYTES);
-      const cipherBuf = await crypto.subtle.encrypt({ name:'AES-GCM', iv: iv }, aesKey, strToU8(plaintext));
-      const cipherU8 = new Uint8Array(cipherBuf);
-      const macData = concatU8(saltU8, iv, cipherU8);
-      const hmac = await computeHmac(hmacKey, macData);
-      return `${abToB64(saltU8.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipherU8.buffer)}.${abToB64(hmac.buffer)}`;
-    }
-
-    // parse numeric safely -> number (fallback 0)
-    function parseToNumberOrZero(v){
-      if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-      if (typeof v === 'string') {
-        const t = v.trim();
-        if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) { const n = Number(t); return Number.isFinite(n) ? n : 0; }
-        return 0;
-      }
-      if (v && typeof v === 'object') {
-        try { if ('value' in v && typeof v.value === 'number') return v.value; const js = JSON.stringify(v); if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(js)) return Number(js); } catch(e){}
-      }
-      return 0;
-    }
-
-    // GDevelop auth helpers
-    function getUsername(){
-      try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
-        const u = gdjs.playerAuthentication.getUsername(); if (u && typeof u === 'string' && u.trim() !== '') return u;
-      }} catch(e) {}
-      return '';
-    }
-    function getToken(){
-      try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
-        return gdjs.playerAuthentication.getUserToken() || '';
-      }} catch(e) {}
-      return '';
-    }
-
-    // Begin critical section
+(function(){
+  window.encryptPlayerUniversalOnce = window.encryptPlayerUniversalOnce || (async function(runtimeScene){
+    const LOCK = '__gd_encrypt_once_manual_lock';
+    if (window[LOCK]) { console.log('[encryptOnce] already running'); return {ok:false,reason:'already'}; }
+    window[LOCK] = true;
     try {
-      // Basic env checks
-      if (typeof window === 'undefined' || !('crypto' in window) || !crypto.subtle) {
-        console.error('[encryptOnce] crypto.subtle not available — aborting.');
-        return { ok: false, reason: 'no-crypto' };
+      if (!('crypto' in window) || !crypto.subtle) return {ok:false,reason:'no-crypto'};
+      const FIELDS = ['BestScore','Pfcs','Points'];
+      const SALT_BYTES = 16, IV_BYTES = 12;
+
+      const strToU8 = (s)=>new TextEncoder().encode(s);
+      const u8ToStr = (u)=>new TextDecoder().decode(u);
+      const randomBytes = (n)=>{ const b=new Uint8Array(n); crypto.getRandomValues(b); return b; };
+      const abToB64 = (buf)=>{ const bytes=new Uint8Array(buf); let s=''; for(let i=0;i<bytes.length;i++) s+=String.fromCharCode(bytes[i]); return btoa(s); };
+      const b64ToU8 = (b64)=>{ const binary=atob(b64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
+
+      async function deriveKey(password, saltU8){
+        const comb = new Uint8Array(strToU8(password).length + saltU8.length); comb.set(strToU8(password),0); comb.set(saltU8, strToU8(password).length);
+        const hash = await crypto.subtle.digest('SHA-256', comb);
+        return await crypto.subtle.importKey('raw', hash, { name:'AES-GCM' }, false, ['encrypt','decrypt']);
+      }
+      async function encryptWith(keyPass, saltU8, plaintext){
+        const iv = randomBytes(IV_BYTES);
+        const key = await deriveKey(keyPass, saltU8);
+        const cipher = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, strToU8(plaintext));
+        return `${abToB64(saltU8.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher)}`;
       }
 
-      const username = getUsername();
-      if (!username) {
-        console.warn('[encryptOnce] user not logged in — aborting.');
-        return { ok: false, reason: 'not-logged' };
-      }
-      const token = getToken();
-      const secret = username + (token ? ('|' + token) : '');
+      function getUser(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername==='function') return gdjs.playerAuthentication.getUsername(); }catch(e){} return ''; }
+      function getToken(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken==='function') return gdjs.playerAuthentication.getUserToken()||'';}catch(e){} return ''; }
 
-      // Get PlayerUniversal
-      let gvars;
-      try { gvars = runtimeScene.getGame().getVariables(); } catch(e){ gvars = null; }
-      if (!gvars) { console.error('[encryptOnce] cannot access game variables'); return { ok: false, reason: 'no-vars' }; }
-      const pu = gvars.get('PlayerUniversal');
-      if (!pu) { console.error('[encryptOnce] PlayerUniversal not found'); return { ok: false, reason: 'no-playeruniversal' }; }
+      const username = getUser(); if (!username) return {ok:false,reason:'not-logged'};
+      const token = getToken(); const secret = username + (token ? ('|' + token) : '');
 
-      // Ensure Encpt exists (getChild often creates)
-      try { pu.getChild('Encpt'); } catch(e){}
+      const gvars = runtimeScene.getGame().getVariables(); if (!gvars) return {ok:false,reason:'no-vars'};
+      const pu = gvars.get('PlayerUniversal'); if (!pu) return {ok:false,reason:'no-pu'};
 
-      // Use persistent salt if exists, otherwise create ephemeral for this run.
-      // IMPORTANT: we do NOT write a persistent "done" flag here so the function can be run again later.
+      // salt persisted or ephemeral
       let saltB64 = '';
-      try {
-        const sVar = pu.getChild('Encpt').getChild('__salt');
-        if (sVar && typeof sVar.getAsString === 'function') saltB64 = sVar.getAsString();
-        if (!saltB64) {
-          // try to persist salt; if write fails, still continue with ephemeral (not fatal)
-          const newSalt = randomBytes(SALT_BYTES);
-          saltB64 = abToB64(newSalt.buffer);
-          try { pu.getChild('Encpt').getChild('__salt').setString(saltB64); }
-          catch(e){ /* non-fatal: proceed with ephemeral saltB64 for this run */ }
-        }
-      } catch(e){
-        // if any error reading/creating salt, create ephemeral salt for this run
-        try { saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); } catch(x){ console.error('[encryptOnce] failed to generate salt', x); return { ok:false, reason:'salt-fail' }; }
-      }
+      try { const sVar = pu.getChild('Encpt').getChild('__salt'); if (sVar && typeof sVar.getAsString === 'function') saltB64 = sVar.getAsString(); if (!saltB64) { saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); try { pu.getChild('Encpt').getChild('__salt').setString(saltB64); } catch(e){} } } catch(e){ saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); }
 
-      // derive master keys once for this invocation
       const saltU8 = b64ToU8(saltB64);
-      let masterKeys;
-      try { masterKeys = await deriveMasterKeys(secret, saltU8); }
-      catch(e){ console.error('[encryptOnce] key derivation failed', e); return { ok:false, reason:'derive-fail' }; }
-
-      // encrypt fields sequentially; yield between items
-      let anySuccess = false;
-      for (let i=0; i<FIELDS.length; ++i) {
+      let any = false;
+      for (let i=0;i<FIELDS.length;i++){
         const k = FIELDS[i];
         try {
-          const child = pu.getChild(k);
-          if (!child) { console.warn('[encryptOnce] missing child', k); continue; }
-          let currentVal;
-          try { currentVal = child.toJSObject(); } catch(e) { currentVal = (typeof child.getAsNumber === 'function') ? child.getAsNumber() : (typeof child.getAsString === 'function' ? child.getAsString() : null); }
-          const num = parseToNumberOrZero(currentVal);
-          const plaintext = String(num);
-          const ciphertext = await encryptWithKeys(masterKeys.aesKey, masterKeys.hmacKey, saltU8, plaintext);
-          // write ciphertext to Encpt.<k>
-          try { pu.getChild('Encpt').getChild(k).setString(ciphertext); anySuccess = true; }
-          catch(e){ console.warn('[encryptOnce] failed to write Encpt.'+k, e); }
-        } catch(e){ console.error('[encryptOnce] error processing field', k, e); }
-        // yield to avoid blocking UI
-        await new Promise(r => setTimeout(r, 8));
+          const ch = pu.getChild(k);
+          if (!ch) continue;
+          let cur; try { cur = ch.toJSObject(); } catch(e){ cur = (typeof ch.getAsNumber === 'function') ? ch.getAsNumber() : (typeof ch.getAsString === 'function' ? ch.getAsString() : null); }
+          const num = (typeof cur === 'number') ? (Number.isFinite(cur)?cur:0) : (typeof cur === 'string' && /^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(cur) ? Number(cur) : 0);
+          const ct = await encryptWith(secret, saltU8, String(num));
+          try { pu.getChild('Encpt').getChild(k).setString(ct); any = true; } catch(e){ console.warn('write Encpt fail',k,e); }
+        } catch(e){ console.error('field encrypt error',k,e); }
+        await new Promise(r=>setTimeout(r,8));
       }
 
-      // If any success, mark PlayerOnSave = 1 so your GD events can Save
-      if (anySuccess) {
-        try {
-          if (typeof gvars.contains === 'function') {
-            if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
-            else gvars.get('PlayerOnSave').setNumber(1);
-          } else {
-            const pv = gvars.get('PlayerOnSave');
-            if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
-          }
-        } catch(e){ console.warn('[encryptOnce] failed to set PlayerOnSave', e); }
-        console.log('[encryptOnce] finished successfully; PlayerOnSave = 1');
-        return { ok: true, encrypted: true };
-      } else {
-        console.log('[encryptOnce] finished: no fields encrypted');
-        return { ok: true, encrypted: false };
-      }
-    } catch(err) {
-      console.error('[encryptOnce] unexpected error', err);
-      return { ok: false, reason: 'unexpected', error: String(err) };
-    } finally {
-      // ALWAYS release lock so future invocations can run
-      try { window[LOCK_KEY] = false; delete window[LOCK_KEY]; } catch(e){}
-    }
+      if (any){
+        try { if (typeof gvars.contains === 'function'){ if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1); else gvars.get('PlayerOnSave').setNumber(1); } else { const pv=gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber==='function') pv.setNumber(1); } } catch(e){}
+        return { ok:true, encrypted:true };
+      } else return { ok:true, encrypted:false };
+
+    } catch(err){ console.error('encryptOne manual unexpected', err); return { ok:false, reason:'error', error:String(err) }; }
+    finally { try{ delete window[LOCK]; }catch(e){} }
   });
-
-  // Auto-run once when this JS event executes (Start of scene)
-  (async function autoRun() {
-    try {
-      // call the exposed function with the runtimeScene passed to this wrapper
-      if (typeof window.encryptPlayerUniversalOnce === 'function') {
-        await window.encryptPlayerUniversalOnce(runtimeScene);
-      }
-    } catch(e){
-      console.error('[encryptOnce:autoRun] error', e);
-    }
-  })();
-
-})(runtimeScene);
+})();
 
 };
 gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
@@ -18892,7 +18634,7 @@ gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x10824c8(runtimeScene);
+gdjs.PlayCode.userFunc0xef1e30(runtimeScene);
 
 }
 
@@ -18968,7 +18710,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x186d700(runtimeScene);
+gdjs.PlayCode.userFunc0x19561d0(runtimeScene);
 
 }
 
@@ -22681,7 +22423,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x88d1d0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1b9c8d8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22700,7 +22442,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x88d270 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0xeb9580 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22965,7 +22707,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x88d1d0(runtimeScene);
+gdjs.PlayCode.userFunc0x1b9c8d8(runtimeScene);
 
 }
 
@@ -22973,7 +22715,7 @@ gdjs.PlayCode.userFunc0x88d1d0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x88d270(runtimeScene);
+gdjs.PlayCode.userFunc0xeb9580(runtimeScene);
 
 }
 
@@ -23095,7 +22837,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1b56cf0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1bddfb8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -24014,7 +23756,7 @@ gdjs.PlayCode.eventsList273 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x1b56cf0(runtimeScene);
+gdjs.PlayCode.userFunc0x1bddfb8(runtimeScene);
 
 }
 
@@ -24094,7 +23836,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1a01610 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1e686d8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -25064,7 +24806,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x1a01610(runtimeScene);
+gdjs.PlayCode.userFunc0x1e686d8(runtimeScene);
 
 }
 
