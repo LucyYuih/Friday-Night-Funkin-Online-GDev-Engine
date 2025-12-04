@@ -530,7 +530,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3)
 
 };gdjs.MenuCode.eventsList2 = function(runtimeScene) {
 
-};gdjs.MenuCode.userFunc0x2a2ee20 = function GDJSInlineCode(runtimeScene) {
+};gdjs.MenuCode.userFunc0x18fe178 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===============================================================
 // Auto-run ONE-TIME decryptor: read PlayerUniversal.Encpt.<field>,
@@ -547,7 +547,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3)
       function getRunKey(username, modShort){ return `${RUN_FLAG}::${username || 'anon'}::${modShort || 'online'}`; }
 
       // ---------- Crypto & helpers ----------
-      const PBKDF2_ITERATIONS = 150000;
+      const PBKDF2_ITERATIONS = 1500;
       const DERIVED_BITS = 512;
       const SALT_IV_CIPHER_HMAC_PARTS = 4;
 
@@ -785,7 +785,7 @@ if (true)
 {
 
 
-gdjs.MenuCode.userFunc0x2a2ee20(runtimeScene);
+gdjs.MenuCode.userFunc0x18fe178(runtimeScene);
 
 }
 

@@ -17934,7 +17934,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x2bccb80 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1cebb40 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18117,7 +18117,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x2bcb200 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xf921f0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ================================================================
 // encryptPlayerUniversalOnce(runtimeScene)
@@ -18142,7 +18142,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
     window[LOCK_KEY] = true;
 
     // Config: tune iterations for target platforms
-    const PBKDF2_ITERATIONS = 150000; // safe default; reduce if necessary on low-end devices
+    const PBKDF2_ITERATIONS = 1500; // safe default; reduce if necessary on low-end devices
     const SALT_BYTES = 16;
     const IV_BYTES = 12;
     const DERIVED_BITS = 512; // 64 bytes = 32 AES + 32 HMAC
@@ -18325,7 +18325,7 @@ gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x2bccb80(runtimeScene);
+gdjs.PlayCode.userFunc0x1cebb40(runtimeScene);
 
 }
 
@@ -18401,7 +18401,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x2bcb200(runtimeScene);
+gdjs.PlayCode.userFunc0xf921f0(runtimeScene);
 
 }
 
@@ -18501,7 +18501,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x2bce500 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x10824c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18684,7 +18684,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x2bc93d8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x186d700 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ================================================================
 // encryptPlayerUniversalOnce(runtimeScene)
@@ -18709,7 +18709,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
     window[LOCK_KEY] = true;
 
     // Config: tune iterations for target platforms
-    const PBKDF2_ITERATIONS = 150000; // safe default; reduce if necessary on low-end devices
+    const PBKDF2_ITERATIONS = 1500; // safe default; reduce if necessary on low-end devices
     const SALT_BYTES = 16;
     const IV_BYTES = 12;
     const DERIVED_BITS = 512; // 64 bytes = 32 AES + 32 HMAC
@@ -18892,7 +18892,7 @@ gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x2bce500(runtimeScene);
+gdjs.PlayCode.userFunc0x10824c8(runtimeScene);
 
 }
 
@@ -18968,7 +18968,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x2bc93d8(runtimeScene);
+gdjs.PlayCode.userFunc0x186d700(runtimeScene);
 
 }
 
@@ -22681,7 +22681,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x2af58c0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x88d1d0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22700,7 +22700,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x2af5978 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x88d270 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22965,7 +22965,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x2af58c0(runtimeScene);
+gdjs.PlayCode.userFunc0x88d1d0(runtimeScene);
 
 }
 
@@ -22973,7 +22973,7 @@ gdjs.PlayCode.userFunc0x2af58c0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x2af5978(runtimeScene);
+gdjs.PlayCode.userFunc0x88d270(runtimeScene);
 
 }
 
@@ -23095,7 +23095,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x2af78d8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1b56cf0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -24014,7 +24014,7 @@ gdjs.PlayCode.eventsList273 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x2af78d8(runtimeScene);
+gdjs.PlayCode.userFunc0x1b56cf0(runtimeScene);
 
 }
 
@@ -24094,7 +24094,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x2af8cb0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a01610 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -25064,7 +25064,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x2af8cb0(runtimeScene);
+gdjs.PlayCode.userFunc0x1a01610(runtimeScene);
 
 }
 

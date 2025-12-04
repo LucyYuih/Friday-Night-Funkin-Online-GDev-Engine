@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x2a7ac80 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1895270 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal save module
@@ -347,7 +347,7 @@ gdjs.InicioCode.userFunc0x2a7ac80 = function GDJSInlineCode(runtimeScene) {
 
 (function () {
   // ---------- Config ----------
-  const PBKDF2_ITERATIONS = 150000;
+  const PBKDF2_ITERATIONS = 1500;
   const SALT_BYTES = 16;
   const IV_BYTES = 12;
   const DERIVED_BITS = 512; // 64 bytes -> 32 AES + 32 HMAC
@@ -857,7 +857,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x2a7ac80(runtimeScene);
+gdjs.InicioCode.userFunc0x1895270(runtimeScene);
 
 }
 
@@ -918,7 +918,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x2a7b680 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1e541c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===============================================================
 // Auto-run ONE-TIME decryptor: read PlayerUniversal.Encpt.<field>,
@@ -1148,12 +1148,12 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2a7b680(runtimeScene);
+gdjs.InicioCode.userFunc0x1e541c8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x2a7b938 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xa9cc78 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -2500,12 +2500,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2a7b938(runtimeScene);
+gdjs.InicioCode.userFunc0xa9cc78(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x2a7bc08 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1d4dc98 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -3122,12 +3122,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2a7bc08(runtimeScene);
+gdjs.InicioCode.userFunc0x1d4dc98(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x2a7bf28 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x13646d0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveExportUI(runtimeScene);
 
@@ -3137,12 +3137,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2a7bf28(runtimeScene);
+gdjs.InicioCode.userFunc0x13646d0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x2a7c238 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x185ba40 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 
@@ -3152,7 +3152,7 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2a7c238(runtimeScene);
+gdjs.InicioCode.userFunc0x185ba40(runtimeScene);
 
 }
 
