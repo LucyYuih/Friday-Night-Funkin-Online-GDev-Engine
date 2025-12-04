@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0xf1c638 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1897988 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal export/import UI — lightweight key derivation (SHA-256)
@@ -584,7 +584,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0xf1c638(runtimeScene);
+gdjs.InicioCode.userFunc0x1897988(runtimeScene);
 
 }
 
@@ -645,7 +645,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1c02790 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x129b530 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ================================================================
 // Auto-run ONE-TIME decryptor (SHA-256 derivation)
@@ -734,12 +734,12 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1c02790(runtimeScene);
+gdjs.InicioCode.userFunc0x129b530(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1c02a00 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1b7def0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -2086,12 +2086,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1c02a00(runtimeScene);
+gdjs.InicioCode.userFunc0x1b7def0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1c02c80 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x19bd740 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -2708,12 +2708,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1c02c80(runtimeScene);
+gdjs.InicioCode.userFunc0x19bd740(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1c02f48 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x19ebf50 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveExportUI(runtimeScene);
 
@@ -2723,12 +2723,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1c02f48(runtimeScene);
+gdjs.InicioCode.userFunc0x19ebf50(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1c03200 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x19ec250 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 
@@ -2738,7 +2738,7 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1c03200(runtimeScene);
+gdjs.InicioCode.userFunc0x19ec250(runtimeScene);
 
 }
 

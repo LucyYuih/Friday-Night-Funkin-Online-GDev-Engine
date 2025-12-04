@@ -17934,7 +17934,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1830ae0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x17f7950 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18117,78 +18117,213 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x184a360 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xf789e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// ================================================================
-// Exposed function: await window.encryptPlayerUniversalOnce(runtimeScene)
-// - Single-call, safe lock/unlock, SHA-256 derivation
-// - Writes PlayerUniversal.Encpt.<field> ciphertexts and sets PlayerOnSave=1 on success
-// ================================================================
-(function(){
-  window.encryptPlayerUniversalOnce = window.encryptPlayerUniversalOnce || (async function(runtimeScene){
-    const LOCK = '__gd_encrypt_once_manual_lock';
-    if (window[LOCK]) { console.log('[encryptOnce] already running'); return {ok:false,reason:'already'}; }
-    window[LOCK] = true;
-    try {
-      if (!('crypto' in window) || !crypto.subtle) return {ok:false,reason:'no-crypto'};
-      const FIELDS = ['BestScore','Pfcs','Points'];
-      const SALT_BYTES = 16, IV_BYTES = 12;
+// =============================================================
+// encryptPlayerUniversalSafe (definitivo — evita loops / crashes)
+// - Auto-runs once per session for current user+mod (safe)
+// - Locking, timeout, guaranteed finally-unlock
+// - Lightweight SHA-256 derivation + AES-GCM encrypt
+// - Use in Start of scene JS event (runs once)
+// - If quiser chamar manualmente: await window.encryptPlayerUniversalSafe(runtimeScene)
+// =============================================================
 
-      const strToU8 = (s)=>new TextEncoder().encode(s);
-      const u8ToStr = (u)=>new TextDecoder().decode(u);
-      const randomBytes = (n)=>{ const b=new Uint8Array(n); crypto.getRandomValues(b); return b; };
-      const abToB64 = (buf)=>{ const bytes=new Uint8Array(buf); let s=''; for(let i=0;i<bytes.length;i++) s+=String.fromCharCode(bytes[i]); return btoa(s); };
-      const b64ToU8 = (b64)=>{ const binary=atob(b64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
+(function(runtimeScene){
+  (async function(){
+    // ---------- CONFIG ----------
+    const LOCK_GLOBAL = '__gd_encrypt_once_safe_lock_v3';
+    const DONE_GLOBAL = '__gd_encrypt_once_safe_done_v3'; // session memory of completions
+    const FIELDS = ['BestScore','Pfcs','Points'];
+    const SALT_BYTES = 16;
+    const IV_BYTES = 12;
+    const OP_TIMEOUT_MS = 20000; // 20 seconds global timeout (adjust down if needed)
+    const YIELD_MS = 8; // small yield between fields to avoid blocking UI
 
-      async function deriveKey(password, saltU8){
-        const comb = new Uint8Array(strToU8(password).length + saltU8.length); comb.set(strToU8(password),0); comb.set(saltU8, strToU8(password).length);
-        const hash = await crypto.subtle.digest('SHA-256', comb);
-        return await crypto.subtle.importKey('raw', hash, { name:'AES-GCM' }, false, ['encrypt','decrypt']);
+    // ---------- small helpers ----------
+    const log = (...a)=>{ try{ console.log('[encrypt-safe]',...a); }catch(e){} };
+    const warn = (...a)=>{ try{ console.warn('[encrypt-safe]',...a); }catch(e){} };
+    const error = (...a)=>{ try{ console.error('[encrypt-safe]',...a); }catch(e){} };
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const strToU8 = s => new TextEncoder().encode(s);
+    const u8ToStr = u => new TextDecoder().decode(u);
+    const randomBytes = n => { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; };
+    const abToB64 = buf => { const bytes = new Uint8Array(buf); let s=''; for (let i=0;i<bytes.length;i++) s+=String.fromCharCode(bytes[i]); return btoa(s); };
+    const b64ToU8 = b64 => { const binary = atob(b64); const bytes = new Uint8Array(binary.length); for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
+
+    // ---------- crypto (SHA-256 derivation -> AES-GCM key) ----------
+    async function deriveKeySHA256(password, saltU8){
+      const pwU8 = strToU8(password);
+      const comb = new Uint8Array(pwU8.length + saltU8.length);
+      comb.set(pwU8, 0);
+      comb.set(saltU8, pwU8.length);
+      const digest = await crypto.subtle.digest('SHA-256', comb);
+      return crypto.subtle.importKey('raw', digest, { name:'AES-GCM' }, false, ['encrypt','decrypt']);
+    }
+    async function encryptWithKey(keyPassword, saltU8, plaintext){
+      const iv = randomBytes(IV_BYTES);
+      const aesKey = await deriveKeySHA256(keyPassword, saltU8);
+      const cipherBuf = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, aesKey, strToU8(plaintext));
+      return `${abToB64(saltU8.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipherBuf)}`;
+    }
+
+    // parse number safely
+    function parseToNumberOrZero(v){
+      if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+      if (typeof v === 'string') {
+        const t = v.trim();
+        if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) return Number(t);
+        return 0;
       }
-      async function encryptWith(keyPass, saltU8, plaintext){
-        const iv = randomBytes(IV_BYTES);
-        const key = await deriveKey(keyPass, saltU8);
-        const cipher = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, strToU8(plaintext));
-        return `${abToB64(saltU8.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher)}`;
+      if (v && typeof v === 'object') {
+        try { if ('value' in v && typeof v.value === 'number') return v.value; const js = JSON.stringify(v); if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(js)) return Number(js); } catch(e){}
       }
+      return 0;
+    }
 
-      function getUser(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername==='function') return gdjs.playerAuthentication.getUsername(); }catch(e){} return ''; }
-      function getToken(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken==='function') return gdjs.playerAuthentication.getUserToken()||'';}catch(e){} return ''; }
+    // ---------- GDevelop auth helpers ----------
+    function getUsername(){
+      try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
+        const u = gdjs.playerAuthentication.getUsername(); if (u && u.trim()) return u;
+      } } catch(e){} return '';
+    }
+    function getUserToken(){
+      try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
+        return gdjs.playerAuthentication.getUserToken() || '';
+      } } catch(e){} return '';
+    }
+    function getModShort(runtimeScene){
+      try {
+        const gvars = runtimeScene.getGame().getVariables();
+        if (gvars && typeof gvars.contains === 'function' && gvars.contains('ModShortName')) {
+          const gv = gvars.get('ModShortName'); if (gv && typeof gv.getAsString === 'function') return gv.getAsString();
+        } else if (gvars && typeof gvars.get === 'function') {
+          const gv2 = gvars.get('ModShortName'); if (gv2) return gv2.getAsString ? gv2.getAsString() : String(gv2);
+        }
+      } catch(e){}
+      try {
+        const svs = runtimeScene.getVariables();
+        if (svs && typeof svs.contains === 'function' && svs.contains('ModShortName')) {
+          const sv = svs.get('ModShortName'); if (sv && typeof sv.getAsString === 'function') return sv.getAsString();
+        } else if (svs && typeof svs.get === 'function') {
+          const sv2 = svs.get('ModShortName'); if (sv2) return sv2.getAsString ? sv2.getAsString() : String(sv2);
+        }
+      } catch(e){}
+      return 'online';
+    }
 
-      const username = getUser(); if (!username) return {ok:false,reason:'not-logged'};
-      const token = getToken(); const secret = username + (token ? ('|' + token) : '');
+    // ---------- determine runKey (per user+mod) ----------
+    const username = getUsername();
+    if (!username) { log('User not logged in — encrypt-one-time SAFE will not run.'); return; }
+    const token = getUserToken();
+    const modShort = getModShort(runtimeScene);
+    const runKey = `${username}::${modShort}`; // per-session key
 
-      const gvars = runtimeScene.getGame().getVariables(); if (!gvars) return {ok:false,reason:'no-vars'};
-      const pu = gvars.get('PlayerUniversal'); if (!pu) return {ok:false,reason:'no-pu'};
+    // init global state containers if not exist
+    if (!window[LOCK_GLOBAL]) window[LOCK_GLOBAL] = {};
+    if (!window[DONE_GLOBAL]) window[DONE_GLOBAL] = {};
 
-      // salt persisted or ephemeral
-      let saltB64 = '';
-      try { const sVar = pu.getChild('Encpt').getChild('__salt'); if (sVar && typeof sVar.getAsString === 'function') saltB64 = sVar.getAsString(); if (!saltB64) { saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); try { pu.getChild('Encpt').getChild('__salt').setString(saltB64); } catch(e){} } } catch(e){ saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); }
+    // if already completed in this session -> skip
+    if (window[DONE_GLOBAL][runKey]) { log('encrypt-one-time already completed this session for', runKey, '- skipping.'); return; }
 
-      const saltU8 = b64ToU8(saltB64);
-      let any = false;
-      for (let i=0;i<FIELDS.length;i++){
-        const k = FIELDS[i];
+    // if already running for this runKey -> skip
+    if (window[LOCK_GLOBAL][runKey]) { log('encrypt-one-time is already running for', runKey, '- skipping invocation.'); return; }
+
+    // Define the actual worker function (will be raced against timeout)
+    async function worker() {
+      window[LOCK_GLOBAL][runKey] = true; // lock
+      let anySuccess = false;
+      try {
+        // environment checks
+        if (typeof window === 'undefined' || !('crypto' in window) || !crypto.subtle) throw new Error('WebCrypto (crypto.subtle) not available');
+
+        // access vars
+        const gvars = runtimeScene.getGame().getVariables();
+        if (!gvars) throw new Error('Game variables not available');
+        const pu = gvars.get('PlayerUniversal');
+        if (!pu) throw new Error('PlayerUniversal variable not found');
+
+        // ensure Encpt exists (getChild may create)
+        try { pu.getChild('Encpt'); } catch(e){}
+
+        // get or create salt (persisting salt is fine; non-fatal if write fails)
+        let saltB64 = '';
         try {
-          const ch = pu.getChild(k);
-          if (!ch) continue;
-          let cur; try { cur = ch.toJSObject(); } catch(e){ cur = (typeof ch.getAsNumber === 'function') ? ch.getAsNumber() : (typeof ch.getAsString === 'function' ? ch.getAsString() : null); }
-          const num = (typeof cur === 'number') ? (Number.isFinite(cur)?cur:0) : (typeof cur === 'string' && /^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(cur) ? Number(cur) : 0);
-          const ct = await encryptWith(secret, saltU8, String(num));
-          try { pu.getChild('Encpt').getChild(k).setString(ct); any = true; } catch(e){ console.warn('write Encpt fail',k,e); }
-        } catch(e){ console.error('field encrypt error',k,e); }
-        await new Promise(r=>setTimeout(r,8));
+          const sVar = pu.getChild('Encpt').getChild('__salt');
+          if (sVar && typeof sVar.getAsString === 'function') saltB64 = sVar.getAsString();
+          if (!saltB64) {
+            const newSalt = randomBytes(SALT_BYTES);
+            saltB64 = abToB64(newSalt.buffer);
+            try { pu.getChild('Encpt').getChild('__salt').setString(saltB64); } catch(e){ warn('Could not persist __salt (non-fatal)'); }
+          }
+        } catch(e) {
+          // fallback ephemeral salt
+          saltB64 = abToB64(randomBytes(SALT_BYTES).buffer);
+          warn('Using ephemeral salt for this run (persist failed)');
+        }
+
+        const saltU8 = b64ToU8(saltB64);
+        const secret = username + (token ? ('|' + token) : '');
+
+        // derive key per run only when encryptWithKey called - derive is internal in encryptWithKey
+        // iterate fields sequentially (no heavy work)
+        for (let i = 0; i < FIELDS.length; ++i) {
+          const k = FIELDS[i];
+          try {
+            const child = pu.getChild(k);
+            if (!child) { warn('Missing field', k, '- skipping'); continue; }
+            let cur;
+            try { cur = child.toJSObject(); } catch(e) { cur = (typeof child.getAsNumber === 'function') ? child.getAsNumber() : (typeof child.getAsString === 'function' ? child.getAsString() : null); }
+            const num = parseToNumberOrZero(cur);
+            const plaintext = String(num);
+            const ciphertext = await encryptWithKey(secret, saltU8, plaintext);
+            try { pu.getChild('Encpt').getChild(k).setString(ciphertext); anySuccess = true; log('Wrote Encpt.'+k); } catch(e){ warn('Failed to write Encpt.'+k, e); }
+          } catch(e){ warn('Error processing field', k, e); }
+          // yield to event loop to avoid blocking runtime
+          await sleep(YIELD_MS);
+        }
+
+        // If wrote something, mark PlayerOnSave
+        if (anySuccess) {
+          try {
+            if (typeof gvars.contains === 'function') {
+              if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
+              else gvars.get('PlayerOnSave').setNumber(1);
+            } else {
+              const pv = gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
+            }
+            log('PlayerOnSave set to 1');
+          } catch(e){ warn('Failed to set PlayerOnSave', e); }
+        } else {
+          log('No fields encrypted (none written)');
+        }
+
+        // mark completed for this session runKey
+        window[DONE_GLOBAL][runKey] = true;
+        return { ok: true, encrypted: anySuccess };
+      } finally {
+        // ALWAYS release lock for this runKey
+        try { window[LOCK_GLOBAL][runKey] = false; delete window[LOCK_GLOBAL][runKey]; } catch(e){}
       }
+    } // end worker
 
-      if (any){
-        try { if (typeof gvars.contains === 'function'){ if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1); else gvars.get('PlayerOnSave').setNumber(1); } else { const pv=gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber==='function') pv.setNumber(1); } } catch(e){}
-        return { ok:true, encrypted:true };
-      } else return { ok:true, encrypted:false };
-
-    } catch(err){ console.error('encryptOne manual unexpected', err); return { ok:false, reason:'error', error:String(err) }; }
-    finally { try{ delete window[LOCK]; }catch(e){} }
-  });
-})();
+    // ---------- Run with timeout guard ----------
+    try {
+      // if worker doesn't finish in OP_TIMEOUT_MS, we consider it failed and allow retries later
+      const result = await Promise.race([
+        worker(),
+        new Promise((_, reject)=> setTimeout(()=> reject(new Error('encrypt-one-time timeout')), OP_TIMEOUT_MS))
+      ]);
+      log('encrypt-one-time finished:', result);
+    } catch(err) {
+      // on timeout or other unrecoverable error, ensure lock cleared (worker's finally should have done it,
+      // but in case worker blocked before setting lock we clear defensively)
+      try { window[LOCK_GLOBAL][runKey] = false; delete window[LOCK_GLOBAL][runKey]; } catch(e){}
+      warn('encrypt-one-time aborted:', err && err.message ? err.message : String(err));
+      // do NOT mark DONE_GLOBAL in this case so that a later retry is possible
+    }
+  })();
+})(runtimeScene);
 
 };
 gdjs.PlayCode.asyncCallback27564772 = function (runtimeScene, asyncObjectsList) {
@@ -18226,7 +18361,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(1), 
 {
 
 
-gdjs.PlayCode.userFunc0x1830ae0(runtimeScene);
+gdjs.PlayCode.userFunc0x17f7950(runtimeScene);
 
 }
 
@@ -18302,7 +18437,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x184a360(runtimeScene);
+gdjs.PlayCode.userFunc0xf789e0(runtimeScene);
 
 }
 
@@ -18413,7 +18548,7 @@ gdjs.PlayCode.eventsList224(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1c64990 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x19a06c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18596,78 +18731,213 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x10ff850 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1244638 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// ================================================================
-// Exposed function: await window.encryptPlayerUniversalOnce(runtimeScene)
-// - Single-call, safe lock/unlock, SHA-256 derivation
-// - Writes PlayerUniversal.Encpt.<field> ciphertexts and sets PlayerOnSave=1 on success
-// ================================================================
-(function(){
-  window.encryptPlayerUniversalOnce = window.encryptPlayerUniversalOnce || (async function(runtimeScene){
-    const LOCK = '__gd_encrypt_once_manual_lock';
-    if (window[LOCK]) { console.log('[encryptOnce] already running'); return {ok:false,reason:'already'}; }
-    window[LOCK] = true;
-    try {
-      if (!('crypto' in window) || !crypto.subtle) return {ok:false,reason:'no-crypto'};
-      const FIELDS = ['BestScore','Pfcs','Points'];
-      const SALT_BYTES = 16, IV_BYTES = 12;
+// =============================================================
+// encryptPlayerUniversalSafe (definitivo — evita loops / crashes)
+// - Auto-runs once per session for current user+mod (safe)
+// - Locking, timeout, guaranteed finally-unlock
+// - Lightweight SHA-256 derivation + AES-GCM encrypt
+// - Use in Start of scene JS event (runs once)
+// - If quiser chamar manualmente: await window.encryptPlayerUniversalSafe(runtimeScene)
+// =============================================================
 
-      const strToU8 = (s)=>new TextEncoder().encode(s);
-      const u8ToStr = (u)=>new TextDecoder().decode(u);
-      const randomBytes = (n)=>{ const b=new Uint8Array(n); crypto.getRandomValues(b); return b; };
-      const abToB64 = (buf)=>{ const bytes=new Uint8Array(buf); let s=''; for(let i=0;i<bytes.length;i++) s+=String.fromCharCode(bytes[i]); return btoa(s); };
-      const b64ToU8 = (b64)=>{ const binary=atob(b64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
+(function(runtimeScene){
+  (async function(){
+    // ---------- CONFIG ----------
+    const LOCK_GLOBAL = '__gd_encrypt_once_safe_lock_v3';
+    const DONE_GLOBAL = '__gd_encrypt_once_safe_done_v3'; // session memory of completions
+    const FIELDS = ['BestScore','Pfcs','Points'];
+    const SALT_BYTES = 16;
+    const IV_BYTES = 12;
+    const OP_TIMEOUT_MS = 20000; // 20 seconds global timeout (adjust down if needed)
+    const YIELD_MS = 8; // small yield between fields to avoid blocking UI
 
-      async function deriveKey(password, saltU8){
-        const comb = new Uint8Array(strToU8(password).length + saltU8.length); comb.set(strToU8(password),0); comb.set(saltU8, strToU8(password).length);
-        const hash = await crypto.subtle.digest('SHA-256', comb);
-        return await crypto.subtle.importKey('raw', hash, { name:'AES-GCM' }, false, ['encrypt','decrypt']);
+    // ---------- small helpers ----------
+    const log = (...a)=>{ try{ console.log('[encrypt-safe]',...a); }catch(e){} };
+    const warn = (...a)=>{ try{ console.warn('[encrypt-safe]',...a); }catch(e){} };
+    const error = (...a)=>{ try{ console.error('[encrypt-safe]',...a); }catch(e){} };
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const strToU8 = s => new TextEncoder().encode(s);
+    const u8ToStr = u => new TextDecoder().decode(u);
+    const randomBytes = n => { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; };
+    const abToB64 = buf => { const bytes = new Uint8Array(buf); let s=''; for (let i=0;i<bytes.length;i++) s+=String.fromCharCode(bytes[i]); return btoa(s); };
+    const b64ToU8 = b64 => { const binary = atob(b64); const bytes = new Uint8Array(binary.length); for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; };
+
+    // ---------- crypto (SHA-256 derivation -> AES-GCM key) ----------
+    async function deriveKeySHA256(password, saltU8){
+      const pwU8 = strToU8(password);
+      const comb = new Uint8Array(pwU8.length + saltU8.length);
+      comb.set(pwU8, 0);
+      comb.set(saltU8, pwU8.length);
+      const digest = await crypto.subtle.digest('SHA-256', comb);
+      return crypto.subtle.importKey('raw', digest, { name:'AES-GCM' }, false, ['encrypt','decrypt']);
+    }
+    async function encryptWithKey(keyPassword, saltU8, plaintext){
+      const iv = randomBytes(IV_BYTES);
+      const aesKey = await deriveKeySHA256(keyPassword, saltU8);
+      const cipherBuf = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, aesKey, strToU8(plaintext));
+      return `${abToB64(saltU8.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipherBuf)}`;
+    }
+
+    // parse number safely
+    function parseToNumberOrZero(v){
+      if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+      if (typeof v === 'string') {
+        const t = v.trim();
+        if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) return Number(t);
+        return 0;
       }
-      async function encryptWith(keyPass, saltU8, plaintext){
-        const iv = randomBytes(IV_BYTES);
-        const key = await deriveKey(keyPass, saltU8);
-        const cipher = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, strToU8(plaintext));
-        return `${abToB64(saltU8.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher)}`;
+      if (v && typeof v === 'object') {
+        try { if ('value' in v && typeof v.value === 'number') return v.value; const js = JSON.stringify(v); if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(js)) return Number(js); } catch(e){}
       }
+      return 0;
+    }
 
-      function getUser(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername==='function') return gdjs.playerAuthentication.getUsername(); }catch(e){} return ''; }
-      function getToken(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken==='function') return gdjs.playerAuthentication.getUserToken()||'';}catch(e){} return ''; }
+    // ---------- GDevelop auth helpers ----------
+    function getUsername(){
+      try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
+        const u = gdjs.playerAuthentication.getUsername(); if (u && u.trim()) return u;
+      } } catch(e){} return '';
+    }
+    function getUserToken(){
+      try { if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
+        return gdjs.playerAuthentication.getUserToken() || '';
+      } } catch(e){} return '';
+    }
+    function getModShort(runtimeScene){
+      try {
+        const gvars = runtimeScene.getGame().getVariables();
+        if (gvars && typeof gvars.contains === 'function' && gvars.contains('ModShortName')) {
+          const gv = gvars.get('ModShortName'); if (gv && typeof gv.getAsString === 'function') return gv.getAsString();
+        } else if (gvars && typeof gvars.get === 'function') {
+          const gv2 = gvars.get('ModShortName'); if (gv2) return gv2.getAsString ? gv2.getAsString() : String(gv2);
+        }
+      } catch(e){}
+      try {
+        const svs = runtimeScene.getVariables();
+        if (svs && typeof svs.contains === 'function' && svs.contains('ModShortName')) {
+          const sv = svs.get('ModShortName'); if (sv && typeof sv.getAsString === 'function') return sv.getAsString();
+        } else if (svs && typeof svs.get === 'function') {
+          const sv2 = svs.get('ModShortName'); if (sv2) return sv2.getAsString ? sv2.getAsString() : String(sv2);
+        }
+      } catch(e){}
+      return 'online';
+    }
 
-      const username = getUser(); if (!username) return {ok:false,reason:'not-logged'};
-      const token = getToken(); const secret = username + (token ? ('|' + token) : '');
+    // ---------- determine runKey (per user+mod) ----------
+    const username = getUsername();
+    if (!username) { log('User not logged in — encrypt-one-time SAFE will not run.'); return; }
+    const token = getUserToken();
+    const modShort = getModShort(runtimeScene);
+    const runKey = `${username}::${modShort}`; // per-session key
 
-      const gvars = runtimeScene.getGame().getVariables(); if (!gvars) return {ok:false,reason:'no-vars'};
-      const pu = gvars.get('PlayerUniversal'); if (!pu) return {ok:false,reason:'no-pu'};
+    // init global state containers if not exist
+    if (!window[LOCK_GLOBAL]) window[LOCK_GLOBAL] = {};
+    if (!window[DONE_GLOBAL]) window[DONE_GLOBAL] = {};
 
-      // salt persisted or ephemeral
-      let saltB64 = '';
-      try { const sVar = pu.getChild('Encpt').getChild('__salt'); if (sVar && typeof sVar.getAsString === 'function') saltB64 = sVar.getAsString(); if (!saltB64) { saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); try { pu.getChild('Encpt').getChild('__salt').setString(saltB64); } catch(e){} } } catch(e){ saltB64 = abToB64(randomBytes(SALT_BYTES).buffer); }
+    // if already completed in this session -> skip
+    if (window[DONE_GLOBAL][runKey]) { log('encrypt-one-time already completed this session for', runKey, '- skipping.'); return; }
 
-      const saltU8 = b64ToU8(saltB64);
-      let any = false;
-      for (let i=0;i<FIELDS.length;i++){
-        const k = FIELDS[i];
+    // if already running for this runKey -> skip
+    if (window[LOCK_GLOBAL][runKey]) { log('encrypt-one-time is already running for', runKey, '- skipping invocation.'); return; }
+
+    // Define the actual worker function (will be raced against timeout)
+    async function worker() {
+      window[LOCK_GLOBAL][runKey] = true; // lock
+      let anySuccess = false;
+      try {
+        // environment checks
+        if (typeof window === 'undefined' || !('crypto' in window) || !crypto.subtle) throw new Error('WebCrypto (crypto.subtle) not available');
+
+        // access vars
+        const gvars = runtimeScene.getGame().getVariables();
+        if (!gvars) throw new Error('Game variables not available');
+        const pu = gvars.get('PlayerUniversal');
+        if (!pu) throw new Error('PlayerUniversal variable not found');
+
+        // ensure Encpt exists (getChild may create)
+        try { pu.getChild('Encpt'); } catch(e){}
+
+        // get or create salt (persisting salt is fine; non-fatal if write fails)
+        let saltB64 = '';
         try {
-          const ch = pu.getChild(k);
-          if (!ch) continue;
-          let cur; try { cur = ch.toJSObject(); } catch(e){ cur = (typeof ch.getAsNumber === 'function') ? ch.getAsNumber() : (typeof ch.getAsString === 'function' ? ch.getAsString() : null); }
-          const num = (typeof cur === 'number') ? (Number.isFinite(cur)?cur:0) : (typeof cur === 'string' && /^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(cur) ? Number(cur) : 0);
-          const ct = await encryptWith(secret, saltU8, String(num));
-          try { pu.getChild('Encpt').getChild(k).setString(ct); any = true; } catch(e){ console.warn('write Encpt fail',k,e); }
-        } catch(e){ console.error('field encrypt error',k,e); }
-        await new Promise(r=>setTimeout(r,8));
+          const sVar = pu.getChild('Encpt').getChild('__salt');
+          if (sVar && typeof sVar.getAsString === 'function') saltB64 = sVar.getAsString();
+          if (!saltB64) {
+            const newSalt = randomBytes(SALT_BYTES);
+            saltB64 = abToB64(newSalt.buffer);
+            try { pu.getChild('Encpt').getChild('__salt').setString(saltB64); } catch(e){ warn('Could not persist __salt (non-fatal)'); }
+          }
+        } catch(e) {
+          // fallback ephemeral salt
+          saltB64 = abToB64(randomBytes(SALT_BYTES).buffer);
+          warn('Using ephemeral salt for this run (persist failed)');
+        }
+
+        const saltU8 = b64ToU8(saltB64);
+        const secret = username + (token ? ('|' + token) : '');
+
+        // derive key per run only when encryptWithKey called - derive is internal in encryptWithKey
+        // iterate fields sequentially (no heavy work)
+        for (let i = 0; i < FIELDS.length; ++i) {
+          const k = FIELDS[i];
+          try {
+            const child = pu.getChild(k);
+            if (!child) { warn('Missing field', k, '- skipping'); continue; }
+            let cur;
+            try { cur = child.toJSObject(); } catch(e) { cur = (typeof child.getAsNumber === 'function') ? child.getAsNumber() : (typeof child.getAsString === 'function' ? child.getAsString() : null); }
+            const num = parseToNumberOrZero(cur);
+            const plaintext = String(num);
+            const ciphertext = await encryptWithKey(secret, saltU8, plaintext);
+            try { pu.getChild('Encpt').getChild(k).setString(ciphertext); anySuccess = true; log('Wrote Encpt.'+k); } catch(e){ warn('Failed to write Encpt.'+k, e); }
+          } catch(e){ warn('Error processing field', k, e); }
+          // yield to event loop to avoid blocking runtime
+          await sleep(YIELD_MS);
+        }
+
+        // If wrote something, mark PlayerOnSave
+        if (anySuccess) {
+          try {
+            if (typeof gvars.contains === 'function') {
+              if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
+              else gvars.get('PlayerOnSave').setNumber(1);
+            } else {
+              const pv = gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
+            }
+            log('PlayerOnSave set to 1');
+          } catch(e){ warn('Failed to set PlayerOnSave', e); }
+        } else {
+          log('No fields encrypted (none written)');
+        }
+
+        // mark completed for this session runKey
+        window[DONE_GLOBAL][runKey] = true;
+        return { ok: true, encrypted: anySuccess };
+      } finally {
+        // ALWAYS release lock for this runKey
+        try { window[LOCK_GLOBAL][runKey] = false; delete window[LOCK_GLOBAL][runKey]; } catch(e){}
       }
+    } // end worker
 
-      if (any){
-        try { if (typeof gvars.contains === 'function'){ if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1); else gvars.get('PlayerOnSave').setNumber(1); } else { const pv=gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber==='function') pv.setNumber(1); } } catch(e){}
-        return { ok:true, encrypted:true };
-      } else return { ok:true, encrypted:false };
-
-    } catch(err){ console.error('encryptOne manual unexpected', err); return { ok:false, reason:'error', error:String(err) }; }
-    finally { try{ delete window[LOCK]; }catch(e){} }
-  });
-})();
+    // ---------- Run with timeout guard ----------
+    try {
+      // if worker doesn't finish in OP_TIMEOUT_MS, we consider it failed and allow retries later
+      const result = await Promise.race([
+        worker(),
+        new Promise((_, reject)=> setTimeout(()=> reject(new Error('encrypt-one-time timeout')), OP_TIMEOUT_MS))
+      ]);
+      log('encrypt-one-time finished:', result);
+    } catch(err) {
+      // on timeout or other unrecoverable error, ensure lock cleared (worker's finally should have done it,
+      // but in case worker blocked before setting lock we clear defensively)
+      try { window[LOCK_GLOBAL][runKey] = false; delete window[LOCK_GLOBAL][runKey]; } catch(e){}
+      warn('encrypt-one-time aborted:', err && err.message ? err.message : String(err));
+      // do NOT mark DONE_GLOBAL in this case so that a later retry is possible
+    }
+  })();
+})(runtimeScene);
 
 };
 gdjs.PlayCode.asyncCallback36767612 = function (runtimeScene, asyncObjectsList) {
@@ -18705,7 +18975,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(1), 
 {
 
 
-gdjs.PlayCode.userFunc0x1c64990(runtimeScene);
+gdjs.PlayCode.userFunc0x19a06c8(runtimeScene);
 
 }
 
@@ -18781,7 +19051,7 @@ gdjs.PlayCode.eventsList229(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x10ff850(runtimeScene);
+gdjs.PlayCode.userFunc0x1244638(runtimeScene);
 
 }
 
@@ -22455,7 +22725,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x1c416e0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x18c1e28 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22474,7 +22744,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x1c41780 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x1809478 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -22739,7 +23009,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x1c416e0(runtimeScene);
+gdjs.PlayCode.userFunc0x18c1e28(runtimeScene);
 
 }
 
@@ -22747,7 +23017,7 @@ gdjs.PlayCode.userFunc0x1c416e0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x1c41780(runtimeScene);
+gdjs.PlayCode.userFunc0x1809478(runtimeScene);
 
 }
 
@@ -22869,7 +23139,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1c38f30 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xff8d58 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -23788,7 +24058,7 @@ gdjs.PlayCode.eventsList274 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x1c38f30(runtimeScene);
+gdjs.PlayCode.userFunc0xff8d58(runtimeScene);
 
 }
 
@@ -23868,7 +24138,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1e46700 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x19bc1d0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -24838,7 +25108,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x1e46700(runtimeScene);
+gdjs.PlayCode.userFunc0x19bc1d0(runtimeScene);
 
 }
 
