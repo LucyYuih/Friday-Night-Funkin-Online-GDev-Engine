@@ -530,7 +530,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3)
 
 };gdjs.MenuCode.eventsList2 = function(runtimeScene) {
 
-};gdjs.MenuCode.userFunc0x1b997f0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.MenuCode.userFunc0x1882518 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ================================================================
 // Auto-run ONE-TIME decryptor (SHA-256 derivation)
@@ -644,7 +644,7 @@ if (true)
 {
 
 
-gdjs.MenuCode.userFunc0x1b997f0(runtimeScene);
+gdjs.MenuCode.userFunc0x1882518(runtimeScene);
 
 }
 
