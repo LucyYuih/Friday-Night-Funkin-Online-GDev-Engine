@@ -10,7 +10,7 @@ gdjs.evtsExt__ArrayTools__ObjectReverse.idToCallbackMap = new Map();
 gdjs.evtsExt__ArrayTools__ObjectReverse.GDObjectObjects1= [];
 
 
-gdjs.evtsExt__ArrayTools__ObjectReverse.userFunc0x1215b20 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__ArrayTools__ObjectReverse.userFunc0x120e220 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 /** @type {gdjs.Variable} */
 const array = eventsFunctionContext.getArgument("Array");
@@ -26,7 +26,7 @@ gdjs.evtsExt__ArrayTools__ObjectReverse.eventsList0 = function(runtimeScene, eve
 {
 
 
-gdjs.evtsExt__ArrayTools__ObjectReverse.userFunc0x1215b20(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__ArrayTools__ObjectReverse.userFunc0x120e220(runtimeScene, eventsFunctionContext);
 
 }
 
