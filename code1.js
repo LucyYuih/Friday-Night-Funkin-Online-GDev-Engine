@@ -339,7 +339,6 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x12be3b8 = function GDJSInlineCode(runtimeScene) {
 gdjs.InicioCode.userFunc0x1f215a0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
