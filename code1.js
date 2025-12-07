@@ -339,15 +339,13 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0xfbb938 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x12be3b8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
-// PlayerUniversal save module (final)
-// - Ensures PlayerUniversal children (BestScore, Pfcs, Points) are stored as NUMBER
-// - Ensures PlayerUniversal.Encpt.<field> contains ciphertext STRING per-field
-// - Import: applies plaintext -> sets numeric children -> writes ciphertext to Encpt -> sets PlayerOnSave = 1
-// - One-time: encryptPlayerUniversalToEncptOnce(runtimeScene) encrypts current numeric children into Encpt (no memory change)
-// - Uses gdjs.playerAuthentication.getUsername() and getUserToken() as key material (username|token)
+// PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
+// - Keeps automatic fallback but removes explicit "Save to device" button.
+// - Ensures max 3 saved entries per user+modShort; deletes oldest when excede.
+// - UI close (X) fixed, download/share explicit buttons remain.
 // ===================================================================
 
 (function () {
@@ -355,78 +353,31 @@ gdjs.InicioCode.userFunc0xfbb938 = function GDJSInlineCode(runtimeScene) {
   const PBKDF2_ITERATIONS = 150000;
   const SALT_BYTES = 16;
   const IV_BYTES = 12;
-  const DERIVED_BITS = 512; // 64 bytes -> 32 AES + 32 HMAC
-  const WANT_FIELDS = ["BestScore", "Pfcs", "Points"];
-  const NOT_LOGGED_MSG = "Save available only for logged-in players (please log in from the menu)";
+  const DERIVED_BITS = 512;
+  const FIELDS = ['BestScore', 'Pfcs', 'Points'];
+  const MAX_FALLBACK_ENTRIES = 3; // máximo mantido por usuário+modShort
 
-  // ---------- Helpers ----------
-  function trimStr(s){ return typeof s === 'string' ? s.trim() : s; }
-  function isNumericString(s){
-    if (typeof s !== 'string') return false;
-    return /^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(s);
-  }
-  function parseToNumber(v){
-    // returns a finite number or null if cannot parse
-    if (typeof v === 'number') {
-      return Number.isFinite(v) ? v : null;
+  // ---------- Utils ----------
+  function strToU8(s) { return new TextEncoder().encode(s); }
+  function u8ToStr(u) { return new TextDecoder().decode(u); }
+  function randomBytes(n) { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
+  function abToB64(buf) { let binary = ''; const bytes = new Uint8Array(buf); for (let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]); return btoa(binary); }
+  function b64ToU8(b64) { const binary = atob(b64); const bytes = new Uint8Array(binary.length); for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; }
+  function concatU8(...arrs){ const total = arrs.reduce((s,a)=>s+a.length,0); const out = new Uint8Array(total); let off=0; for (const a of arrs){ out.set(a, off); off+=a.length; } return out; }
+  function isNumericString(s){ return typeof s==='string' && /^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(s.trim()); }
+  function parseToNumberOrZero(v){
+    if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+    if (typeof v === 'string' && isNumericString(v)) return Number(v);
+    if (v && typeof v === 'object') {
+      try { if ('value' in v && typeof v.value === 'number') return v.value; const js = JSON.stringify(v); if (isNumericString(js)) return Number(js); } catch(e){}
     }
-    if (typeof v === 'string') {
-      const t = v.trim();
-      if (isNumericString(t)) {
-        const n = Number(t);
-        return Number.isFinite(n) ? n : null;
-      }
-      return null;
-    }
-    if (typeof v === 'object' && v !== null) {
-      try {
-        // try common patterns: {value: 123} or JSON stringify then parse number
-        if ('value' in v && typeof v.value === 'number' && Number.isFinite(v.value)) return v.value;
-        const js = JSON.stringify(v);
-        if (isNumericString(js)) {
-          const n = Number(js);
-          return Number.isFinite(n) ? n : null;
-        }
-      } catch(e){}
-    }
-    // fallback null
-    return null;
-  }
-
-  function strToU8(s){ return new TextEncoder().encode(s); }
-  function u8ToStr(u){ return new TextDecoder().decode(u); }
-  function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
-  function abToB64(buf){
-    let binary = '';
-    const bytes = new Uint8Array(buf);
-    for (let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]);
-    return btoa(binary);
-  }
-  function b64ToU8(b64){
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-    return bytes;
-  }
-  function concatU8(...arrs){
-    const total = arrs.reduce((s,a)=>s+a.length,0);
-    const out = new Uint8Array(total);
-    let off=0;
-    for (const a of arrs){ out.set(a, off); off+=a.length; }
-    return out;
-  }
-  function equalConstTime(a,b){
-    if (!a || !b) return false;
-    if (a.length !== b.length) return false;
-    let r = 0;
-    for (let i=0;i<a.length;i++) r |= a[i] ^ b[i];
-    return r === 0;
+    return 0;
   }
 
   // ---------- Crypto core ----------
-  async function deriveKeys(password, salt){
+  async function deriveKeys(password, saltU8){
     const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-    const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
+    const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
     const db = new Uint8Array(derived);
     const aesBytes = db.slice(0,32);
     const hmacBytes = db.slice(32,64);
@@ -434,55 +385,68 @@ gdjs.InicioCode.userFunc0xfbb938 = function GDJSInlineCode(runtimeScene) {
     const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
     return { aesKey, hmacKey };
   }
-  async function computeHmac(hmacKey, dataU8){
-    const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8);
-    return new Uint8Array(sig);
-  }
-  async function encryptStringForField(password, plaintextString) {
+  async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8); return new Uint8Array(sig); }
+
+  async function encryptFilePayload(secret, jsonText){
     const salt = randomBytes(SALT_BYTES);
     const iv = randomBytes(IV_BYTES);
-    const { aesKey, hmacKey } = await deriveKeys(password, salt);
-    const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(plaintextString));
+    const { aesKey, hmacKey } = await deriveKeys(secret, salt);
+    const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(jsonText));
     const cipher = new Uint8Array(cipherBuf);
     const macData = concatU8(salt, iv, cipher);
     const hmac = await computeHmac(hmacKey, macData);
     return `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
   }
-  async function decryptFilePayload(password, fileText){
+  async function decryptFilePayload(secret, fileText){
     const parts = fileText.trim().split('.');
     if (parts.length !== 4) throw new Error("Invalid file format");
     const salt = b64ToU8(parts[0]);
     const iv = b64ToU8(parts[1]);
     const cipher = b64ToU8(parts[2]);
     const hmac = b64ToU8(parts[3]);
-    const { aesKey, hmacKey } = await deriveKeys(password, salt);
+    const { aesKey, hmacKey } = await deriveKeys(secret, salt);
     const macData = concatU8(salt, iv, cipher);
     const expected = await computeHmac(hmacKey, macData);
-    if (!equalConstTime(expected, hmac)) throw new Error("Integrity/HMAC check failed (wrong key or file modified).");
+    if (expected.length !== hmac.length) throw new Error("HMAC mismatch");
+    let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("HMAC mismatch");
     const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv: iv}, aesKey, cipher);
     return u8ToStr(new Uint8Array(plainBuf));
   }
-
-  // ---------- Auth helpers (GDevelop) ----------
-  function getAuthenticatedUsername() {
-    try {
-      if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
-        const u = gdjs.playerAuthentication.getUsername();
-        if (u && typeof u === 'string' && u.trim() !== '') return u;
-      }
-    } catch(e){}
-    return '';
-  }
-  function getAuthenticatedUserToken() {
-    try {
-      if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
-        return gdjs.playerAuthentication.getUserToken() || '';
-      }
-    } catch(e){}
-    return '';
+  async function encryptFieldString(secret, plaintextString){
+    const salt = randomBytes(SALT_BYTES);
+    const iv = randomBytes(IV_BYTES);
+    const { aesKey, hmacKey } = await deriveKeys(secret, salt);
+    const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(plaintextString));
+    const cipher = new Uint8Array(cipherBuf);
+    const macData = concatU8(salt, iv, cipher);
+    const hmac = await computeHmac(hmacKey, macData);
+    return `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
   }
 
-  // ---------- Minimal modal helpers (responsive) ----------
+  // ---------- GDevelop helpers ----------
+  function getUsername(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') return gdjs.playerAuthentication.getUsername(); }catch(e){} return ''; }
+  function getToken(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') return gdjs.playerAuthentication.getUserToken() || ''; } catch(e){} return ''; }
+  function getModShort(runtimeScene){
+    try {
+      const gvars = runtimeScene.getGame().getVariables();
+      if (gvars && typeof gvars.get === 'function') {
+        const gv = gvars.get('ModShortName');
+        if (gv && typeof gv.getAsString === 'function'){ const s=gv.getAsString(); if (s && s.trim()!=='') return s; }
+        if (gv) return (gv.getAsString?gv.getAsString():String(gv));
+      }
+    } catch(e){}
+    try {
+      const svs = runtimeScene.getVariables();
+      if (svs && typeof svs.get === 'function') {
+        const sv = svs.get('ModShortName');
+        if (sv && typeof sv.getAsString === 'function'){ const s2=sv.getAsString(); if (s2 && s2.trim()!=='') return s2; }
+        if (sv) return (sv.getAsString?sv.getAsString():String(sv));
+      }
+    } catch(e){}
+    return 'online';
+  }
+
+  // ---------- Modal helpers ----------
   let modalRoot = null;
   function ensureModalRoot(){
     if (modalRoot) return modalRoot;
@@ -509,30 +473,28 @@ gdjs.InicioCode.userFunc0xfbb938 = function GDJSInlineCode(runtimeScene) {
     root.style.backdropFilter = 'blur(2px)';
     root.style.pointerEvents = 'auto';
     const box = document.createElement('div');
-    box.style.width = 'min(92vw,760px)';
+    box.style.width = 'min(94vw,820px)';
     box.style.maxHeight = '90vh';
     box.style.overflow = 'auto';
     box.style.borderRadius = '12px';
-    box.style.background = 'linear-gradient(180deg, #0f1724, #071022)';
-    box.style.boxShadow = '0 8px 40px rgba(0,0,0,0.6)';
-    box.style.padding = '18px';
+    box.style.background = '#0b1220';
+    box.style.boxShadow = '0 10px 40px rgba(0,0,0,0.6)';
+    box.style.padding = '16px';
     box.style.color = '#e6eef8';
     box.style.display = 'flex';
     box.style.flexDirection = 'column';
-    box.style.gap = '12px';
+    box.style.gap = '10px';
     const header = document.createElement('div');
     header.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="font-size:18px;font-weight:600">${titleHtml}</div>
+      <div style="font-size:17px;font-weight:600">${titleHtml}</div>
       <button id="gd-save-close-btn" aria-label="Fechar" title="Fechar"
-        style="background:transparent;border:none;color:inherit;font-size:20px;cursor:pointer;padding:6px;border-radius:8px;">
-        ✕
-      </button>
+        style="background:transparent;border:none;color:inherit;font-size:20px;cursor:pointer;padding:6px;border-radius:8px;">✕</button>
     </div>`;
     box.appendChild(header);
     const body = document.createElement('div');
     body.style.display = 'flex';
     body.style.flexDirection = 'column';
-    body.style.gap = '10px';
+    body.style.gap = '8px';
     box.appendChild(body);
     const footer = document.createElement('div');
     footer.style.display = 'flex';
@@ -540,295 +502,1316 @@ gdjs.InicioCode.userFunc0xfbb938 = function GDJSInlineCode(runtimeScene) {
     footer.style.justifyContent = 'flex-end';
     box.appendChild(footer);
     root.appendChild(box);
+
     const closeBtn = header.querySelector('#gd-save-close-btn');
     function close(){
-      root.style.display = 'none';
-      root.innerHTML = '';
-      try { root.remove(); } catch(e){}
+      try { root.style.display = 'none'; root.innerHTML = ''; root.remove(); } catch(e) {}
       modalRoot = null;
     }
+    closeBtn.addEventListener('click', close);
+    root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
+
     return { root, box, header, body, footer, close, closeBtn };
   }
   function createButton(text, primary=false){
-    const b = document.createElement('button');
-    b.innerText = text;
-    b.style.padding = '10px 14px';
-    b.style.borderRadius = '9px';
-    b.style.border = 'none';
-    b.style.cursor = 'pointer';
-    b.style.fontSize = '14px';
-    b.style.fontWeight = '600';
-    if (primary){
-      b.style.background = 'linear-gradient(90deg,#2563eb,#7c3aed)';
-      b.style.color = '#fff';
-    } else {
-      b.style.background = 'rgba(255,255,255,0.03)';
-      b.style.color = '#e6eef8';
-    }
+    const b = document.createElement('button'); b.innerText = text;
+    b.style.padding = '8px 12px'; b.style.borderRadius='8px'; b.style.border='none'; b.style.cursor='pointer'; b.style.fontSize='14px';
+    if (primary){ b.style.background = 'linear-gradient(90deg,#2563eb,#7c3aed)'; b.style.color='#fff'; b.style.fontWeight='600'; }
+    else { b.style.background='rgba(255,255,255,0.03)'; b.style.color='#e6eef8'; }
     return b;
   }
-  function createSmallNote(txt){
-    const p = document.createElement('div');
-    p.style.fontSize = '12px';
-    p.style.opacity = '0.9';
-    p.innerText = txt;
-    return p;
+  function createSmallNote(txt){ const p=document.createElement('div'); p.style.fontSize='13px'; p.style.opacity='0.95'; p.innerText=txt; return p; }
+
+  // ---------- Storage helpers with trimming ----------
+  function saveToLocalFallback(key, text){
+    try { localStorage.setItem(key, text); return true; } catch(e){ try { sessionStorage.setItem(key, text); return true; } catch(e2){ return false; } }
+  }
+  function readLocalFallback(key){ try { return localStorage.getItem(key); } catch(e){ try { return sessionStorage.getItem(key); } catch(e2){ return null; } } }
+
+  // Return keys for prefix sorted ascending by timestamp (oldest first)
+  function getFallbackKeysSortedAsc(prefix){
+    const out = [];
+    try {
+      for (let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.startsWith(prefix)) {
+          // try extract timestamp at end
+          const m = k.match(/_(\d+)$/);
+          const stamp = m ? Number(m[1]) : 0;
+          out.push({ key: k, stamp });
+        }
+      }
+    } catch(e){}
+    // also check sessionStorage as backup
+    try {
+      for (let i=0;i<sessionStorage.length;i++){
+        const k = sessionStorage.key(i);
+        if (!k) continue;
+        if (k.startsWith(prefix)) {
+          if (out.find(o=>o.key===k)) continue;
+          const m = k.match(/_(\d+)$/);
+          const stamp = m ? Number(m[1]) : 0;
+          out.push({ key: k, stamp });
+        }
+      }
+    } catch(e){}
+    out.sort((a,b)=> (a.stamp - b.stamp) || a.key.localeCompare(b.key));
+    return out.map(o=>o.key);
+  }
+
+  // Trim oldest until count < MAX_FALLBACK_ENTRIES, then store new key
+  function doLocalFallbackStoreWithTrim(keyPrefix, text){
+    try {
+      const keysAsc = getFallbackKeysSortedAsc(keyPrefix);
+      // Delete oldest until count < MAX
+      while (keysAsc.length >= MAX_FALLBACK_ENTRIES){
+        const oldest = keysAsc.shift();
+        try { localStorage.removeItem(oldest); } catch(e){ try { sessionStorage.removeItem(oldest); } catch(e2){} }
+      }
+      const stamp = Date.now();
+      const newKey = `${keyPrefix}_${stamp}`;
+      const ok = saveToLocalFallback(newKey, text);
+      return ok ? newKey : null;
+    } catch(e){
+      return null;
+    }
+  }
+
+  function loadLocalFallbackKeys(prefix){
+    // return newest-first for UI convenience
+    const asc = getFallbackKeysSortedAsc(prefix);
+    return asc.reverse();
+  }
+
+  async function copyToClipboard(text){ try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; } const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); return true; } catch(e){ return false; } }
+
+  // ---------- Export method primitives ----------
+  function doDownloadBlob(blob, filename){
+    try {
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1500);
+      return true;
+    } catch(e){ console.error('doDownloadBlob error', e); return false; }
+  }
+  async function doShareFile(blob, filename){
+    try {
+      const file = new File([blob], filename, { type: 'application/octet-stream' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return true;
+      }
+      return false;
+    } catch(e){ console.warn('doShareFile failed', e); return false; }
   }
 
   // ---------- Export UI ----------
   async function openExportUI(runtimeScene){
     const modal = createModal('Export save — PlayerUniversal');
-    const { body, footer, closeBtn, root } = modal;
-    const username = getAuthenticatedUsername();
+    const { body, footer, root, close } = modal;
+
+    const username = getUsername();
     if (!username) {
-      body.appendChild(createSmallNote(NOT_LOGGED_MSG));
-      const btnClose = createButton('Close', true);
-      footer.appendChild(btnClose);
-      btnClose.addEventListener('click', ()=>{ try{ root.remove(); }catch(e){} modalRoot=null; });
-      root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
+      body.appendChild(createSmallNote('Save available only for logged-in players (please log in from the menu)'));
+      const btnClose = createButton('Close', true); footer.appendChild(btnClose); btnClose.addEventListener('click', ()=> close());
       return;
     }
+
     body.appendChild(createSmallNote('Exporting save for user: ' + username));
-    body.appendChild(createSmallNote('This will use your authenticated account as encryption key on this device.'));
+    body.appendChild(createSmallNote('Choose export method or press Export to auto-choose.'));
 
-    const btnCancel = createButton('Cancel', false);
-    const btnExport = createButton('Export', true);
-    footer.appendChild(btnCancel);
-    footer.appendChild(btnExport);
+    const status = document.createElement('div'); status.style.fontSize='13px'; status.style.minHeight='22px'; body.appendChild(status);
 
-    const status = document.createElement('div');
-    status.style.fontSize = '13px';
-    status.style.minHeight = '22px';
-    body.appendChild(status);
+    // Buttons row: method choices (no fallback explicit button)
+    const methodRow = document.createElement('div'); methodRow.style.display='flex'; methodRow.style.flexWrap='wrap'; methodRow.style.gap='8px'; body.appendChild(methodRow);
+    const btnDownload = createButton('Download (.save)', false);
+    const btnShare = createButton('Share (mobile)', false);
+    methodRow.appendChild(btnDownload); methodRow.appendChild(btnShare);
 
-    btnCancel.addEventListener('click', ()=>{ try{ root.remove(); }catch(e){} modalRoot=null; });
+    // main footer buttons
+    const btnRow = document.createElement('div'); btnRow.style.display='flex'; btnRow.style.gap='8px'; footer.appendChild(btnRow);
+    const btnCancel = createButton('Cancel', false); btnRow.appendChild(btnCancel);
+    const btnExport = createButton('Export (auto)', true); btnRow.appendChild(btnExport);
 
-    btnExport.addEventListener('click', async ()=>{
+    btnCancel.addEventListener('click', ()=> close());
+
+    // Core export action (returns true if some method succeeded)
+    async function performExport(runtimeScene, chosenMethod){
       status.innerText = 'Generating encrypted save...';
       try {
-        const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-        if (!gv) throw new Error("Global variable 'PlayerUniversal' not found.");
+        const gvars = runtimeScene.getGame().getVariables();
+        const pu = gvars.get('PlayerUniversal');
+        if (!pu) throw new Error('PlayerUniversal variable not found.');
         const payload = {};
-        for (const k of WANT_FIELDS){
-          const child = gv.getChild(k);
-          try { payload[k] = child ? child.toJSObject() : null; } catch(e){ payload[k] = null; }
+        for (const k of FIELDS){
+          try { payload[k] = pu.getChild(k).toJSObject(); } catch(e){ try { payload[k] = (pu.getChild(k).getAsString?pu.getChild(k).getAsString():null); } catch(e2){ payload[k] = null; } }
         }
-        const json = JSON.stringify({ version: 1, payload: payload });
-        const token = getAuthenticatedUserToken();
+        const json = JSON.stringify({ version:1, payload: payload });
+        const token = getToken();
         const secret = username + (token ? ('|' + token) : '');
+        if (!('crypto' in window) || !crypto.subtle) throw new Error('WebCrypto not available (required for encryption).');
+        const outText = await encryptFilePayload(secret, json);
 
-        // encrypt file
-        const salt = randomBytes(SALT_BYTES);
-        const iv = randomBytes(IV_BYTES);
-        const { aesKey, hmacKey } = await deriveKeys(secret, salt);
-        const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(json));
-        const cipher = new Uint8Array(cipherBuf);
-        const macData = concatU8(salt, iv, cipher);
-        const hmac = await computeHmac(hmacKey, macData);
-        const out = `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
-        const blob = new Blob([out], { type: "application/octet-stream" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'PlayerUniversal.save';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        status.innerText = 'Export completed.';
+        const filename = 'PlayerUniversal.save';
+        const blob = new Blob([outText], { type: 'application/octet-stream' });
+
+        if (chosenMethod === 'download') {
+          const ok = doDownloadBlob(blob, filename);
+          if (ok) { status.innerText = 'Downloaded file.'; return true; }
+        } else if (chosenMethod === 'share') {
+          const ok = await doShareFile(blob, filename);
+          if (ok) { status.innerText = 'Shared via system dialog.'; return true; }
+        } else if (chosenMethod === 'auto') {
+          // try anchor download first
+          try {
+            if (doDownloadBlob(blob, filename)) { status.innerText = 'Downloaded file.'; return true; }
+          } catch(e){}
+          // try share
+          try {
+            if (await doShareFile(blob, filename)) { status.innerText = 'Shared via system dialog.'; return true; }
+          } catch(e){}
+          // fallback (automatic) with trimming
+          const keyPrefix = `PlayerSave_${username}_${getModShort(runtimeScene)}`;
+          const key = doLocalFallbackStoreWithTrim(keyPrefix, outText);
+          if (key) { status.innerText = `Saved to device storage as key: ${key}`; return true; }
+          throw new Error('All export methods failed.');
+        }
+        // if method-specific didn't succeed, try automatic fallback (trimmed)
+        const keyPrefix = `PlayerSave_${username}_${getModShort(runtimeScene)}`;
+        const key = doLocalFallbackStoreWithTrim(keyPrefix, outText);
+        if (key) { status.innerText = `Saved to device storage as key: ${key}`; return true; }
+        throw new Error('Export method failed.');
       } catch (err) {
-        console.error(err);
         status.innerText = 'Error: ' + (err && err.message ? err.message : String(err));
-      } finally {
-        setTimeout(()=>{ try{ root.remove(); }catch(e){} modalRoot=null; }, 900);
+        console.error('Export error', err);
+        return false;
       }
+    }
+
+    // wire explicit method buttons
+    btnDownload.addEventListener('click', async () => {
+      btnDownload.disabled = true; status.innerText = 'Starting download...';
+      const ok = await performExport(runtimeScene, 'download');
+      setTimeout(()=>{ btnDownload.disabled=false; if(ok) close(); }, 900);
+    });
+    btnShare.addEventListener('click', async () => {
+      btnShare.disabled = true; status.innerText = 'Opening share...';
+      const ok = await performExport(runtimeScene, 'share');
+      setTimeout(()=>{ btnShare.disabled=false; if(ok) close(); }, 900);
     });
 
-    root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
+    // auto export button
+    btnExport.addEventListener('click', async () => {
+      btnExport.disabled = true; status.innerText = 'Exporting (auto)...';
+      const ok = await performExport(runtimeScene, 'auto');
+      setTimeout(()=>{ btnExport.disabled=false; if(ok) close(); }, 1100);
+    });
 
     return;
   }
 
-  // ---------- Import UI (final behavior) ----------
+  // ---------- Import UI ----------
   async function openImportUI(runtimeScene){
     const modal = createModal('Import save — PlayerUniversal');
-    const { body, footer, closeBtn, root } = modal;
-    const username = getAuthenticatedUsername();
+    const { body, footer, root, close } = modal;
+
+    const username = getUsername();
     if (!username) {
-      body.appendChild(createSmallNote(NOT_LOGGED_MSG));
-      const btnClose = createButton('Close', true);
-      footer.appendChild(btnClose);
-      btnClose.addEventListener('click', ()=>{ try{ root.remove(); }catch(e){} modalRoot=null; });
-      root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
+      body.appendChild(createSmallNote('Save available only for logged-in players (please log in from the menu)'));
+      const btnClose = createButton('Close', true); footer.appendChild(btnClose); btnClose.addEventListener('click', ()=> close());
       return;
     }
 
     body.appendChild(createSmallNote('Importing for user: ' + username));
-    body.appendChild(createSmallNote('Select a .save file exported by this game for this account.'));
+    body.appendChild(createSmallNote('Choose a .save file, paste encrypted text, or pick a saved device entry.'));
 
     // file selector
-    const fileRow = document.createElement('div');
-    fileRow.style.display='flex'; fileRow.style.flexDirection='column'; fileRow.style.gap='6px';
-    const fileLabel = document.createElement('label'); fileLabel.innerText = 'File (.save)';
-    fileLabel.style.fontSize='13px';
-    const fileBtn = createButton('Choose file', false);
-    const fileName = document.createElement('div'); fileName.style.fontSize='13px'; fileName.style.opacity='0.9';
-    fileRow.appendChild(fileLabel); fileRow.appendChild(fileBtn); fileRow.appendChild(fileName);
-    body.appendChild(fileRow);
-    const hiddenFile = document.createElement('input');
-    hiddenFile.type = 'file';
-    hiddenFile.accept = '.save,application/octet-stream,text/plain';
-    hiddenFile.style.display = 'none';
-    document.body.appendChild(hiddenFile);
+    const fileInput = document.createElement('input'); fileInput.type='file'; fileInput.accept='.save,application/octet-stream,text/plain'; fileInput.style.display='block';
+    body.appendChild(fileInput);
+    const pasteLabel = document.createElement('div'); pasteLabel.style.fontSize='13px'; pasteLabel.innerText='Or paste encrypted save text below:'; body.appendChild(pasteLabel);
+    const pasteArea = document.createElement('textarea'); pasteArea.rows=6; pasteArea.style.width='100%'; pasteArea.placeholder='Paste encrypted save text here'; body.appendChild(pasteArea);
+    const btnPasteClipboard = createButton('Paste from clipboard', false); body.appendChild(btnPasteClipboard);
 
-    const status = document.createElement('div');
-    status.style.fontSize = '13px';
-    status.style.minHeight = '22px';
-    body.appendChild(status);
+    // fallback list
+    const fallbackListDiv = document.createElement('div'); fallbackListDiv.style.display='block'; fallbackListDiv.style.marginTop='8px'; body.appendChild(fallbackListDiv);
 
-    const btnCancel = createButton('Cancel', false);
-    const btnImport = createButton('Import', true);
+    const status = document.createElement('div'); status.style.minHeight='20px'; status.style.fontSize='13px'; body.appendChild(status);
+
+    // Populate fallback localStorage saves (max 3 enforced by store)
+    const modShort = getModShort(runtimeScene);
+    const fallbackPrefix = `PlayerSave_${username}_${modShort}`;
+    function refreshFallbackList(){
+      fallbackListDiv.innerHTML = '<div style="font-size:13px;font-weight:600;margin-bottom:6px">Saved entries on device:</div>';
+      const keys = loadLocalFallbackKeys(`${fallbackPrefix}_`);
+      if (!keys.length) { fallbackListDiv.innerHTML += '<div style="font-size:13px;opacity:0.9">No local fallback saves found.</div>'; return; }
+      for (const k of keys){
+        const row = document.createElement('div'); row.style.display='flex'; row.style.alignItems='center'; row.style.gap='8px'; row.style.marginBottom='6px';
+        const label = document.createElement('div'); label.style.fontSize='12px'; label.style.opacity='0.95'; label.innerText = k;
+        const btnLoad = createButton('Load', false); const btnCopy = createButton('Copy text', false);
+        row.appendChild(label); row.appendChild(btnLoad); row.appendChild(btnCopy); fallbackListDiv.appendChild(row);
+        btnLoad.addEventListener('click', ()=> {
+          const txt = readLocalFallback(k);
+          pasteArea.value = txt || '';
+          status.innerText = txt ? `Loaded ${k}` : `Could not read ${k}`;
+        });
+        btnCopy.addEventListener('click', async ()=>{
+          const txt = readLocalFallback(k);
+          if (!txt) { status.innerText = 'Empty'; return; }
+          const ok = await copyToClipboard(txt);
+          status.innerText = ok ? 'Copied to clipboard' : 'Failed to copy';
+        });
+      }
+    }
+    refreshFallbackList();
+
+    btnPasteClipboard.addEventListener('click', async ()=>{
+      try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          const txt = await navigator.clipboard.readText();
+          pasteArea.value = txt || '';
+          status.innerText = 'Pasted from clipboard';
+        } else {
+          status.innerText = 'Clipboard API not available';
+        }
+      } catch(e){ status.innerText = 'Clipboard read error'; }
+    });
+
+    const btnCancel = createButton('Cancel', false); const btnImport = createButton('Import', true);
     footer.appendChild(btnCancel); footer.appendChild(btnImport);
+    btnCancel.addEventListener('click', ()=> close());
 
-    let chosenFileText = null;
-    fileBtn.addEventListener('click', ()=> hiddenFile.click());
-    hiddenFile.addEventListener('change', (e)=>{
+    // file reading
+    let fileText = null;
+    fileInput.addEventListener('change', (e)=>{
       const f = e.target.files[0];
-      if (!f){ fileName.innerText = 'No file selected'; chosenFileText = null; return; }
-      fileName.innerText = `${f.name} • ${Math.round(f.size/1024)} KB`;
+      if (!f) { status.innerText = 'No file selected'; fileText = null; return; }
       const reader = new FileReader();
-      reader.onload = ()=> { chosenFileText = String(reader.result); status.innerText = 'File loaded.'; };
-      reader.onerror = ()=> { chosenFileText = null; status.innerText = 'Failed to read file.'; };
+      reader.onload = ()=> { fileText = String(reader.result); status.innerText = `File loaded (${f.name})`; };
+      reader.onerror = ()=> { fileText = null; status.innerText = 'Failed to read file'; };
       reader.readAsText(f);
     });
 
-    btnCancel.addEventListener('click', ()=>{ try{ root.remove(); }catch(e){} modalRoot=null; });
-
     btnImport.addEventListener('click', async ()=>{
-      if (!chosenFileText){ status.innerText = 'Choose a file first.'; return; }
-      status.innerText = 'Importing... please wait.';
+      status.innerText = 'Importing...';
       try {
-        const token = getAuthenticatedUserToken();
+        const token = getToken();
         const secret = username + (token ? ('|' + token) : '');
-        // decrypt payload
-        const plain = await decryptFilePayload(secret, chosenFileText);
-        const parsed = JSON.parse(plain);
+        let encryptedText = fileText || (pasteArea.value && pasteArea.value.trim()) || null;
+        if (!encryptedText) { status.innerText = 'Choose a file or paste encrypted text'; return; }
+        if (!('crypto' in window) || !crypto.subtle) { status.innerText = 'WebCrypto not available; cannot decrypt here.'; return; }
+
+        // decrypt file payload
+        let plain;
+        try { plain = await decryptFilePayload(secret, encryptedText); } catch(e){ status.innerText = 'Decryption failed: ' + (e.message || e); console.error(e); return; }
+        let parsed;
+        try { parsed = JSON.parse(plain); } catch(e){ status.innerText = 'Invalid payload JSON'; console.error(e); return; }
         const payload = parsed.payload || parsed;
-        const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-        if (!gv) throw new Error("Global variable 'PlayerUniversal' not found.");
 
-        // Ensure Encpt structure exists (getChild will create if needed in some runtimes)
-        try { gv.getChild("Encpt"); } catch(e){ /* ignore */ }
+        // apply numeric fields into PlayerUniversal and create per-field ciphertexts in Encpt
+        const gvars = runtimeScene.getGame().getVariables();
+        const pu = gvars.get('PlayerUniversal');
+        if (!pu) { status.innerText = 'PlayerUniversal missing'; return; }
+        try { pu.getChild('Encpt'); } catch(e){}
 
-        for (const k of WANT_FIELDS) {
-          const v = (payload && (k in payload)) ? payload[k] : null;
-          const child = gv.getChild(k);
-          if (!child) continue;
-
-          // --- Force PlayerUniversal child to be NUMBER ---
-          let num = parseToNumber(v);
-          if (num === null) {
-            // if payload null/undefined or unparsable, fallback to 0
-            num = 0;
-          }
-          try { child.setNumber(num); } catch(e) { try { child.setNumber(Number(num) || 0); } catch(e2){} }
-
-          // --- Produce ciphertext from the numeric string representation and store in Encpt.<k> as STRING ---
+        for (const k of FIELDS){
           try {
-            const plainForField = String(num); // ensure numeric string
-            const ciphertext = await encryptStringForField(secret, plainForField);
+            const v = (payload && (k in payload)) ? payload[k] : null;
+            const num = parseToNumberOrZero(v);
+            try { pu.getChild(k).setNumber(num); } catch(e){ try { pu.getChild(k).setNumber(Number(num) || 0); } catch(e2){} }
             try {
-              gv.getChild("Encpt").getChild(k).setString(ciphertext);
-            } catch(e){
-              // fallback create/get then set
-              try { gv.getChild("Encpt").getChild(k).setString(ciphertext); } catch(e2){ console.warn('Failed to set Encpt.'+k, e2); }
-            }
-          } catch(e){ console.error('Per-field encryption failed for', k, e); }
+              const ctxt = await encryptFieldString(secret, String(num));
+              pu.getChild('Encpt').getChild(k).setString(ctxt);
+            } catch(e){ console.warn('Per-field encrypt failed for', k, e); }
+          } catch(e){ console.warn('Apply field error', k, e); }
         }
 
-        // After applying all numeric children and storing ciphertexts, set PlayerOnSave = 1
-        try {
-          const gvars = runtimeScene.getGame().getVariables();
-          if (gvars) {
-            try {
-              if (typeof gvars.contains === 'function') {
-                if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
-                else gvars.get('PlayerOnSave').setNumber(1);
-              } else {
-                const pv = gvars.get('PlayerOnSave');
-                if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
-              }
-            } catch(e){
-              try { gvars.get('PlayerOnSave').setNumber(1); } catch(e2){ console.warn('Failed to set PlayerOnSave', e2); }
-            }
-          }
-        } catch(e){ console.warn('Could not set PlayerOnSave global variable', e); }
+        // After applying fields set PlayerOnSave = 1
+        try { const pv = gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber === 'function') pv.setNumber(1); } catch(e){ console.warn('Failed set PlayerOnSave', e); }
 
-        status.innerText = 'Import applied — numeric children set and ciphertext saved in Encpt; PlayerOnSave = 1.';
+        status.innerText = 'Import applied — PlayerOnSave set to 1. Perform native save if desired.';
+        setTimeout(()=>close(), 1200);
       } catch (err) {
-        console.error(err);
-        status.innerText = 'Error: ' + (err && err.message ? err.message : String(err));
-      } finally {
-        setTimeout(()=>{ try{ root.remove(); }catch(e){} modalRoot=null; }, 900);
+        status.innerText = 'Import error: ' + (err && err.message ? err.message : String(err));
+        console.error('Import error', err);
       }
     });
-
-    root.addEventListener('click', (ev)=>{ ev.stopPropagation(); });
 
     return;
   }
 
-  // ---------- One-time encryption util ----------
-  // Call: window.encryptPlayerUniversalToEncptOnce(runtimeScene)
-  (function exposeOneTime(){
-    async function oneTime(runtimeScene){
-      const username = getAuthenticatedUsername();
-      if (!username) { console.warn('encryptPlayerUniversalToEncptOnce: user not logged in'); return false; }
-      const token = getAuthenticatedUserToken();
-      const secret = username + (token ? ('|' + token) : '');
+  // expose to window
+  window.openPlayerSaveExportUI = function(runtimeScene){ try { return openExportUI(runtimeScene); } catch(e){ console.error('openPlayerSaveExportUI', e); } };
+  window.openPlayerSaveImportUI = function(runtimeScene){ try { return openImportUI(runtimeScene); } catch(e){ console.error('openPlayerSaveImportUI', e); } };
 
-      const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-      if (!gv) { console.warn('encryptPlayerUniversalToEncptOnce: PlayerUniversal not found'); return false; }
+  console.log('PlayerUniversal Export/Import module (mobile-friendly, UI & storage trimming) loaded.');
+})();
 
-      // ensure Encpt
-      try { gv.getChild("Encpt"); } catch(e){ /* ignore */ }
+};
+gdjs.InicioCode.userFunc0x936920 = function GDJSInlineCode(runtimeScene) {
+"use strict";
+(function(runtimeScene){
+  if (window._firebaseAuthUIInjected) {
+    window._gd_runtimeScene = runtimeScene;
+    return;
+  }
+  window._firebaseAuthUIInjected = true;
+  window._gd_runtimeScene = runtimeScene;
 
-      for (const k of WANT_FIELDS) {
-        const child = gv.getChild(k);
-        if (!child) continue;
-        let current;
-        try { current = child.toJSObject(); } catch(e){
-          try { current = child.getAsNumber ? child.getAsNumber() : (child.getAsString ? child.getAsString() : null); } catch(e2){ current = null; }
-        }
-        // Ensure we use numeric value (since PlayerUniversal children must be numbers)
-        let num = parseToNumber(current);
-        if (num === null) num = 0;
-        const plainForField = String(num);
-        try {
-          const ciphertext = await encryptStringForField(secret, plainForField);
-          try { gv.getChild("Encpt").getChild(k).setString(ciphertext); }
-          catch(e){ try { gv.getChild("Encpt").getChild(k).setString(ciphertext); } catch(e2){ console.warn('Failed to set Encpt.'+k, e2); } }
-        } catch(e){ console.error('encryptPlayerUniversalToEncptOnce: failed for', k, e); }
-      }
-      console.log('encryptPlayerUniversalToEncptOnce: done');
-      return true;
+  const moduleCode = `
+/* ============================================================
+   Complete module: Auth UI + Avatar (URL/base64 resize 256) +
+   Names/Descriptions + PlayerSave sync (encrypt/decrypt)
+   Based on user's PlayerUniversal export/import script.
+   ============================================================ */
+
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+  sendPasswordResetEmail
+} from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js';
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  serverTimestamp,
+  arrayUnion,
+  arrayRemove
+} from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
+
+// ------------------ Your firebaseConfig (kept as provided) ------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyBeJ5nkLRENkjRlDmC7LhLsG5XBa0BIG_k",
+  authDomain: "fnf-gdev-online.firebaseapp.com",
+  projectId: "fnf-gdev-online",
+  storageBucket: "fnf-gdev-online.firebasestorage.app",
+  messagingSenderId: "595615246122",
+  appId: "1:595615246122:web:4b545361c1f01ea1c7a053",
+  measurementId: "G-MD2E4G1195"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ------------------ Crypto + export/import helpers (from your file) ------------------
+const PBKDF2_ITERATIONS = 150000;
+const SALT_BYTES = 16;
+const IV_BYTES = 12;
+const DERIVED_BITS = 512;
+const EXPORT_FIELDS = ['BestScore','Pfcs','Points']; // same fields used previously
+
+function strToU8(s) { return new TextEncoder().encode(s); }
+function u8ToStr(u) { return new TextDecoder().decode(u); }
+function randomBytes(n) { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
+function abToB64(buf) { let binary=''; const bytes=new Uint8Array(buf); for (let i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]); return btoa(binary); }
+function b64ToU8(b64) { const binary=atob(b64); const bytes=new Uint8Array(binary.length); for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; }
+function concatU8(...arrs){ const total=arrs.reduce((s,a)=>s+a.length,0); const out=new Uint8Array(total); let off=0; for(const a of arrs){ out.set(a, off); off+=a.length;} return out; }
+
+async function deriveKeys(password, saltU8){
+  const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
+  const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
+  const db = new Uint8Array(derived);
+  const aesBytes = db.slice(0,32);
+  const hmacBytes = db.slice(32,64);
+  const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
+  const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
+  return { aesKey, hmacKey };
+}
+async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8); return new Uint8Array(sig); }
+
+async function encryptFilePayload(secret, jsonText){
+  const salt = randomBytes(SALT_BYTES);
+  const iv = randomBytes(IV_BYTES);
+  const { aesKey, hmacKey } = await deriveKeys(secret, salt);
+  const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(jsonText));
+  const cipher = new Uint8Array(cipherBuf);
+  const macData = concatU8(salt, iv, cipher);
+  const hmac = await computeHmac(hmacKey, macData);
+  return \`\${abToB64(salt.buffer)}.\${abToB64(iv.buffer)}.\${abToB64(cipher.buffer)}.\${abToB64(hmac.buffer)}\`;
+}
+
+async function decryptFilePayload(secret, fileText){
+  const parts = fileText.trim().split('.');
+  if (parts.length !== 4) throw new Error("Invalid file format");
+  const salt = b64ToU8(parts[0]);
+  const iv = b64ToU8(parts[1]);
+  const cipher = b64ToU8(parts[2]);
+  const hmac = b64ToU8(parts[3]);
+  const { aesKey, hmacKey } = await deriveKeys(secret, salt);
+  const macData = concatU8(salt, iv, cipher);
+  const expected = await computeHmac(hmacKey, macData);
+  if (expected.length !== hmac.length) throw new Error("HMAC mismatch");
+  let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("HMAC mismatch");
+  const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv: iv}, aesKey, cipher);
+  return u8ToStr(new Uint8Array(plainBuf));
+}
+
+async function encryptFieldString(secret, plaintextString){
+  const salt = randomBytes(SALT_BYTES);
+  const iv = randomBytes(IV_BYTES);
+  const { aesKey, hmacKey } = await deriveKeys(secret, salt);
+  const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(plaintextString));
+  const cipher = new Uint8Array(cipherBuf);
+  const macData = concatU8(salt, iv, cipher);
+  const hmac = await computeHmac(hmacKey, macData);
+  return \`\${abToB64(salt.buffer)}.\${abToB64(iv.buffer)}.\${abToB64(cipher.buffer)}.\${abToB64(hmac.buffer)}\`;
+}
+
+// compute SHA256 hex for deterministic comparison of plaintext save JSON
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', strToU8(text));
+  const u8 = new Uint8Array(buf);
+  const hex = Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
+  return hex;
+}
+
+// ---------- Helpers for GDevelop variables (same style) ----------
+function getUsername(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') return gdjs.playerAuthentication.getUsername(); }catch(e){} return ''; }
+function getToken(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') return gdjs.playerAuthentication.getUserToken() || ''; } catch(e){} return ''; }
+function getModShort(runtimeScene){
+  try {
+    const gvars = runtimeScene.getGame().getVariables();
+    if (gvars && typeof gvars.get === 'function') {
+      const gv = gvars.get('ModShortName');
+      if (gv && typeof gv.getAsString === 'function'){ const s=gv.getAsString(); if (s && s.trim()!=='') return s; }
+      if (gv) return (gv.getAsString?gv.getAsString():String(gv));
     }
+  } catch(e){}
+  try {
+    const svs = runtimeScene.getVariables();
+    if (svs && typeof svs.get === 'function') {
+      const sv = svs.get('ModShortName');
+      if (sv && typeof sv.getAsString === 'function'){ const s2=sv.getAsString(); if (s2 && s2.trim()!=='') return s2; }
+      if (sv) return (sv.getAsString?sv.getAsString():String(sv));
+    }
+  } catch(e){}
+  return 'online';
+}
 
-    window.encryptPlayerUniversalToEncptOnce = async function(runtimeScene){
-      return oneTime(runtimeScene);
-    };
+// parse numeric helper (same as in your script)
+function isNumericString(s){ return typeof s==='string' && /^[\\s]*[+-]?(?:\\d+)(?:\\.\\d+)?[\\s]*$/.test(s.trim()); }
+function parseToNumberOrZero(v){
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  if (typeof v === 'string' && isNumericString(v)) return Number(v);
+  if (v && typeof v === 'object') {
+    try { if ('value' in v && typeof v.value === 'number') return v.value; const js = JSON.stringify(v); if (isNumericString(js)) return Number(js); } catch(e){}
+  }
+  return 0;
+}
+
+// ------------------ UI + Avatar + names/descriptions (reuse from previous module) ------------------
+/* For brevity I'm using the exact UI structure we already agreed on earlier:
+   - overlay with login/register/profile/settings
+   - avatar upload/resizing to 256x256
+   - names list handling (names/AllNames doc)
+   - playerDescriptions/{uid}
+   Implementation is identical to the module we used previously (keeps same IDs).
+*/
+function createAuthOverlay() {
+  if (document.getElementById('gd-firebase-auth-overlay')) return;
+
+  const css = \`
+#gd-firebase-auth-overlay { position: fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:999999; background: rgba(0,0,0,0.45); font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+#gd-firebase-auth-card { width: 520px; max-width: calc(100% - 32px); background: #0f1724; color: #e6eef8; border-radius: 12px; box-shadow: 0 10px 30px rgba(2,6,23,0.6); padding: 18px; position:relative; min-height:120px; }
+.gd-input { width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color:inherit; box-sizing:border-box; }
+.gd-btn { padding:10px 12px; border-radius:8px; border:none; background:#2563eb; color:white; cursor:pointer; font-weight:600; }
+.gd-link { cursor:pointer; color:#60a5fa; text-decoration:underline; margin-top:8px; display:inline-block; }
+.gd-small { font-size:13px; color:#bcd7ff; margin-top:6px; }
+#gd-auth-error { color:#ffd1d1; min-height:18px; margin-top:6px; font-size:13px; }
+#gd-auth-close { position:absolute; right:14px; top:10px; cursor:pointer; color:#9fb8ff; font-weight:700; }
+#gd-pfp-preview { width:96px; height:96px; border-radius:10px; object-fit:cover; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); }
+#gd-pfp-mini { width:64px; height:64px; border-radius:8px; object-fit:cover; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); }
+#gd-settings-actions { display:flex; gap:8px; margin-top:10px; }
+#gd-auth-title { margin-bottom:6px; }
+#gd-eye-btn { background: transparent; color: #9fb8ff; border: none; cursor: pointer; font-size: 14px; }
+\`;
+  const style = document.createElement('style');
+  style.id = 'gd-firebase-auth-style';
+  style.textContent = css;
+  document.head.appendChild(style);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'gd-firebase-auth-overlay';
+  overlay.style.display = 'none';
+  overlay.innerHTML = \`
+    <div id="gd-firebase-auth-card" role="dialog" aria-modal="true">
+      <div id="gd-auth-close" title="Fechar">✕</div>
+      <h2 id="gd-auth-title">Entrar</h2>
+
+      <div id="gd-auth-forms">
+        <!-- LOGIN -->
+        <div id="gd-login-form">
+          <input id="gd-email" class="gd-input" type="email" placeholder="Email" autocomplete="email" />
+          <input id="gd-password" class="gd-input" type="password" placeholder="Senha" autocomplete="current-password" />
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button id="gd-login-btn" class="gd-btn" style="flex:1;">Entrar</button>
+            <button id="gd-show-register-btn" class="gd-btn" style="flex:1; background:#10B981;">Criar</button>
+          </div>
+          <div id="gd-auth-error"></div>
+          <div id="gd-auth-footer">
+            <span class="gd-link" id="gd-forgot">Esqueci a senha</span>
+          </div>
+        </div>
+
+        <!-- REGISTER -->
+        <div id="gd-register-form" style="display:none;">
+          <input id="gd-reg-name" class="gd-input" type="text" placeholder="Nome (obrigatório)" />
+          <input id="gd-reg-email" class="gd-input" type="email" placeholder="Email" autocomplete="email" />
+          <input id="gd-reg-password" class="gd-input" type="password" placeholder="Senha (6+ caracteres)" />
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button id="gd-register-btn" class="gd-btn" style="flex:1; background:#10B981;">Criar Conta</button>
+            <button id="gd-show-login-btn" class="gd-btn" style="flex:1; background:#64748b;">Voltar</button>
+          </div>
+          <div id="gd-auth-error-reg" style="color:#ffd1d1; min-height:18px; margin-top:6px; font-size:13px;"></div>
+        </div>
+      </div>
+
+      <!-- PERFIL -->
+      <div id="gd-auth-user" style="display:none;">
+        <div id="gd-user-info">
+          <div id="gd-user-display" class="gd-small">Conectado</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+            <button id="gd-eye-btn" title="Mostrar/Ocultar email">👁️</button>
+            <div id="gd-user-email" class="gd-small" style="opacity:0.9;"></div>
+          </div>
+          <div id="gd-user-avatar-url" class="gd-small" style="opacity:0.8; margin-top:8px; word-break:break-all;"></div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+          <img id="gd-pfp-mini" src="" alt="PFP" />
+          <div style="display:flex; gap:8px;">
+            <button id="gd-settings-btn" class="gd-btn" style="background:#0ea5a4;">Configurar</button>
+            <button id="gd-logout-btn" class="gd-btn" style="background:#ef4444;">Sair</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONFIGURAÇÕES -->
+      <div id="gd-settings-panel">
+        <h3 style="margin:0 0 8px 0;font-size:15px;color:#cbe7ff;">Configurações da Conta</h3>
+        <input id="gd-settings-name" class="gd-input" type="text" placeholder="Nome (obrigatório)" />
+        <textarea id="gd-settings-desc" class="gd-input" placeholder="Descrição (visível ao público)" style="height:80px; resize:vertical;"></textarea>
+        <div id="gd-pfp-row" style="display:flex; gap:12px; align-items:flex-start; margin-top:8px;">
+          <img id="gd-pfp-preview" src="" alt="Preview" />
+          <div style="flex:1;">
+            <input id="gd-pfp-url" class="gd-input" type="text" placeholder="URL da imagem (apenas URL)" />
+            <div style="margin-top:8px;">
+              <input id="gd-pfp-file" type="file" accept="image/*" />
+            </div>
+            <div id="gd-settings-actions">
+              <button id="gd-save-settings" class="gd-btn" style="background:#2563eb;">Salvar</button>
+              <button id="gd-remove-pfp" class="gd-btn" style="background:#6b7280;">Remover PFP</button>
+              <button id="gd-settings-back" class="gd-btn" style="background:#94a3b8;">Voltar</button>
+            </div>
+            <div id="gd-settings-msg" class="gd-small" style="margin-top:6px;"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  \`;
+
+  document.body.appendChild(overlay);
+
+  const $ = id => document.getElementById(id);
+  function showOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='flex'; }
+  function hideOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='none'; }
+
+  // resize helper: File or dataURL -> resized dataURL 256x256
+  async function resizeImageTo256(fileOrDataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const maxSize = 256;
+          const canvas = document.createElement('canvas');
+          canvas.width = maxSize;
+          canvas.height = maxSize;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0,0,canvas.width, canvas.height);
+          const scale = Math.min(maxSize / img.width, maxSize / img.height);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const x = Math.round((maxSize - w) / 2);
+          const y = Math.round((maxSize - h) / 2);
+          ctx.drawImage(img, x, y, w, h);
+          const dataUrl = canvas.toDataURL('image/png');
+          resolve(dataUrl);
+        } catch (e) { reject(e); }
+      };
+      img.onerror = (e) => reject(e);
+      if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:')) {
+        img.src = fileOrDataUrl;
+      } else if (fileOrDataUrl instanceof File) {
+        const reader = new FileReader();
+        reader.onload = () => { img.src = reader.result; };
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(fileOrDataUrl);
+      } else {
+        reject(new Error('Formato inválido para resizeImageTo256'));
+      }
+    });
+  }
+
+  // --- UI action bindings (login/register/settings etc) ---
+  $('gd-auth-close').addEventListener('click', hideOverlay);
+  $('gd-show-register-btn').addEventListener('click', ()=>{ showRegisterView(); });
+  $('gd-show-login-btn').addEventListener('click', ()=>{ showLoginView(); });
+
+  function showLoginView(){
+    $('gd-auth-title').textContent = 'Entrar';
+    $('gd-login-form').style.display = '';
+    $('gd-register-form').style.display = 'none';
+    $('gd-auth-user').style.display = 'none';
+    $('gd-settings-panel').style.display = 'none';
+  }
+  function showRegisterView(){
+    $('gd-auth-title').textContent = 'Criar conta';
+    $('gd-login-form').style.display = 'none';
+    $('gd-register-form').style.display = '';
+    $('gd-auth-user').style.display = 'none';
+    $('gd-settings-panel').style.display = 'none';
+  }
+
+  // forgot password
+  $('gd-forgot').addEventListener('click', async ()=>{
+    const readyEmail = $('gd-email').value.trim();
+    const email = readyEmail || prompt('Digite seu email para reset de senha:');
+    if (!email) return;
+    try {
+      await sendPasswordResetEmail(auth, email);
+      alert('Email de redefinição enviado! Verifique sua caixa de entrada.');
+    } catch(err) {
+      alert('Erro ao enviar email de redefinição: ' + (err && err.message ? err.message : String(err)));
+    }
+  });
+
+  // REGISTER (name required & unique)
+  $('gd-register-btn').addEventListener('click', async ()=>{
+    const name = $('gd-reg-name').value.trim();
+    const email = $('gd-reg-email').value.trim();
+    const password = $('gd-reg-password').value;
+    $('gd-auth-error-reg').textContent = '';
+
+    if (!name) { $('gd-auth-error-reg').textContent = 'Nome é obrigatório.'; return; }
+
+    try {
+      const allRef = doc(db, 'names', 'AllNames');
+      const allSnap = await getDoc(allRef);
+      const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
+      if (list.includes(name)) { $('gd-auth-error-reg').textContent = 'Nome já em uso. Escolha outro.'; return; }
+
+      const uc = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = uc.user.uid;
+
+      await setDoc(doc(db, 'users', uid), {
+        displayName: name,
+        avatarURL: null,
+        updatedAt: serverTimestamp()
+      });
+
+      await setDoc(doc(db, 'avatarURL', uid), { url: null, updatedAt: serverTimestamp() });
+
+      try {
+        if (allSnap.exists()) {
+          await updateDoc(allRef, { list: arrayUnion(name) });
+        } else {
+          await setDoc(allRef, { list: [name] });
+        }
+      } catch(e){ console.warn('names list update failed on register', e); }
+
+      await setDoc(doc(db, 'playerDescriptions', uid), { description: '', updatedAt: serverTimestamp() });
+
+      try { await updateProfile(uc.user, { displayName: name, photoURL: null }); } catch(e){ console.warn(e); }
+
+      await handleUserAfterLogin(uc.user || auth.currentUser);
+    } catch(err) {
+      console.warn('register error', err);
+      $('gd-auth-error-reg').textContent = err && err.message ? err.message : String(err);
+    }
+  });
+
+  // LOGIN
+  $('gd-login-btn').addEventListener('click', async ()=>{
+    const email = $('gd-email').value.trim();
+    const password = $('gd-password').value;
+    $('gd-auth-error').textContent = '';
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const user = cred && cred.user ? cred.user : auth.currentUser;
+      await handleUserAfterLogin(user);
+    } catch(err) {
+      console.warn('signIn error', err);
+      $('gd-auth-error').textContent = err && err.message ? err.message : String(err);
+    }
+  });
+
+  // LOGOUT
+  $('gd-logout-btn').addEventListener('click', async ()=>{
+    try {
+      await signOut(auth);
+      hideOverlay();
+    } catch(err) {
+      alert('Erro ao sair: ' + (err && err.message ? err.message : String(err)));
+    }
+  });
+
+  // toggle email visibility
+  let emailVisible = false;
+  $('gd-eye-btn').addEventListener('click', ()=>{
+    emailVisible = !emailVisible;
+    $('gd-user-email').style.opacity = emailVisible ? '1' : '0';
+  });
+
+  // settings open / populate
+  $('gd-settings-btn').addEventListener('click', async ()=>{
+    const u = auth.currentUser;
+    if (!u) {
+      showLoginView();
+      showOverlay();
+      return;
+    }
+    $('gd-settings-panel').style.display = 'block';
+    $('gd-auth-user').style.display = 'none';
+    showOverlay();
+    setTimeout(()=> populateSettingsFields(u), 60);
+  });
+
+  $('gd-settings-back').addEventListener('click', ()=>{
+    $('gd-settings-panel').style.display = 'none';
+    $('gd-auth-user').style.display = '';
+  });
+
+  // remove pfp
+  $('gd-remove-pfp').addEventListener('click', async ()=>{
+    const u = auth.currentUser;
+    if (!u) { $('gd-settings-msg').textContent = 'Faça login primeiro.'; return; }
+    try {
+      await setDoc(doc(db, 'avatarURL', u.uid), { url: null, updatedAt: serverTimestamp() }, { merge: true });
+      try { await updateProfile(u, { photoURL: null }); } catch(e){ }
+      await updateDoc(doc(db,'users',u.uid), { avatarURL: null }).catch(()=>{});
+      $('gd-pfp-preview').src = '';
+      $('gd-pfp-mini').src = '';
+      $('gd-pfp-url').value = '';
+      $('gd-settings-msg').textContent = 'PFP removida.';
+      updateGDevelopVarsFromUser(u);
+    } catch(err) {
+      $('gd-settings-msg').textContent = 'Erro ao remover PFP: ' + (err && err.message ? err.message : String(err));
+    }
+  });
+
+  // save settings (name required unique, description, url)
+  $('gd-save-settings').addEventListener('click', async ()=>{
+    const u = auth.currentUser;
+    if (!u) { $('gd-settings-msg').textContent = 'Faça login primeiro.'; return; }
+    const newName = $('gd-settings-name').value.trim();
+    const description = $('gd-settings-desc').value || '';
+    const urlCandidate = $('gd-pfp-url').value.trim();
+    $('gd-settings-msg').textContent = 'Salvando...';
+
+    if (!newName) { $('gd-settings-msg').textContent = 'Nome é obrigatório.'; return; }
+
+    try {
+      const allRef = doc(db, 'names', 'AllNames');
+      const allSnap = await getDoc(allRef);
+      const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
+      let currentName = null;
+      try {
+        const userDoc = await getDoc(doc(db, 'users', u.uid));
+        if (userDoc.exists()) currentName = userDoc.data().displayName || null;
+      } catch(e){}
+
+      if (list.includes(newName) && newName !== currentName) {
+        $('gd-settings-msg').textContent = 'Nome já em uso. Escolha outro.';
+        return;
+      }
+
+      try {
+        if (currentName && currentName !== newName) {
+          await updateDoc(allRef, { list: arrayRemove(currentName) }).catch(()=>{});
+        }
+        if (!list.includes(newName)) {
+          if (allSnap.exists()) {
+            await updateDoc(allRef, { list: arrayUnion(newName) });
+          } else {
+            await setDoc(allRef, { list: [newName] });
+          }
+        }
+      } catch(e){ console.warn('names list update failed', e); }
+
+      await setDoc(doc(db, 'users', u.uid), {
+        displayName: newName,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      await setDoc(doc(db, 'playerDescriptions', u.uid), {
+        description: description,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      if (urlCandidate) {
+        await setDoc(doc(db, 'avatarURL', u.uid), { url: urlCandidate, updatedAt: serverTimestamp() }, { merge: true });
+        await updateDoc(doc(db,'users',u.uid), { avatarURL: urlCandidate }).catch(()=>{});
+        try { await updateProfile(u, { displayName: newName, photoURL: urlCandidate }); } catch(e){ console.warn('updateProfile failed', e); }
+        $('gd-pfp-preview').src = urlCandidate;
+        $('gd-pfp-mini').src = urlCandidate;
+      } else {
+        try { await updateProfile(u, { displayName: newName }); } catch(e){ console.warn('updateProfile failed', e); }
+      }
+
+      $('gd-settings-msg').textContent = 'Configurações salvas.';
+      updateGDevelopVarsFromUser(u);
+    } catch(err) {
+      console.error('save settings error', err);
+      $('gd-settings-msg').textContent = 'Erro ao salvar: ' + (err && err.message ? err.message : String(err));
+    }
+  });
+
+  // file input handler: resize to 256 and save base64
+  (function attachFileHandler(){
+    const fileInput = $('gd-pfp-file');
+    if (!fileInput) return;
+    fileInput.addEventListener('change', async (e) => {
+      const u = auth.currentUser;
+      if (!u) { alert('Faça login primeiro para importar uma imagem.'); return; }
+      const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+      if (!file) return;
+      if (file.size > (5 * 1024 * 1024)) {
+        if (!confirm('Arquivo >5MB. Converter para base64 pode ser demorado. Continuar?')) return;
+      }
+      $('gd-settings-msg').textContent = 'Convertendo/Redimensionando imagem...';
+      try {
+        const dataUrl256 = await resizeImageTo256(file);
+        await setDoc(doc(db, 'avatarURL', u.uid), { url: dataUrl256, updatedAt: serverTimestamp() }, { merge: true });
+        await setDoc(doc(db, 'users', u.uid), { avatarURL: dataUrl256, updatedAt: serverTimestamp() }, { merge: true });
+        try { await updateProfile(u, { photoURL: dataUrl256 }); } catch(e){ console.warn('updateProfile with dataURL failed', e); }
+        $('gd-pfp-preview').src = dataUrl256;
+        $('gd-pfp-mini').src = dataUrl256;
+        $('gd-pfp-url').value = dataUrl256;
+        $('gd-settings-msg').textContent = 'Imagem salva (Base64, redimensionada para 256×256).';
+        updateGDevelopVarsFromUser(u);
+      } catch(err) {
+        console.error('Error saving base64 avatar', err);
+        $('gd-settings-msg').textContent = 'Erro ao salvar imagem: ' + (err && err.message ? err.message : String(err));
+      }
+    });
   })();
 
-  // Expose UI calls
-  window.openPlayerSaveExportUI = function(runtimeScene){
-    try { return openExportUI(runtimeScene); } catch(e){ console.error(e); alert('Error opening export UI: '+e.message); }
-  };
-  window.openPlayerSaveImportUI = function(runtimeScene){
-    try { return openImportUI(runtimeScene); } catch(e){ console.error(e); alert('Error opening import UI: '+e.message); }
+  // populate settings
+  async function populateSettingsFields(user, retry = 0) {
+    const maxRetry = 12;
+    if (!document.getElementById('gd-settings-name') && retry < maxRetry) {
+      await new Promise(r=>setTimeout(r, 60));
+      return populateSettingsFields(user, retry+1);
+    }
+    if (!document.getElementById('gd-settings-name')) return;
+
+    try {
+      const nameEl = $('gd-settings-name');
+      const urlEl = $('gd-pfp-url');
+      const preview = $('gd-pfp-preview');
+      const mini = $('gd-pfp-mini');
+      const msg = $('gd-settings-msg');
+      const descEl = $('gd-settings-desc');
+      const avatarUrlDisplay = $('gd-user-avatar-url');
+
+      nameEl.value = user && (user.displayName || '') || '';
+      urlEl.value = user && (user.photoURL || '') || '';
+      preview.src = user && (user.photoURL || '') || '';
+      mini.src = user && (user.photoURL || '') || '';
+      if (avatarUrlDisplay) avatarUrlDisplay.textContent = '';
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const udata = userDoc.data();
+          if (udata.displayName) nameEl.value = udata.displayName;
+          if (udata.avatarURL) { preview.src = udata.avatarURL; mini.src = udata.avatarURL; urlEl.value = udata.avatarURL; }
+        }
+      } catch(e) { console.warn('users doc read failed', e); }
+
+      try {
+        const d = await getDoc(doc(db, 'avatarURL', user.uid));
+        if (d.exists()) {
+          const data = d.data();
+          const url = data && data.url ? data.url : null;
+          if (url) {
+            urlEl.value = url;
+            preview.src = url;
+            mini.src = url;
+            if (avatarUrlDisplay) avatarUrlDisplay.textContent = 'Avatar: ' + (url.length>80 ? url.slice(0,80)+'…' : url);
+          }
+        }
+      } catch(e) {
+        console.warn('populateSettingsFields firestore avatar read failed', e);
+        if (msg) msg.textContent = 'Aviso: não foi possível ler avatar do servidor.';
+      }
+
+      try {
+        const ddesc = await getDoc(doc(db, 'playerDescriptions', user.uid));
+        if (ddesc.exists() && ddesc.data().description !== undefined) {
+          descEl.value = ddesc.data().description || '';
+        } else {
+          descEl.value = '';
+        }
+      } catch(e) { console.warn('playerDescriptions read failed', e); }
+
+      if (msg) msg.textContent = '';
+    } catch(e) {
+      console.warn('populateSettingsFields error', e);
+    }
+  }
+
+  // update GDevelop variables
+  async function updateGDevelopVarsFromUser(user) {
+    try {
+      const rs = window._gd_runtimeScene;
+      if (!rs) return;
+      const vars = rs.getVariables ? rs.getVariables() : (rs.getScene ? rs.getScene().getVariables() : null);
+      if (!vars) return;
+
+      vars.get('auth_uid').setString(user ? user.uid : '');
+      vars.get('auth_email').setString(user ? (user.email || '') : '');
+      vars.get('auth_name').setString(user ? (user.displayName || '') : '');
+      vars.get('auth_photo').setString(user ? (user.photoURL || '') : '');
+
+      try {
+        if (user) {
+          const d = await getDoc(doc(db, 'avatarURL', user.uid));
+          const url = (d.exists() && d.data() && d.data().url) ? d.data().url : (user.photoURL || '');
+          vars.get('auth_avatar_url').setString(url || '');
+          const pd = await getDoc(doc(db, 'playerDescriptions', user.uid));
+          const desc = (pd.exists() && pd.data() && pd.data().description) ? pd.data().description : '';
+          vars.get('auth_description').setString(desc || '');
+          const game = rs.getGame ? rs.getGame() : (typeof runtimeGame !== 'undefined' ? runtimeGame : null);
+          if (game && game.getVariables) {
+            game.getVariables().get('auth_avatar_url').setString(url || '');
+            game.getVariables().get('auth_photo').setString(user.photoURL || '');
+            game.getVariables().get('auth_description').setString(desc || '');
+          }
+        } else {
+          vars.get('auth_avatar_url').setString('');
+          vars.get('auth_description').setString('');
+          const game = rs.getGame ? rs.getGame() : (typeof runtimeGame !== 'undefined' ? runtimeGame : null);
+          if (game && game.getVariables) {
+            game.getVariables().get('auth_avatar_url').setString('');
+            game.getVariables().get('auth_photo').setString('');
+            game.getVariables().get('auth_description').setString('');
+          }
+        }
+      } catch(e) {
+        console.warn('updateGDevelopVarsFromUser: avatar/desc read failed', e);
+      }
+    } catch(e) {
+      console.warn('updateGDevelopVarsFromUser error', e);
+    }
+  }
+
+  // read authoritative avatar doc to update profile UI
+  async function handleUserAfterLogin(user) {
+    if (!user) return;
+    try {
+      $('gd-auth-title').textContent = 'Perfil';
+      $('gd-login-form').style.display = 'none';
+      $('gd-register-form').style.display = 'none';
+      $('gd-settings-panel').style.display = 'none';
+      $('gd-auth-user').style.display = '';
+
+      $('gd-user-display').textContent = user.displayName || user.email || 'Usuário';
+      $('gd-user-email').textContent = user.email || '';
+      $('gd-user-email').style.opacity = '0';
+
+      try {
+        const d = await getDoc(doc(db, 'avatarURL', user.uid));
+        const url = (d.exists() && d.data() && d.data().url) ? d.data().url : (user.photoURL || '');
+        $('gd-pfp-mini').src = url || '';
+        const avatarUrlDisplay = $('gd-user-avatar-url');
+        if (avatarUrlDisplay) avatarUrlDisplay.textContent = url ? ('Avatar: ' + (url.length > 80 ? url.slice(0,80)+'…' : url)) : '';
+      } catch(e) {
+        console.warn('handleUserAfterLogin: avatar read failed', e);
+        $('gd-pfp-mini').src = user.photoURL || '';
+      }
+
+      updateGDevelopVarsFromUser(user);
+
+      // After login, trigger sync of player save automatically (first-run sync behavior)
+      try {
+        await syncPlayerSaveIfNeeded(window._gd_runtimeScene);
+      } catch(e) { console.warn('player save sync after login failed', e); }
+
+    } catch(e) {
+      console.warn('handleUserAfterLogin error', e);
+    }
+  }
+
+  // auth state listener
+  onAuthStateChanged(auth, async (user) => {
+    console.log('onAuthStateChanged', user);
+    if (user) {
+      try {
+        $('gd-auth-title').textContent = 'Perfil';
+        $('gd-login-form').style.display = 'none';
+        $('gd-register-form').style.display = 'none';
+        $('gd-auth-user').style.display = '';
+        $('gd-settings-panel').style.display = 'none';
+      } catch(e){}
+      await handleUserAfterLogin(user);
+    } else {
+      try {
+        const overlay = $('gd-firebase-auth-overlay');
+        if (overlay && overlay.style.display === 'flex') {
+          showLoginView();
+        }
+      } catch(e){}
+      updateGDevelopVarsFromUser(null);
+    }
+  });
+
+  // public API
+  window.gdFirebaseAuthUI = {
+    show: () => {
+      const user = auth.currentUser;
+      showOverlay();
+      if (user) {
+        try {
+          $('gd-auth-title').textContent = 'Perfil';
+          $('gd-login-form').style.display = 'none';
+          $('gd-register-form').style.display = 'none';
+          $('gd-auth-user').style.display = '';
+          $('gd-settings-panel').style.display = 'none';
+        } catch(e){}
+        handleUserAfterLogin(user).catch(e => console.warn(e));
+        return;
+      }
+      showLoginView();
+    },
+    hide: hideOverlay,
+    getCurrentUser: () => auth.currentUser,
+    setRuntimeScene: (rs) => { window._gd_runtimeScene = rs; updateGDevelopVarsFromUser(auth.currentUser); },
+    openSettings: () => {
+      const user = auth.currentUser;
+      if (!user) {
+        window.gdFirebaseAuthUI.show();
+        return;
+      }
+      showOverlay();
+      try {
+        $('gd-auth-title').textContent = 'Perfil — Configurações';
+        $('gd-login-form').style.display = 'none';
+        $('gd-register-form').style.display = 'none';
+        $('gd-auth-user').style.display = 'none';
+        $('gd-settings-panel').style.display = 'block';
+      } catch(e){}
+      setTimeout(()=> populateSettingsFields(user), 60);
+    },
+    // NEW: explicit sync trigger
+    syncPlayerSaveNow: async () => {
+      try {
+        await syncPlayerSaveIfNeeded(window._gd_runtimeScene, { force: true });
+        return true;
+      } catch(e) { console.warn(e); return false; }
+    }
   };
 
-  console.log('PlayerUniversal final module loaded (numeric-preserving PlayerUniversal, ciphertext in Encpt).');
+} // end createAuthOverlay
+
+createAuthOverlay();
+
+/* ============================
+   PlayerSave sync logic
+   - On first execution after login, does:
+     - check playerSave/{uid} in Firestore;
+     - if exists: decrypt and apply fields (like import UI did);
+     - if not exists or content differs from current plaintext save => encrypt current save and write to Firestore with hash.
+   - Public API: window.gdFirebaseAuthUI.syncPlayerSaveNow()
+   - Uses same encryption primitives above for compatibility.
+   ============================ */
+
+async function buildCurrentSavePlaintext(runtimeScene){
+  // Build the same structure {version:1, payload:{ BestScore, Pfcs, Points } }
+  try {
+    const gvars = runtimeScene.getGame().getVariables();
+    const pu = gvars.get('PlayerUniversal');
+    if (!pu) throw new Error('PlayerUniversal variable not found.');
+    const payload = {};
+    for (const k of EXPORT_FIELDS){
+      try { payload[k] = pu.getChild(k).toJSObject(); } catch(e){ try { payload[k] = (pu.getChild(k).getAsString? pu.getChild(k).getAsString() : null); } catch(e2){ payload[k] = null; } }
+    }
+    return JSON.stringify({ version:1, payload });
+  } catch(e){ throw e; }
+}
+
+async function applyDecryptedSaveToGame(runtimeScene, decryptedJsonText){
+  // identical to import: parse JSON -> payload -> set numeric fields and per-field encpt
+  const parsed = JSON.parse(decryptedJsonText);
+  const payload = parsed.payload || parsed;
+  const gvars = runtimeScene.getGame().getVariables();
+  const pu = gvars.get('PlayerUniversal');
+  if (!pu) throw new Error('PlayerUniversal missing');
+  try { pu.getChild('Encpt'); } catch(e){}
+  for (const k of EXPORT_FIELDS){
+    try {
+      const v = (payload && (k in payload)) ? payload[k] : null;
+      const num = parseToNumberOrZero(v);
+      try { pu.getChild(k).setNumber(num); } catch(e){ try { pu.getChild(k).setNumber(Number(num) || 0); } catch(e2){} }
+      try {
+        const token = getToken();
+        const username = getUsername();
+        const secret = username + (token ? ('|' + token) : '');
+        const ctxt = await encryptFieldString(secret, String(num));
+        pu.getChild('Encpt').getChild(k).setString(ctxt);
+      } catch(e){ console.warn('Per-field encrypt failed for', k, e); }
+    } catch(e){ console.warn('Apply field error', k, e); }
+  }
+  try { const pv = gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber === 'function') pv.setNumber(1); } catch(e){ console.warn('Failed set PlayerOnSave', e); }
+}
+
+// Read Firestore playerSave doc (returns { save: string, hash: string } or null)
+async function readPlayerSaveDoc(uid){
+  try {
+    const snap = await getDoc(doc(db, 'playerSave', uid));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    return { save: data.save || null, hash: data.hash || null };
+  } catch(e){ console.warn('readPlayerSaveDoc failed', e); return null; }
+}
+
+// Write playerSave doc with save string and hash
+async function writePlayerSaveDoc(uid, saveString, hashHex){
+  try {
+    await setDoc(doc(db, 'playerSave', uid), { save: saveString, hash: hashHex, updatedAt: serverTimestamp() }, { merge: true });
+    return true;
+  } catch(e){ console.warn('writePlayerSaveDoc failed', e); return false; }
+}
+
+// Core sync behavior
+async function syncPlayerSaveIfNeeded(runtimeScene, opts = { force: false }){
+  // opts.force = true -> always write current plaintext to firestore (unless identical)
+  if (!runtimeScene) {
+    console.warn('syncPlayerSaveIfNeeded: runtimeScene not provided');
+    return;
+  }
+  const user = auth.currentUser;
+  if (!user) {
+    console.log('syncPlayerSaveIfNeeded: no auth user, skipping');
+    return;
+  }
+  try {
+    // Build current plaintext JSON
+    const currentPlain = await buildCurrentSavePlaintext(runtimeScene);
+    const currentHash = await sha256Hex(currentPlain);
+
+    // read remote
+    const remote = await readPlayerSaveDoc(user.uid);
+
+    if (!remote || !remote.save) {
+      // no remote save -> encrypt current and write
+      const token = getToken();
+      const secret = getUsername() + (token ? ('|' + token) : '');
+      const enc = await encryptFilePayload(secret, currentPlain);
+      await writePlayerSaveDoc(user.uid, enc, currentHash);
+      console.log('syncPlayerSaveIfNeeded: saved current save to firestore (no previous).');
+      return;
+    }
+
+    // remote exists: compare hash: if identical, just apply remote (decrypt+apply)
+    if (remote.hash && remote.hash === currentHash && !opts.force) {
+      // hashes equal -> remote contents equal to current; but we still apply remote decrypted to ensure in-game Encpt updated
+      try {
+        const token = getToken();
+        const secret = getUsername() + (token ? ('|' + token) : '');
+        const plain = await decryptFilePayload(secret, remote.save);
+        await applyDecryptedSaveToGame(runtimeScene, plain);
+        console.log('syncPlayerSaveIfNeeded: remote save matches local (hash match). Decrypted and applied.');
+        return;
+      } catch(e) {
+        // if decryption fails, fallback to writing current save to firestore
+        console.warn('syncPlayerSaveIfNeeded: decryption failed for remote save even though hash matched - will overwrite remote', e);
+        const token = getToken();
+        const secret = getUsername() + (token ? ('|' + token) : '');
+        const enc = await encryptFilePayload(secret, currentPlain);
+        await writePlayerSaveDoc(user.uid, enc, currentHash);
+        return;
+      }
+    } else {
+      // hashes differ (remote different than current) -> decide: if opts.force true -> overwrite remote with current
+      if (opts.force) {
+        const token = getToken();
+        const secret = getUsername() + (token ? ('|' + token) : '');
+        const enc = await encryptFilePayload(secret, currentPlain);
+        await writePlayerSaveDoc(user.uid, enc, currentHash);
+        console.log('syncPlayerSaveIfNeeded: forced overwrite remote with current save.');
+        return;
+      }
+
+      // remote exists but different: prefer remote (user asked: "se ja existir o save na firebase ele só le e aplica os valores nas respectivas variaveis igual o js que eu enviei")
+      // So per your request: if there's a remote save, we should read & apply it.
+      try {
+        const token = getToken();
+        const secret = getUsername() + (token ? ('|' + token) : '');
+        const plain = await decryptFilePayload(secret, remote.save);
+        await applyDecryptedSaveToGame(runtimeScene, plain);
+        console.log('syncPlayerSaveIfNeeded: remote save exists and was applied (over local differences).');
+        // After applying remote, if you prefer to push local later you can call sync with force:true
+        return;
+      } catch(e) {
+        // If decryption fails (maybe tokens different), fallback to writing local
+        console.warn('syncPlayerSaveIfNeeded: failed to decrypt remote save, will attempt to upload local save', e);
+        try {
+          const token = getToken();
+          const secret = getUsername() + (token ? ('|' + token) : '');
+          const enc = await encryptFilePayload(secret, currentPlain);
+          await writePlayerSaveDoc(user.uid, enc, currentHash);
+          console.log('syncPlayerSaveIfNeeded: uploaded local save after decrypt failure.');
+          return;
+        } catch(e2){
+          console.error('syncPlayerSaveIfNeeded: failed to upload local save as fallback', e2);
+          return;
+        }
+      }
+    }
+  } catch(e){
+    console.error('syncPlayerSaveIfNeeded error', e);
+    throw e;
+  }
+}
+
+// Expose sync function globally too
+window.gdFirebaseAuthUI = window.gdFirebaseAuthUI || {};
+window.gdFirebaseAuthUI.syncPlayerSaveNow = async function(){ try{ await syncPlayerSaveIfNeeded(window._gd_runtimeScene, { force: true }); return true; } catch(e){ console.warn(e); return false; } };
+
+// Also attempt initial sync if user already logged and runtimeScene available
+(async ()=>{
+  try {
+    const u = auth.currentUser;
+    if (u) {
+      // give a short delay to ensure runtimeScene is set
+      await new Promise(r=>setTimeout(r, 200));
+      if (window._gd_runtimeScene) {
+        try { await syncPlayerSaveIfNeeded(window._gd_runtimeScene); } catch(e){ console.warn('initial syncPlayerSaveIfNeeded failed', e); }
+      }
+    }
+  } catch(e){ console.warn('initial player save sync error', e); }
 })();
+
+`; // end moduleCode string
+
+  const s = document.createElement('script');
+  s.type = 'module';
+  s.textContent = moduleCode;
+  document.head.appendChild(s);
+
+  // keep runtimeScene reference for variable syncing
+  window._gd_runtimeScene = runtimeScene;
+})(runtimeScene);
 
 };
 gdjs.InicioCode.eventsList1 = function(runtimeScene) {
@@ -862,7 +1845,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0xfbb938(runtimeScene);
+gdjs.InicioCode.userFunc0x12be3b8(runtimeScene);
 
 }
 
@@ -881,6 +1864,14 @@ let isConditionTrue_0 = false;
 {gdjs.evtTools.input.touchSimulateMouse(runtimeScene, true);
 }
 }
+
+}
+
+
+{
+
+
+gdjs.InicioCode.userFunc0x936920(runtimeScene);
 
 }
 
@@ -923,241 +1914,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0xf1c308 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-// ===============================================================
-// Auto-run ONE-TIME decryptor: read PlayerUniversal.Encpt.<field>,
-// decrypt each field and write numeric value into PlayerUniversal.<field>
-// Runs once when this JS event executes (suitable for Start of scene).
-// After successful application, sets Global variable PlayerOnSave = 1.
-// ===============================================================
-
-(function(runtimeScene){
-  (async function(){
-    try {
-      // run-flag key helpers
-      const RUN_FLAG = '__gd_decrypt_playeruniversal_encpt_done';
-      function getRunKey(username, modShort){ return `${RUN_FLAG}::${username || 'anon'}::${modShort || 'online'}`; }
-
-      // ---------- Crypto & helpers ----------
-      const PBKDF2_ITERATIONS = 150000;
-      const DERIVED_BITS = 512;
-      const SALT_IV_CIPHER_HMAC_PARTS = 4;
-
-      function strToU8(s){ return new TextEncoder().encode(s); }
-      function u8ToStr(u){ return new TextDecoder().decode(u); }
-      function b64ToU8(b64){
-        const binary = atob(b64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-        return bytes;
-      }
-      function concatU8(...arrs){
-        const total = arrs.reduce((s,a)=>s+a.length,0);
-        const out = new Uint8Array(total);
-        let off=0;
-        for (const a of arrs){ out.set(a, off); off+=a.length; }
-        return out;
-      }
-      function equalConstTime(a,b){
-        if (!a || !b) return false;
-        if (a.length !== b.length) return false;
-        let r = 0;
-        for (let i=0;i<a.length;i++) r |= a[i] ^ b[i];
-        return r === 0;
-      }
-
-      async function deriveKeys(password, saltU8){
-        const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-        const derived = await crypto.subtle.deriveBits(
-          { name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256" },
-          baseKey,
-          DERIVED_BITS
-        );
-        const db = new Uint8Array(derived);
-        const aesBytes = db.slice(0,32);
-        const hmacBytes = db.slice(32,64);
-        const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
-        const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
-        return { aesKey, hmacKey };
-      }
-
-      async function computeHmac(hmacKey, dataU8){
-        const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8);
-        return new Uint8Array(sig);
-      }
-
-      async function decryptFieldString(password, ciphertextDotString){
-        if (typeof ciphertextDotString !== 'string') throw new Error('ciphertext not a string');
-        const parts = ciphertextDotString.trim().split('.');
-        if (parts.length !== SALT_IV_CIPHER_HMAC_PARTS) throw new Error('ciphertext format invalid');
-        const salt = b64ToU8(parts[0]);
-        const iv = b64ToU8(parts[1]);
-        const cipher = b64ToU8(parts[2]);
-        const hmac = b64ToU8(parts[3]);
-
-        const { aesKey, hmacKey } = await deriveKeys(password, salt);
-        const macData = concatU8(salt, iv, cipher);
-        const expected = await computeHmac(hmacKey, macData);
-        if (!equalConstTime(expected, hmac)) throw new Error('HMAC mismatch (wrong key or modified ciphertext)');
-
-        const plainBuf = await crypto.subtle.decrypt({ name:"AES-GCM", iv: iv }, aesKey, cipher);
-        return u8ToStr(new Uint8Array(plainBuf));
-      }
-
-      // parse numeric helper
-      function parseToNumber(v){
-        if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-        if (typeof v === 'string') {
-          const t = v.trim();
-          if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) {
-            const n = Number(t);
-            return Number.isFinite(n) ? n : 0;
-          }
-          return 0;
-        }
-        // object fallback: try value property or stringify
-        if (typeof v === 'object' && v !== null) {
-          try {
-            if ('value' in v && typeof v.value === 'number' && Number.isFinite(v.value)) return v.value;
-            const js = JSON.stringify(v);
-            const t = js.trim();
-            if (/^[\s]*[+-]?(?:\d+)(?:\.\d+)?[\s]*$/.test(t)) return Number(t);
-          } catch(e){}
-        }
-        return 0;
-      }
-
-      // ---------- Auth & run-key ----------
-      function getUsername(){
-        try {
-          if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') {
-            const u = gdjs.playerAuthentication.getUsername();
-            if (u && typeof u === 'string' && u.trim() !== '') return u;
-          }
-        } catch(e){}
-        return '';
-      }
-      function getToken(){
-        try {
-          if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') {
-            return gdjs.playerAuthentication.getUserToken() || '';
-          }
-        } catch(e){}
-        return '';
-      }
-      function getModShort(runtimeScene){
-        try {
-          const gvars = runtimeScene.getGame().getVariables();
-          if (gvars && typeof gvars.contains === 'function' && gvars.contains("ModShortName")) {
-            const gv = gvars.get("ModShortName");
-            if (gv && typeof gv.getAsString === 'function'){ const s=gv.getAsString(); if (s && s.trim()!=='') return s; }
-          } else if (gvars && typeof gvars.get === 'function') {
-            try { const gv2 = gvars.get("ModShortName"); if (gv2){ const s=gv2.getAsString?gv2.getAsString():String(gv2); if(s&&s.trim()!=='') return s; } } catch(e){}
-          }
-        } catch(e){}
-        try {
-          const svs = runtimeScene.getVariables();
-          if (svs && typeof svs.contains === 'function' && svs.contains("ModShortName")) {
-            const sv = svs.get("ModShortName");
-            if (sv && typeof sv.getAsString === 'function'){ const s2=sv.getAsString(); if (s2 && s2.trim()!=='') return s2; }
-          } else if (svs && typeof svs.get === 'function') {
-            try { const sv2 = svs.get("ModShortName"); if (sv2){ const s2=sv2.getAsString?sv2.getAsString():String(sv2); if(s2&&s2.trim()!=='') return s2; } } catch(e){}
-          }
-        } catch(e){}
-        return 'online';
-      }
-
-      const username = getUsername();
-      if (!username) { console.warn('decryptPlayerUniversalEncpt auto-run: user not logged in — abort'); return; }
-      const token = getToken();
-      const secret = username + (token ? ('|' + token) : '');
-      const modShort = getModShort(runtimeScene);
-      const runKey = getRunKey(username, modShort);
-
-      if (!window.__gd_dec_flags) window.__gd_dec_flags = {};
-      if (window.__gd_dec_flags[runKey]) {
-        console.log('decryptPlayerUniversalEncpt auto-run: already executed for this user+modShort in this session — skipping.');
-        return;
-      }
-      window.__gd_dec_flags[runKey] = true; // mark early to avoid races
-
-      // ---------- Get PlayerUniversal variable and Encpt children ----------
-      const gv = runtimeScene.getGame().getVariables().get("PlayerUniversal");
-      if (!gv) { console.warn('decryptPlayerUniversalEncpt auto-run: PlayerUniversal not found — abort'); return; }
-
-      // if Encpt missing -> nothing to do
-      let encptVar = null;
-      try { encptVar = gv.getChild("Encpt"); } catch(e){ encptVar = null; }
-      if (!encptVar) { console.log('decryptPlayerUniversalEncpt auto-run: no PlayerUniversal.Encpt found — nothing to decrypt'); return; }
-
-      const FIELDS = ["BestScore","Pfcs","Points"];
-      let anyApplied = false;
-
-      for (const k of FIELDS){
-        try {
-          const encChild = encptVar.getChild ? encptVar.getChild(k) : gv.getChild("Encpt").getChild(k);
-          if (!encChild) { console.log('decrypt: Encpt child missing for', k); continue; }
-          const ciphertext = encChild.getAsString ? encChild.getAsString() : (encChild.toString ? encChild.toString() : null);
-          if (!ciphertext || typeof ciphertext !== 'string') { console.log('decrypt: no ciphertext for', k); continue; }
-
-          // decrypt (may throw)
-          let plain;
-          try {
-            plain = await decryptFieldString(secret, ciphertext);
-          } catch(e){
-            console.error('decrypt: failed to decrypt field', k, e);
-            continue;
-          }
-
-          // parse numeric and write to PlayerUniversal child as number
-          const numeric = parseToNumber(plain);
-          const child = gv.getChild(k);
-          if (!child) { console.warn('decrypt: PlayerUniversal child missing for', k); continue; }
-          try { child.setNumber(numeric); anyApplied = true; } catch(e){ 
-            try { child.setNumber(Number(numeric) || 0); anyApplied = true; } catch(e2){ console.error('decrypt: failed to set number for', k, e2); }
-          }
-          console.log(`decrypt: applied ${k} = ${numeric}`);
-        } catch(e){
-          console.error('decrypt: unexpected error for field', k, e);
-        }
-      }
-
-      // After successful apply, set PlayerOnSave = 1 for your manual GD save (only if we applied something)
-      if (anyApplied) {
-        try {
-          const gvars = runtimeScene.getGame().getVariables();
-          if (gvars) {
-            if (typeof gvars.contains === 'function') {
-              if (!gvars.contains('PlayerOnSave')) gvars.get('PlayerOnSave').setNumber(1);
-              else gvars.get('PlayerOnSave').setNumber(1);
-            } else {
-              const pv = gvars.get('PlayerOnSave');
-              if (pv && typeof pv.setNumber === 'function') pv.setNumber(1);
-            }
-          }
-        } catch(e){ console.warn('decrypt: failed to set PlayerOnSave', e); }
-      }
-
-      console.log('decryptPlayerUniversalEncpt auto-run: finished for', username, 'modShort:', modShort);
-    } catch(err){
-      console.error('decryptPlayerUniversalEncpt auto-run: unexpected error', err);
-    }
-  })();
-})(runtimeScene);
-
-};
-gdjs.InicioCode.eventsList3 = function(runtimeScene) {
-
-{
-
-
-gdjs.InicioCode.userFunc0xf1c308(runtimeScene);
-
-}
-
-
-};gdjs.InicioCode.userFunc0x137a108 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1464358 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -2499,17 +3256,17 @@ gdjs.InicioCode.userFunc0xf1c308(runtimeScene);
 })();
 
 };
-gdjs.InicioCode.eventsList4 = function(runtimeScene) {
+gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0x137a108(runtimeScene);
+gdjs.InicioCode.userFunc0x1464358(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xe0b480 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x12bc898 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -3121,17 +3878,31 @@ gdjs.InicioCode.userFunc0x137a108(runtimeScene);
 })(runtimeScene);
 
 };
+gdjs.InicioCode.eventsList4 = function(runtimeScene) {
+
+{
+
+
+gdjs.InicioCode.userFunc0x12bc898(runtimeScene);
+
+}
+
+
+};gdjs.InicioCode.userFunc0x1821f40 = function GDJSInlineCode(runtimeScene) {
+"use strict";
+if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
+};
 gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0xe0b480(runtimeScene);
+gdjs.InicioCode.userFunc0x1821f40(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1a112a0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xae9770 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveExportUI(runtimeScene);
 };
@@ -3140,27 +3911,13 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1a112a0(runtimeScene);
-
-}
-
-
-};gdjs.InicioCode.userFunc0xfc6130 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-window.openPlayerSaveImportUI(runtimeScene);
-};
-gdjs.InicioCode.eventsList7 = function(runtimeScene) {
-
-{
-
-
-gdjs.InicioCode.userFunc0xfc6130(runtimeScene);
+gdjs.InicioCode.userFunc0xae9770(runtimeScene);
 
 }
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.eventsList8 = function(runtimeScene) {
+gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 
 {
 
@@ -3192,7 +3949,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.asyncCallback34559580 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback37418484 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(67), null);
 }
@@ -3206,8 +3963,8 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34559580, gdjs.InicioCode.asyncCallback34559580);
-gdjs.InicioCode.eventsList9 = function(runtimeScene) {
+gdjs.InicioCode.idToCallbackMap.set(37418484, gdjs.InicioCode.asyncCallback37418484);
+gdjs.InicioCode.eventsList8 = function(runtimeScene) {
 
 {
 
@@ -3216,18 +3973,18 @@ gdjs.InicioCode.eventsList9 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback34559580(runtimeScene, asyncObjectsList)), 34559580, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback37418484(runtimeScene, asyncObjectsList)), 37418484, asyncObjectsList);
 }
 }
 
 }
 
+
+};gdjs.InicioCode.eventsList9 = function(runtimeScene) {
 
 };gdjs.InicioCode.eventsList10 = function(runtimeScene) {
 
 };gdjs.InicioCode.eventsList11 = function(runtimeScene) {
-
-};gdjs.InicioCode.eventsList12 = function(runtimeScene) {
 
 {
 
@@ -3288,13 +4045,13 @@ let isConditionTrue_0 = false;
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects2Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects2});
-gdjs.InicioCode.eventsList13 = function(runtimeScene) {
+gdjs.InicioCode.eventsList12 = function(runtimeScene) {
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects2Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects2});
-gdjs.InicioCode.eventsList14 = function(runtimeScene) {
+gdjs.InicioCode.eventsList13 = function(runtimeScene) {
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDOppIconObjects2Objects = Hashtable.newFrom({"OppIcon": gdjs.InicioCode.GDOppIconObjects2});
-gdjs.InicioCode.eventsList15 = function(runtimeScene) {
+gdjs.InicioCode.eventsList14 = function(runtimeScene) {
 
 {
 
@@ -3351,7 +4108,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.eventsList16 = function(runtimeScene) {
+};gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 
 {
 
@@ -3367,7 +4124,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.eventsList17 = function(runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.eventsList16 = function(runtimeScene, asyncObjectsList) {
 
 {
 
@@ -3381,14 +4138,37 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback34609740 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback37494084 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
-gdjs.InicioCode.eventsList17(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.InicioCode.eventsList16(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34609740, gdjs.InicioCode.asyncCallback34609740);
+gdjs.InicioCode.idToCallbackMap.set(37494084, gdjs.InicioCode.asyncCallback37494084);
+gdjs.InicioCode.eventsList17 = function(runtimeScene) {
+
+{
+
+
+{
+{
+const asyncObjectsList = new gdjs.LongLivedObjectsList();
+asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback37494084(runtimeScene, asyncObjectsList)), 37494084, asyncObjectsList);
+}
+}
+
+}
+
+
+};gdjs.InicioCode.asyncCallback37504108 = function (runtimeScene, asyncObjectsList) {
+asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
+{runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
+}
+gdjs.InicioCode.localVariables.length = 0;
+}
+gdjs.InicioCode.idToCallbackMap.set(37504108, gdjs.InicioCode.asyncCallback37504108);
 gdjs.InicioCode.eventsList18 = function(runtimeScene) {
 
 {
@@ -3398,37 +4178,14 @@ gdjs.InicioCode.eventsList18 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34609740(runtimeScene, asyncObjectsList)), 34609740, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback37504108(runtimeScene, asyncObjectsList)), 37504108, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback34619116 = function (runtimeScene, asyncObjectsList) {
-asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
-{runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
-}
-gdjs.InicioCode.localVariables.length = 0;
-}
-gdjs.InicioCode.idToCallbackMap.set(34619116, gdjs.InicioCode.asyncCallback34619116);
-gdjs.InicioCode.eventsList19 = function(runtimeScene) {
-
-{
-
-
-{
-{
-const asyncObjectsList = new gdjs.LongLivedObjectsList();
-asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback34619116(runtimeScene, asyncObjectsList)), 34619116, asyncObjectsList);
-}
-}
-
-}
-
-
-};gdjs.InicioCode.asyncCallback34624660 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback37509652 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 
@@ -3438,8 +4195,8 @@ gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPoin
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34624660, gdjs.InicioCode.asyncCallback34624660);
-gdjs.InicioCode.eventsList20 = function(runtimeScene) {
+gdjs.InicioCode.idToCallbackMap.set(37509652, gdjs.InicioCode.asyncCallback37509652);
+gdjs.InicioCode.eventsList19 = function(runtimeScene) {
 
 {
 
@@ -3449,14 +4206,14 @@ gdjs.InicioCode.eventsList20 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34624660(runtimeScene, asyncObjectsList)), 34624660, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback37509652(runtimeScene, asyncObjectsList)), 37509652, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.eventsList21 = function(runtimeScene) {
+};gdjs.InicioCode.eventsList20 = function(runtimeScene) {
 
 {
 
@@ -3467,7 +4224,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34622140);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37507132);
 }
 }
 if (isConditionTrue_0) {
@@ -3503,19 +4260,19 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34624740);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37509732);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList20(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList19(runtimeScene);} //End of subevents
 }
 
 }
 
 
-};gdjs.InicioCode.eventsList22 = function(runtimeScene) {
+};gdjs.InicioCode.eventsList21 = function(runtimeScene) {
 
 {
 
@@ -3568,28 +4325,6 @@ gdjs.InicioCode.eventsList2(runtimeScene);} //End of subevents
 {
 
 
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = !runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Load").getAsBoolean();
-}
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34535044);
-}
-}
-if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Load").setBoolean(true);
-}
-{gdjs.evtTools.storage.readStringFromJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Points", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Points"));
-}
-{gdjs.evtTools.storage.readStringFromJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "BestScore", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("BestScore"));
-}
-{gdjs.evtTools.storage.readStringFromJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Pfcs", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Pfcs"));
-}
-
-{ //Subevents
-gdjs.InicioCode.eventsList3(runtimeScene);} //End of subevents
-}
 
 }
 
@@ -3610,13 +4345,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34545668);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37407956);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList4(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList3(runtimeScene);} //End of subevents
 }
 
 }
@@ -3638,13 +4373,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34533476);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37402356);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList5(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList4(runtimeScene);} //End of subevents
 }
 
 }
@@ -3666,13 +4401,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDExportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDExportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34541132);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37404028);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList6(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList5(runtimeScene);} //End of subevents
 }
 
 }
@@ -3694,13 +4429,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDImportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDImportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34540580);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37403452);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList7(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList6(runtimeScene);} //End of subevents
 }
 
 }
@@ -3715,7 +4450,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34552676);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37414812);
 }
 }
 if (isConditionTrue_0) {
@@ -3774,7 +4509,7 @@ gdjs.InicioCode.GDbegfontObjects1.length = 0;
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList8(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList7(runtimeScene);} //End of subevents
 }
 
 }
@@ -3789,13 +4524,13 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34567164);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37419020);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList9(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList8(runtimeScene);} //End of subevents
 }
 
 }
@@ -3815,7 +4550,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList12(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList11(runtimeScene);} //End of subevents
 }
 
 }
@@ -3936,7 +4671,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.InicioCode.eventsList15(runtimeScene);} //Subevents end.
+gdjs.InicioCode.eventsList14(runtimeScene);} //Subevents end.
 }
 }
 
@@ -4011,7 +4746,7 @@ gdjs.copyArray(runtimeScene.getObjects("SwipeText"), gdjs.InicioCode.GDSwipeText
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList16(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList15(runtimeScene);} //End of subevents
 }
 
 }
@@ -4097,7 +4832,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34608028);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37492276);
 }
 }
 }
@@ -4114,7 +4849,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.InicioCode.eventsList18(runtimeScene);} //Subevents end.
+gdjs.InicioCode.eventsList17(runtimeScene);} //Subevents end.
 }
 }
 
@@ -4159,7 +4894,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34615476);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37500380);
 }
 }
 if (isConditionTrue_0) {
@@ -4200,7 +4935,7 @@ gdjs.copyArray(runtimeScene.getObjects("UpKeybind"), gdjs.InicioCode.GDUpKeybind
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList19(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList18(runtimeScene);} //End of subevents
 }
 
 }
@@ -4230,7 +4965,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34620492);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37505484);
 }
 }
 if (isConditionTrue_0) {
@@ -4246,7 +4981,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.eventsList21(runtimeScene);
+gdjs.InicioCode.eventsList20(runtimeScene);
 }
 
 
@@ -4307,7 +5042,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34630572);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37536196);
 }
 }
 if (isConditionTrue_0) {
@@ -4624,7 +5359,7 @@ gdjs.InicioCode.GDStatistics2Objects3.length = 0;
 gdjs.InicioCode.GDStatistics2Objects4.length = 0;
 gdjs.InicioCode.GDStatistics2Objects5.length = 0;
 
-gdjs.InicioCode.eventsList22(runtimeScene);
+gdjs.InicioCode.eventsList21(runtimeScene);
 gdjs.InicioCode.GDBackObjects1.length = 0;
 gdjs.InicioCode.GDBackObjects2.length = 0;
 gdjs.InicioCode.GDBackObjects3.length = 0;
