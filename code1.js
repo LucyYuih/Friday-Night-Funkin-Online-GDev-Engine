@@ -340,6 +340,7 @@ let isConditionTrue_0 = false;
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.userFunc0x12be3b8 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1f215a0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,22 +849,24 @@ gdjs.InicioCode.userFunc0x12be3b8 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.userFunc0x936920 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x13814e8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
-  if (window._firebaseAuthUIInjected) {
+  if (window._gd_firebase_ui_no_autosave_v1) {
     window._gd_runtimeScene = runtimeScene;
     return;
   }
-  window._firebaseAuthUIInjected = true;
+  window._gd_firebase_ui_no_autosave_v1 = true;
   window._gd_runtimeScene = runtimeScene;
 
   const moduleCode = `
-/* ============================================================
-   Complete module: Auth UI + Avatar (URL/base64 resize 256) +
-   Names/Descriptions + PlayerSave sync (encrypt/decrypt)
-   Based on user's PlayerUniversal export/import script.
-   ============================================================ */
+/* UI + Firebase module — NO automatic overwrite of remote playerSave.
+   - Reads remote first and applies it if present.
+   - Does NOT write to remote automatically if different; writing only via external call:
+     window.gdFirebaseAuthUI.savePlayerNow()
+   - Keeps avatar/name/description features and per-field Encpt behavior.
+   - API key lightly obfuscated; deobfuscated at runtime.
+*/
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
 import {
@@ -886,9 +889,20 @@ import {
   arrayRemove
 } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
 
-// ------------------ Your firebaseConfig (kept as provided) ------------------
+// --- Obfuscation helper and obfuscated API key (replace if you regenerate) ---
+function _obfDecode(b64xor) {
+  const raw = atob(b64xor);
+  let out = '';
+  for (let i=0;i<raw.length;i++){
+    out += String.fromCharCode(raw.charCodeAt(i) ^ 13);
+  }
+  return out;
+}
+// Correct obfuscated API key for your project (XOR13 + btoa)
+const _OBF_APIKEY = "TER3bF50T2hHOGNmQV9IQ2ZnX2FJYE46QWVBfko4VU9sPU9ESlJm";
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBeJ5nkLRENkjRlDmC7LhLsG5XBa0BIG_k",
+  apiKey: _obfDecode(_OBF_APIKEY),
   authDomain: "fnf-gdev-online.firebaseapp.com",
   projectId: "fnf-gdev-online",
   storageBucket: "fnf-gdev-online.firebasestorage.app",
@@ -901,30 +915,30 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ------------------ Crypto + export/import helpers (from your file) ------------------
+// --- Crypto primitives (same scheme as before) ---
 const PBKDF2_ITERATIONS = 150000;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
 const DERIVED_BITS = 512;
-const EXPORT_FIELDS = ['BestScore','Pfcs','Points']; // same fields used previously
 
-function strToU8(s) { return new TextEncoder().encode(s); }
-function u8ToStr(u) { return new TextDecoder().decode(u); }
-function randomBytes(n) { const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
-function abToB64(buf) { let binary=''; const bytes=new Uint8Array(buf); for (let i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]); return btoa(binary); }
-function b64ToU8(b64) { const binary=atob(b64); const bytes=new Uint8Array(binary.length); for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; }
+function strToU8(s){ return new TextEncoder().encode(String(s)); }
+function u8ToStr(u){ return new TextDecoder().decode(u); }
+function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
+function abToB64(buf){ let binary=''; const bytes=new Uint8Array(buf); for(let i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]); return btoa(binary); }
+function b64ToU8(b64){ const binary=atob(b64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; }
 function concatU8(...arrs){ const total=arrs.reduce((s,a)=>s+a.length,0); const out=new Uint8Array(total); let off=0; for(const a of arrs){ out.set(a, off); off+=a.length;} return out; }
 
 async function deriveKeys(password, saltU8){
   const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
   const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
-  const db = new Uint8Array(derived);
-  const aesBytes = db.slice(0,32);
-  const hmacBytes = db.slice(32,64);
+  const dbuf = new Uint8Array(derived);
+  const aesBytes = dbuf.slice(0,32);
+  const hmacBytes = dbuf.slice(32,64);
   const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
   const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
   return { aesKey, hmacKey };
 }
+
 async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8); return new Uint8Array(sig); }
 
 async function encryptFilePayload(secret, jsonText){
@@ -954,68 +968,188 @@ async function decryptFilePayload(secret, fileText){
   return u8ToStr(new Uint8Array(plainBuf));
 }
 
-async function encryptFieldString(secret, plaintextString){
-  const salt = randomBytes(SALT_BYTES);
-  const iv = randomBytes(IV_BYTES);
-  const { aesKey, hmacKey } = await deriveKeys(secret, salt);
-  const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(plaintextString));
-  const cipher = new Uint8Array(cipherBuf);
-  const macData = concatU8(salt, iv, cipher);
-  const hmac = await computeHmac(hmacKey, macData);
-  return \`\${abToB64(salt.buffer)}.\${abToB64(iv.buffer)}.\${abToB64(cipher.buffer)}.\${abToB64(hmac.buffer)}\`;
-}
-
-// compute SHA256 hex for deterministic comparison of plaintext save JSON
 async function sha256Hex(text){
   const buf = await crypto.subtle.digest('SHA-256', strToU8(text));
   const u8 = new Uint8Array(buf);
-  const hex = Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
-  return hex;
+  return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-// ---------- Helpers for GDevelop variables (same style) ----------
-function getUsername(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') return gdjs.playerAuthentication.getUsername(); }catch(e){} return ''; }
-function getToken(){ try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') return gdjs.playerAuthentication.getUserToken() || ''; } catch(e){} return ''; }
-function getModShort(runtimeScene){
-  try {
-    const gvars = runtimeScene.getGame().getVariables();
-    if (gvars && typeof gvars.get === 'function') {
-      const gv = gvars.get('ModShortName');
-      if (gv && typeof gv.getAsString === 'function'){ const s=gv.getAsString(); if (s && s.trim()!=='') return s; }
-      if (gv) return (gv.getAsString?gv.getAsString():String(gv));
-    }
-  } catch(e){}
-  try {
-    const svs = runtimeScene.getVariables();
-    if (svs && typeof svs.get === 'function') {
-      const sv = svs.get('ModShortName');
-      if (sv && typeof sv.getAsString === 'function'){ const s2=sv.getAsString(); if (s2 && s2.trim()!=='') return s2; }
-      if (sv) return (sv.getAsString?sv.getAsString():String(sv));
-    }
-  } catch(e){}
-  return 'online';
+// --- GDevelop helpers (username/token etc) ---
+function getUsername(){
+  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') return gdjs.playerAuthentication.getUsername(); }catch(e){}
+  try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : ''); } catch(e){}
+  return 'guest';
+}
+function getToken(){
+  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') return gdjs.playerAuthentication.getUserToken() || ''; } catch(e) {}
+  return '';
 }
 
-// parse numeric helper (same as in your script)
-function isNumericString(s){ return typeof s==='string' && /^[\\s]*[+-]?(?:\\d+)(?:\\.\\d+)?[\\s]*$/.test(s.trim()); }
 function parseToNumberOrZero(v){
   if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-  if (typeof v === 'string' && isNumericString(v)) return Number(v);
+  if (typeof v === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v)) return Number(v);
   if (v && typeof v === 'object') {
-    try { if ('value' in v && typeof v.value === 'number') return v.value; const js = JSON.stringify(v); if (isNumericString(js)) return Number(js); } catch(e){}
+    try { if ('getAsNumber' in v && typeof v.getAsNumber === 'function') return v.getAsNumber(); if ('value' in v && typeof v.value === 'number') return v.value; if ('value' in v && typeof v.value === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v.value)) return Number(v.value); } catch(e){}
   }
   return 0;
 }
 
-// ------------------ UI + Avatar + names/descriptions (reuse from previous module) ------------------
-/* For brevity I'm using the exact UI structure we already agreed on earlier:
-   - overlay with login/register/profile/settings
-   - avatar upload/resizing to 256x256
-   - names list handling (names/AllNames doc)
-   - playerDescriptions/{uid}
-   Implementation is identical to the module we used previously (keeps same IDs).
-*/
-function createAuthOverlay() {
+// --- Fixed fields to ensure exact format as your txt save ---
+const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
+
+// read numeric children in the exact order as EXPORT_FIELDS
+function readNumericChildrenOrdered(runtimeScene){
+  try {
+    const gameVars = runtimeScene.getGame().getVariables();
+    const pu = gameVars.get('PlayerUniversal');
+    if (!pu) throw new Error('PlayerUniversal not found');
+    const payload = {};
+    try {
+      if (typeof pu.toJSObject === 'function') {
+        const obj = pu.toJSObject();
+        for (const k of EXPORT_FIELDS) {
+          const raw = obj[k];
+          const num = parseToNumberOrZero(raw);
+          payload[k] = num;
+        }
+        return payload;
+      }
+    } catch(e){}
+    for (const k of EXPORT_FIELDS){
+      try {
+        const child = pu.getChild(k);
+        let val = null;
+        if (child) {
+          if (typeof child.getAsNumber === 'function') val = child.getAsNumber();
+          else if (typeof child.getAsString === 'function') val = child.getAsString();
+          else if ('value' in child) val = child.value;
+        }
+        payload[k] = parseToNumberOrZero(val);
+      } catch(e){
+        payload[k] = 0;
+      }
+    }
+    return payload;
+  } catch(e){
+    console.warn('readNumericChildrenOrdered error', e);
+    const payload = {};
+    for (const k of EXPORT_FIELDS) payload[k] = 0;
+    return payload;
+  }
+}
+
+// Build plaintext JSON in deterministic order
+function buildPlaintextSaveJson(runtimeScene){
+  const payload = readNumericChildrenOrdered(runtimeScene);
+  const ordered = {};
+  for (const k of EXPORT_FIELDS) ordered[k] = payload[k];
+  return JSON.stringify({ version: 1, payload: ordered });
+}
+
+// Firestore helpers
+async function readPlayerSaveDoc(uid){
+  try {
+    const snap = await getDoc(doc(db, 'playerSave', uid));
+    if (!snap.exists()) return null;
+    return snap.data();
+  } catch(e){ console.warn('readPlayerSaveDoc failed', e); return null; }
+}
+async function writePlayerSaveDoc(uid, saveString, hashHex){
+  try {
+    await setDoc(doc(db, 'playerSave', uid), { save: saveString, hash: hashHex, updatedAt: serverTimestamp() }, { merge: true });
+    return true;
+  } catch(e){ console.warn('writePlayerSaveDoc failed', e); return false; }
+}
+
+// apply decrypted save into the game (sets numbers and per-field Encpt)
+async function applyDecryptedSaveToGame(runtimeScene, decryptedJsonText){
+  const parsed = JSON.parse(decryptedJsonText);
+  const payload = parsed.payload || parsed;
+  const gvars = runtimeScene.getGame().getVariables();
+  const pu = gvars.get('PlayerUniversal');
+  if (!pu) throw new Error('PlayerUniversal missing');
+  try {
+    try { pu.getChild('Encpt'); } catch(e){}
+    for (const k of EXPORT_FIELDS){
+      const v = (payload && (k in payload)) ? payload[k] : 0;
+      const num = parseToNumberOrZero(v);
+      try { pu.getChild(k).setNumber(num); } catch(e){ try { pu.getChild(k).setNumber(Number(num) || 0); } catch(e2){} }
+      try {
+        const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+        const ctxt = await encryptFilePayload(secret, String(num));
+        pu.getChild('Encpt').getChild(k).setString(ctxt);
+      } catch(e){ console.warn('Per-field encrypt failed for', k, e); }
+    }
+    try { const pv = gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber === 'function') pv.setNumber(1); } catch(e){ console.warn('Failed set PlayerOnSave', e); }
+  } catch(e){ console.warn('applyDecryptedSaveToGame error', e); }
+}
+
+// ========== RECONCILE (READ-ONLY) ==========
+async function reconcilePlayerSave_ReadOnly(runtimeScene){
+  const user = auth.currentUser;
+  if (!user) {
+    console.warn('reconcilePlayerSave: no user');
+    return;
+  }
+  const uid = user.uid;
+  // run once per uid per session
+  window._gd_reconcile_ran = window._gd_reconcile_ran || {};
+  if (window._gd_reconcile_ran[uid]) {
+    // already applied remote once
+    return;
+  }
+  try {
+    const remoteDoc = await readPlayerSaveDoc(uid);
+    const token = getToken();
+    const secret = getUsername() + (token ? ('|' + token) : '');
+    if (remoteDoc && remoteDoc.save) {
+      try {
+        const remotePlain = await decryptFilePayload(secret, remoteDoc.save);
+        // apply remote to game
+        if (runtimeScene) {
+          await applyDecryptedSaveToGame(runtimeScene, remotePlain);
+        } else if (window._gd_runtimeScene) {
+          await applyDecryptedSaveToGame(window._gd_runtimeScene, remotePlain);
+        }
+        console.log('reconcilePlayerSave: applied remote save for uid', uid);
+      } catch(err){
+        console.warn('reconcilePlayerSave: failed to decrypt remote save', err);
+      }
+    } else {
+      console.log('reconcilePlayerSave: no remote save present for uid', uid, '- not uploading automatically (per config).');
+    }
+    window._gd_reconcile_ran[uid] = true;
+  } catch(e){
+    console.error('reconcilePlayerSave error', e);
+  }
+}
+
+// ========== EXTERNAL SAVE FUNCTION ==========
+async function createAndSaveEncryptedSaveInternal(runtimeScene){
+  if (!runtimeScene) {
+    runtimeScene = window._gd_runtimeScene;
+    if (!runtimeScene) throw new Error('runtimeScene not provided');
+  }
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+
+  const plain = buildPlaintextSaveJson(runtimeScene);
+  const hashHex = await sha256Hex(plain);
+  const token = getToken();
+  const secret = getUsername() + (token ? ('|' + token) : '');
+  const enc = await encryptFilePayload(secret, plain);
+  await writePlayerSaveDoc(user.uid, enc, hashHex);
+  // set PlayerOnSave = 1
+  try {
+    const gs = runtimeScene.getGame().getVariables();
+    const v = gs.get('PlayerOnSave');
+    if (v && typeof v.setNumber === 'function') v.setNumber(1);
+  } catch(e){}
+  return { uid: user.uid, hash: hashHex };
+}
+
+// ---- UI injection & bindings (same structure as before, slightly trimmed)
+function createAuthOverlayAndBind(){
   if (document.getElementById('gd-firebase-auth-overlay')) return;
 
   const css = \`
@@ -1047,7 +1181,6 @@ function createAuthOverlay() {
       <h2 id="gd-auth-title">Entrar</h2>
 
       <div id="gd-auth-forms">
-        <!-- LOGIN -->
         <div id="gd-login-form">
           <input id="gd-email" class="gd-input" type="email" placeholder="Email" autocomplete="email" />
           <input id="gd-password" class="gd-input" type="password" placeholder="Senha" autocomplete="current-password" />
@@ -1061,7 +1194,6 @@ function createAuthOverlay() {
           </div>
         </div>
 
-        <!-- REGISTER -->
         <div id="gd-register-form" style="display:none;">
           <input id="gd-reg-name" class="gd-input" type="text" placeholder="Nome (obrigatório)" />
           <input id="gd-reg-email" class="gd-input" type="email" placeholder="Email" autocomplete="email" />
@@ -1074,7 +1206,6 @@ function createAuthOverlay() {
         </div>
       </div>
 
-      <!-- PERFIL -->
       <div id="gd-auth-user" style="display:none;">
         <div id="gd-user-info">
           <div id="gd-user-display" class="gd-small">Conectado</div>
@@ -1094,7 +1225,6 @@ function createAuthOverlay() {
         </div>
       </div>
 
-      <!-- CONFIGURAÇÕES -->
       <div id="gd-settings-panel">
         <h3 style="margin:0 0 8px 0;font-size:15px;color:#cbe7ff;">Configurações da Conta</h3>
         <input id="gd-settings-name" class="gd-input" type="text" placeholder="Nome (obrigatório)" />
@@ -1125,691 +1255,208 @@ function createAuthOverlay() {
   function showOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='flex'; }
   function hideOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='none'; }
 
-  // resize helper: File or dataURL -> resized dataURL 256x256
-  async function resizeImageTo256(fileOrDataUrl) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const maxSize = 256;
-          const canvas = document.createElement('canvas');
-          canvas.width = maxSize;
-          canvas.height = maxSize;
-          const ctx = canvas.getContext('2d');
-          ctx.clearRect(0,0,canvas.width, canvas.height);
-          const scale = Math.min(maxSize / img.width, maxSize / img.height);
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
-          const x = Math.round((maxSize - w) / 2);
-          const y = Math.round((maxSize - h) / 2);
-          ctx.drawImage(img, x, y, w, h);
-          const dataUrl = canvas.toDataURL('image/png');
-          resolve(dataUrl);
-        } catch (e) { reject(e); }
-      };
-      img.onerror = (e) => reject(e);
-      if (typeof fileOrDataUrl === 'string' && fileOrDataUrl.startsWith('data:')) {
-        img.src = fileOrDataUrl;
-      } else if (fileOrDataUrl instanceof File) {
-        const reader = new FileReader();
-        reader.onload = () => { img.src = reader.result; };
-        reader.onerror = (err) => reject(err);
-        reader.readAsDataURL(fileOrDataUrl);
-      } else {
-        reject(new Error('Formato inválido para resizeImageTo256'));
-      }
-    });
-  }
-
-  // --- UI action bindings (login/register/settings etc) ---
+  // Minimal bindings (login/register/save settings/eye/logout)
   $('gd-auth-close').addEventListener('click', hideOverlay);
-  $('gd-show-register-btn').addEventListener('click', ()=>{ showRegisterView(); });
-  $('gd-show-login-btn').addEventListener('click', ()=>{ showLoginView(); });
+  $('gd-show-register-btn').addEventListener('click', ()=>{ $('gd-login-form').style.display='none'; $('gd-register-form').style.display=''; });
+  $('gd-show-login-btn').addEventListener('click', ()=>{ $('gd-login-form').style.display=''; $('gd-register-form').style.display='none'; });
 
-  function showLoginView(){
-    $('gd-auth-title').textContent = 'Entrar';
-    $('gd-login-form').style.display = '';
-    $('gd-register-form').style.display = 'none';
-    $('gd-auth-user').style.display = 'none';
-    $('gd-settings-panel').style.display = 'none';
-  }
-  function showRegisterView(){
-    $('gd-auth-title').textContent = 'Criar conta';
-    $('gd-login-form').style.display = 'none';
-    $('gd-register-form').style.display = '';
-    $('gd-auth-user').style.display = 'none';
-    $('gd-settings-panel').style.display = 'none';
-  }
-
-  // forgot password
   $('gd-forgot').addEventListener('click', async ()=>{
     const readyEmail = $('gd-email').value.trim();
     const email = readyEmail || prompt('Digite seu email para reset de senha:');
     if (!email) return;
-    try {
-      await sendPasswordResetEmail(auth, email);
-      alert('Email de redefinição enviado! Verifique sua caixa de entrada.');
-    } catch(err) {
-      alert('Erro ao enviar email de redefinição: ' + (err && err.message ? err.message : String(err)));
-    }
+    try { await sendPasswordResetEmail(auth, email); alert('Email de redefinição enviado!'); } catch(err){ alert('Erro: '+(err.message||err)); }
   });
 
-  // REGISTER (name required & unique)
   $('gd-register-btn').addEventListener('click', async ()=>{
     const name = $('gd-reg-name').value.trim();
     const email = $('gd-reg-email').value.trim();
     const password = $('gd-reg-password').value;
-    $('gd-auth-error-reg').textContent = '';
-
     if (!name) { $('gd-auth-error-reg').textContent = 'Nome é obrigatório.'; return; }
-
     try {
       const allRef = doc(db, 'names', 'AllNames');
       const allSnap = await getDoc(allRef);
       const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
-      if (list.includes(name)) { $('gd-auth-error-reg').textContent = 'Nome já em uso. Escolha outro.'; return; }
-
+      if (list.includes(name)) { $('gd-auth-error-reg').textContent = 'Nome já em uso.'; return; }
       const uc = await createUserWithEmailAndPassword(auth, email, password);
       const uid = uc.user.uid;
-
-      await setDoc(doc(db, 'users', uid), {
-        displayName: name,
-        avatarURL: null,
-        updatedAt: serverTimestamp()
-      });
-
+      await setDoc(doc(db, 'users', uid), { displayName: name, avatarURL: null, updatedAt: serverTimestamp() });
       await setDoc(doc(db, 'avatarURL', uid), { url: null, updatedAt: serverTimestamp() });
-
-      try {
-        if (allSnap.exists()) {
-          await updateDoc(allRef, { list: arrayUnion(name) });
-        } else {
-          await setDoc(allRef, { list: [name] });
-        }
-      } catch(e){ console.warn('names list update failed on register', e); }
-
+      if (allSnap.exists()) await updateDoc(allRef, { list: arrayUnion(name) }); else await setDoc(allRef, { list: [name] });
       await setDoc(doc(db, 'playerDescriptions', uid), { description: '', updatedAt: serverTimestamp() });
-
-      try { await updateProfile(uc.user, { displayName: name, photoURL: null }); } catch(e){ console.warn(e); }
-
+      try { await updateProfile(uc.user, { displayName: name }); } catch(e){}
       await handleUserAfterLogin(uc.user || auth.currentUser);
-    } catch(err) {
-      console.warn('register error', err);
-      $('gd-auth-error-reg').textContent = err && err.message ? err.message : String(err);
-    }
+    } catch(err){ console.warn('register error', err); $('gd-auth-error-reg').textContent = err && err.message ? err.message : String(err); }
   });
 
-  // LOGIN
   $('gd-login-btn').addEventListener('click', async ()=>{
     const email = $('gd-email').value.trim();
     const password = $('gd-password').value;
     $('gd-auth-error').textContent = '';
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      const user = cred && cred.user ? cred.user : auth.currentUser;
-      await handleUserAfterLogin(user);
-    } catch(err) {
-      console.warn('signIn error', err);
-      $('gd-auth-error').textContent = err && err.message ? err.message : String(err);
-    }
+      await handleUserAfterLogin(cred && cred.user ? cred.user : auth.currentUser);
+    } catch(err){ console.warn('signIn error', err); $('gd-auth-error').textContent = err && err.message ? err.message : String(err); }
   });
 
-  // LOGOUT
   $('gd-logout-btn').addEventListener('click', async ()=>{
-    try {
-      await signOut(auth);
-      hideOverlay();
-    } catch(err) {
-      alert('Erro ao sair: ' + (err && err.message ? err.message : String(err)));
-    }
+    try { await signOut(auth); hideOverlay(); } catch(err){ alert('Erro ao sair: ' + (err && err.message ? err.message : String(err))); }
   });
 
-  // toggle email visibility
   let emailVisible = false;
-  $('gd-eye-btn').addEventListener('click', ()=>{
-    emailVisible = !emailVisible;
-    $('gd-user-email').style.opacity = emailVisible ? '1' : '0';
-  });
+  $('gd-eye-btn').addEventListener('click', ()=>{ emailVisible = !emailVisible; $('gd-user-email').style.opacity = emailVisible ? '1' : '0'; });
 
-  // settings open / populate
   $('gd-settings-btn').addEventListener('click', async ()=>{
     const u = auth.currentUser;
-    if (!u) {
-      showLoginView();
-      showOverlay();
-      return;
-    }
-    $('gd-settings-panel').style.display = 'block';
-    $('gd-auth-user').style.display = 'none';
-    showOverlay();
-    setTimeout(()=> populateSettingsFields(u), 60);
+    if (!u) { $('gd-login-form').style.display=''; showOverlay(); return; }
+    $('gd-settings-panel').style.display = 'block'; $('gd-auth-user').style.display='none'; showOverlay();
+    setTimeout(()=> populateSettingsFields(u),60);
   });
+  $('gd-settings-back').addEventListener('click', ()=>{ $('gd-settings-panel').style.display='none'; $('gd-auth-user').style.display=''; });
 
-  $('gd-settings-back').addEventListener('click', ()=>{
-    $('gd-settings-panel').style.display = 'none';
-    $('gd-auth-user').style.display = '';
-  });
-
-  // remove pfp
   $('gd-remove-pfp').addEventListener('click', async ()=>{
-    const u = auth.currentUser;
-    if (!u) { $('gd-settings-msg').textContent = 'Faça login primeiro.'; return; }
-    try {
-      await setDoc(doc(db, 'avatarURL', u.uid), { url: null, updatedAt: serverTimestamp() }, { merge: true });
-      try { await updateProfile(u, { photoURL: null }); } catch(e){ }
-      await updateDoc(doc(db,'users',u.uid), { avatarURL: null }).catch(()=>{});
-      $('gd-pfp-preview').src = '';
-      $('gd-pfp-mini').src = '';
-      $('gd-pfp-url').value = '';
-      $('gd-settings-msg').textContent = 'PFP removida.';
-      updateGDevelopVarsFromUser(u);
-    } catch(err) {
-      $('gd-settings-msg').textContent = 'Erro ao remover PFP: ' + (err && err.message ? err.message : String(err));
-    }
+    const u = auth.currentUser; if (!u) { $('gd-settings-msg').textContent = 'Faça login primeiro.'; return; }
+    try { await setDoc(doc(db, 'avatarURL', u.uid), { url:null, updatedAt: serverTimestamp() }, { merge:true }); try { await updateProfile(u, { photoURL: null }); } catch(e){} $('gd-pfp-preview').src=''; $('gd-pfp-mini').src=''; $('gd-pfp-url').value=''; $('gd-settings-msg').textContent='PFP removida.'; } catch(err){ $('gd-settings-msg').textContent = 'Erro: '+(err.message||err); }
   });
 
-  // save settings (name required unique, description, url)
   $('gd-save-settings').addEventListener('click', async ()=>{
-    const u = auth.currentUser;
-    if (!u) { $('gd-settings-msg').textContent = 'Faça login primeiro.'; return; }
-    const newName = $('gd-settings-name').value.trim();
-    const description = $('gd-settings-desc').value || '';
-    const urlCandidate = $('gd-pfp-url').value.trim();
-    $('gd-settings-msg').textContent = 'Salvando...';
-
-    if (!newName) { $('gd-settings-msg').textContent = 'Nome é obrigatório.'; return; }
-
+    const u = auth.currentUser; if (!u) { $('gd-settings-msg').textContent='Faça login primeiro.'; return; }
+    const newName = $('gd-settings-name').value.trim(); const description=$('gd-settings-desc').value||''; const urlCandidate=$('gd-pfp-url').value.trim();
+    if (!newName) { $('gd-settings-msg').textContent='Nome é obrigatório.'; return; }
     try {
-      const allRef = doc(db, 'names', 'AllNames');
-      const allSnap = await getDoc(allRef);
-      const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
-      let currentName = null;
-      try {
-        const userDoc = await getDoc(doc(db, 'users', u.uid));
-        if (userDoc.exists()) currentName = userDoc.data().displayName || null;
-      } catch(e){}
-
-      if (list.includes(newName) && newName !== currentName) {
-        $('gd-settings-msg').textContent = 'Nome já em uso. Escolha outro.';
-        return;
-      }
-
-      try {
-        if (currentName && currentName !== newName) {
-          await updateDoc(allRef, { list: arrayRemove(currentName) }).catch(()=>{});
-        }
-        if (!list.includes(newName)) {
-          if (allSnap.exists()) {
-            await updateDoc(allRef, { list: arrayUnion(newName) });
-          } else {
-            await setDoc(allRef, { list: [newName] });
-          }
-        }
-      } catch(e){ console.warn('names list update failed', e); }
-
-      await setDoc(doc(db, 'users', u.uid), {
-        displayName: newName,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      await setDoc(doc(db, 'playerDescriptions', u.uid), {
-        description: description,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      if (urlCandidate) {
-        await setDoc(doc(db, 'avatarURL', u.uid), { url: urlCandidate, updatedAt: serverTimestamp() }, { merge: true });
-        await updateDoc(doc(db,'users',u.uid), { avatarURL: urlCandidate }).catch(()=>{});
-        try { await updateProfile(u, { displayName: newName, photoURL: urlCandidate }); } catch(e){ console.warn('updateProfile failed', e); }
-        $('gd-pfp-preview').src = urlCandidate;
-        $('gd-pfp-mini').src = urlCandidate;
-      } else {
-        try { await updateProfile(u, { displayName: newName }); } catch(e){ console.warn('updateProfile failed', e); }
-      }
-
-      $('gd-settings-msg').textContent = 'Configurações salvas.';
-      updateGDevelopVarsFromUser(u);
-    } catch(err) {
-      console.error('save settings error', err);
-      $('gd-settings-msg').textContent = 'Erro ao salvar: ' + (err && err.message ? err.message : String(err));
-    }
+      const allRef = doc(db, 'names', 'AllNames'); const allSnap = await getDoc(allRef); const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
+      let currentName = null; try { const userDoc=await getDoc(doc(db,'users',u.uid)); if(userDoc.exists()) currentName=userDoc.data().displayName||null; }catch(e){}
+      if (list.includes(newName) && newName !== currentName) { $('gd-settings-msg').textContent='Nome já em uso.'; return; }
+      try { if (currentName && currentName !== newName) await updateDoc(allRef, { list: arrayRemove(currentName) }).catch(()=>{}); if (!list.includes(newName)){ if (allSnap.exists()) await updateDoc(allRef, { list: arrayUnion(newName) }); else await setDoc(allRef, { list: [newName] }); } }catch(e){}
+      await setDoc(doc(db,'users',u.uid),{ displayName: newName, updatedAt: serverTimestamp() }, { merge:true });
+      await setDoc(doc(db,'playerDescriptions',u.uid),{ description: description, updatedAt: serverTimestamp() }, { merge:true });
+      if (urlCandidate){ await setDoc(doc(db,'avatarURL',u.uid),{ url:urlCandidate, updatedAt: serverTimestamp() }, { merge:true }); await updateDoc(doc(db,'users',u.uid), { avatarURL: urlCandidate }).catch(()=>{}); try { await updateProfile(u, { displayName: newName, photoURL: urlCandidate }); } catch(e){} $('gd-pfp-preview').src=urlCandidate; $('gd-pfp-mini').src=urlCandidate; } else { try { await updateProfile(u, { displayName: newName }); } catch(e){} }
+      $('gd-settings-msg').textContent='Configurações salvas.'; updateGDevelopVarsFromUser(u);
+    } catch(err){ console.error('save settings error', err); $('gd-settings-msg').textContent='Erro ao salvar: '+(err&&err.message?err.message:String(err)); }
   });
 
-  // file input handler: resize to 256 and save base64
   (function attachFileHandler(){
-    const fileInput = $('gd-pfp-file');
-    if (!fileInput) return;
-    fileInput.addEventListener('change', async (e) => {
-      const u = auth.currentUser;
-      if (!u) { alert('Faça login primeiro para importar uma imagem.'); return; }
-      const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-      if (!file) return;
-      if (file.size > (5 * 1024 * 1024)) {
-        if (!confirm('Arquivo >5MB. Converter para base64 pode ser demorado. Continuar?')) return;
-      }
-      $('gd-settings-msg').textContent = 'Convertendo/Redimensionando imagem...';
+    const fileInput = $('gd-pfp-file'); if (!fileInput) return;
+    fileInput.addEventListener('change', async (e)=>{
+      const u = auth.currentUser; if (!u) { alert('Faça login primeiro'); return; }
+      const file = e.target.files && e.target.files[0] ? e.target.files[0] : null; if (!file) return;
+      $('gd-settings-msg').textContent='Convertendo...';
       try {
-        const dataUrl256 = await resizeImageTo256(file);
-        await setDoc(doc(db, 'avatarURL', u.uid), { url: dataUrl256, updatedAt: serverTimestamp() }, { merge: true });
-        await setDoc(doc(db, 'users', u.uid), { avatarURL: dataUrl256, updatedAt: serverTimestamp() }, { merge: true });
-        try { await updateProfile(u, { photoURL: dataUrl256 }); } catch(e){ console.warn('updateProfile with dataURL failed', e); }
-        $('gd-pfp-preview').src = dataUrl256;
-        $('gd-pfp-mini').src = dataUrl256;
-        $('gd-pfp-url').value = dataUrl256;
-        $('gd-settings-msg').textContent = 'Imagem salva (Base64, redimensionada para 256×256).';
-        updateGDevelopVarsFromUser(u);
-      } catch(err) {
-        console.error('Error saving base64 avatar', err);
-        $('gd-settings-msg').textContent = 'Erro ao salvar imagem: ' + (err && err.message ? err.message : String(err));
-      }
+        const dataUrl = await (async (file)=> {
+          return new Promise((res, rej)=>{
+            const img = new Image();
+            const reader = new FileReader();
+            reader.onload = ()=> { img.src = reader.result; };
+            reader.onerror = rej;
+            img.onload = ()=> {
+              try {
+                const max = 256;
+                const canvas = document.createElement('canvas'); canvas.width=max; canvas.height=max;
+                const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,max,max);
+                const scale = Math.min(max/img.width, max/img.height); const w = Math.round(img.width*scale); const h=Math.round(img.height*scale);
+                const x = Math.round((max-w)/2); const y = Math.round((max-h)/2);
+                ctx.drawImage(img, x, y, w, h);
+                res(canvas.toDataURL('image/png'));
+              } catch(e){ rej(e); }
+            };
+            reader.readAsDataURL(file);
+          });
+        })(file);
+        await setDoc(doc(db,'avatarURL',u.uid),{ url:dataUrl, updatedAt: serverTimestamp() }, { merge:true });
+        await setDoc(doc(db,'users',u.uid),{ avatarURL:dataUrl, updatedAt: serverTimestamp() }, { merge:true });
+        try { await updateProfile(u, { photoURL: dataUrl }); } catch(e){}
+        $('gd-pfp-preview').src = dataUrl; $('gd-pfp-mini').src = dataUrl; $('gd-pfp-url').value = dataUrl; $('gd-settings-msg').textContent='Avatar salvo.'; updateGDevelopVarsFromUser(u);
+      } catch(err){ console.error('avatar upload failed', err); $('gd-settings-msg').textContent='Erro ao salvar avatar.'; }
     });
   })();
 
-  // populate settings
-  async function populateSettingsFields(user, retry = 0) {
-    const maxRetry = 12;
-    if (!document.getElementById('gd-settings-name') && retry < maxRetry) {
-      await new Promise(r=>setTimeout(r, 60));
-      return populateSettingsFields(user, retry+1);
-    }
-    if (!document.getElementById('gd-settings-name')) return;
-
+  async function populateSettingsFields(user){
     try {
-      const nameEl = $('gd-settings-name');
-      const urlEl = $('gd-pfp-url');
-      const preview = $('gd-pfp-preview');
-      const mini = $('gd-pfp-mini');
-      const msg = $('gd-settings-msg');
-      const descEl = $('gd-settings-desc');
-      const avatarUrlDisplay = $('gd-user-avatar-url');
-
-      nameEl.value = user && (user.displayName || '') || '';
-      urlEl.value = user && (user.photoURL || '') || '';
-      preview.src = user && (user.photoURL || '') || '';
-      mini.src = user && (user.photoURL || '') || '';
-      if (avatarUrlDisplay) avatarUrlDisplay.textContent = '';
-
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const udata = userDoc.data();
-          if (udata.displayName) nameEl.value = udata.displayName;
-          if (udata.avatarURL) { preview.src = udata.avatarURL; mini.src = udata.avatarURL; urlEl.value = udata.avatarURL; }
-        }
-      } catch(e) { console.warn('users doc read failed', e); }
-
-      try {
-        const d = await getDoc(doc(db, 'avatarURL', user.uid));
-        if (d.exists()) {
-          const data = d.data();
-          const url = data && data.url ? data.url : null;
-          if (url) {
-            urlEl.value = url;
-            preview.src = url;
-            mini.src = url;
-            if (avatarUrlDisplay) avatarUrlDisplay.textContent = 'Avatar: ' + (url.length>80 ? url.slice(0,80)+'…' : url);
-          }
-        }
-      } catch(e) {
-        console.warn('populateSettingsFields firestore avatar read failed', e);
-        if (msg) msg.textContent = 'Aviso: não foi possível ler avatar do servidor.';
-      }
-
-      try {
-        const ddesc = await getDoc(doc(db, 'playerDescriptions', user.uid));
-        if (ddesc.exists() && ddesc.data().description !== undefined) {
-          descEl.value = ddesc.data().description || '';
-        } else {
-          descEl.value = '';
-        }
-      } catch(e) { console.warn('playerDescriptions read failed', e); }
-
+      const nameEl = $('gd-settings-name'); const urlEl = $('gd-pfp-url'); const preview=$('gd-pfp-preview'); const mini=$('gd-pfp-mini'); const msg=$('gd-settings-msg'); const descEl=$('gd-settings-desc'); const avatarUrlDisplay=$('gd-user-avatar-url');
+      nameEl.value = user && (user.displayName||'') || ''; urlEl.value = user && (user.photoURL||'') || ''; preview.src = user && (user.photoURL||'') || ''; mini.src = user && (user.photoURL||'') || '';
+      try { const userDoc = await getDoc(doc(db,'users',user.uid)); if (userDoc.exists()){ const udata = userDoc.data(); if (udata.displayName) nameEl.value = udata.displayName; if (udata.avatarURL){ preview.src=udata.avatarURL; mini.src=udata.avatarURL; urlEl.value=udata.avatarURL; } } } catch(e){ console.warn('users read failed',e); }
+      try { const d = await getDoc(doc(db,'avatarURL',user.uid)); if (d.exists()){ const url = d.data().url || null; if (url) { urlEl.value=url; preview.src=url; mini.src=url; if (avatarUrlDisplay) avatarUrlDisplay.textContent = 'Avatar: ' + (url.length>80 ? url.slice(0,80)+'…' : url); } } } catch(e){ console.warn('avatar read fail',e); if(msg) msg.textContent='Aviso: não foi possível ler avatar.'; }
+      try { const ddesc = await getDoc(doc(db,'playerDescriptions',user.uid)); if (ddesc.exists()) descEl.value = ddesc.data().description || ''; else descEl.value = ''; } catch(e){ console.warn('desc read fail', e); }
       if (msg) msg.textContent = '';
-    } catch(e) {
-      console.warn('populateSettingsFields error', e);
-    }
+    } catch(e){ console.warn('populateSettingsFields error', e); }
   }
 
-  // update GDevelop variables
-  async function updateGDevelopVarsFromUser(user) {
+  async function updateGDevelopVarsFromUser(user){
     try {
-      const rs = window._gd_runtimeScene;
-      if (!rs) return;
-      const vars = rs.getVariables ? rs.getVariables() : (rs.getScene ? rs.getScene().getVariables() : null);
-      if (!vars) return;
-
-      vars.get('auth_uid').setString(user ? user.uid : '');
-      vars.get('auth_email').setString(user ? (user.email || '') : '');
-      vars.get('auth_name').setString(user ? (user.displayName || '') : '');
-      vars.get('auth_photo').setString(user ? (user.photoURL || '') : '');
-
+      const rs = window._gd_runtimeScene; if (!rs) return;
+      const vars = rs.getVariables ? rs.getVariables() : (rs.getScene ? rs.getScene().getVariables() : null); if (!vars) return;
+      vars.get('auth_uid').setString(user ? user.uid : ''); vars.get('auth_email').setString(user ? (user.email||'') : ''); vars.get('auth_name').setString(user ? (user.displayName||'') : ''); vars.get('auth_photo').setString(user ? (user.photoURL||'') : '');
       try {
         if (user) {
-          const d = await getDoc(doc(db, 'avatarURL', user.uid));
-          const url = (d.exists() && d.data() && d.data().url) ? d.data().url : (user.photoURL || '');
+          const d = await getDoc(doc(db,'avatarURL',user.uid)); const url = (d.exists() && d.data() && d.data().url) ? d.data().url : (user.photoURL||'');
           vars.get('auth_avatar_url').setString(url || '');
-          const pd = await getDoc(doc(db, 'playerDescriptions', user.uid));
-          const desc = (pd.exists() && pd.data() && pd.data().description) ? pd.data().description : '';
+          const pd = await getDoc(doc(db,'playerDescriptions',user.uid)); const desc = (pd.exists() && pd.data() && pd.data().description) ? pd.data().description : '';
           vars.get('auth_description').setString(desc || '');
-          const game = rs.getGame ? rs.getGame() : (typeof runtimeGame !== 'undefined' ? runtimeGame : null);
-          if (game && game.getVariables) {
-            game.getVariables().get('auth_avatar_url').setString(url || '');
-            game.getVariables().get('auth_photo').setString(user.photoURL || '');
-            game.getVariables().get('auth_description').setString(desc || '');
-          }
-        } else {
-          vars.get('auth_avatar_url').setString('');
-          vars.get('auth_description').setString('');
-          const game = rs.getGame ? rs.getGame() : (typeof runtimeGame !== 'undefined' ? runtimeGame : null);
-          if (game && game.getVariables) {
-            game.getVariables().get('auth_avatar_url').setString('');
-            game.getVariables().get('auth_photo').setString('');
-            game.getVariables().get('auth_description').setString('');
-          }
-        }
-      } catch(e) {
-        console.warn('updateGDevelopVarsFromUser: avatar/desc read failed', e);
-      }
-    } catch(e) {
-      console.warn('updateGDevelopVarsFromUser error', e);
-    }
+          const game = rs.getGame ? rs.getGame() : (typeof runtimeGame !== 'undefined' ? runtimeGame : null); if (game && game.getVariables){ game.getVariables().get('auth_avatar_url').setString(url||''); game.getVariables().get('auth_description').setString(desc||''); }
+        } else { vars.get('auth_avatar_url').setString(''); vars.get('auth_description').setString(''); }
+      } catch(e){ console.warn('updateGDevelopVarsFromUser avatar/desc read failed', e); }
+    } catch(e){ console.warn('updateGDevelopVarsFromUser error', e); }
   }
 
-  // read authoritative avatar doc to update profile UI
-  async function handleUserAfterLogin(user) {
+  async function handleUserAfterLogin(user){
     if (!user) return;
     try {
-      $('gd-auth-title').textContent = 'Perfil';
-      $('gd-login-form').style.display = 'none';
-      $('gd-register-form').style.display = 'none';
-      $('gd-settings-panel').style.display = 'none';
-      $('gd-auth-user').style.display = '';
-
+      $('gd-auth-title').textContent = 'Perfil'; $('gd-login-form').style.display='none'; $('gd-register-form').style.display='none'; $('gd-settings-panel').style.display='none'; $('gd-auth-user').style.display='';
       $('gd-user-display').textContent = user.displayName || user.email || 'Usuário';
-      $('gd-user-email').textContent = user.email || '';
-      $('gd-user-email').style.opacity = '0';
-
-      try {
-        const d = await getDoc(doc(db, 'avatarURL', user.uid));
-        const url = (d.exists() && d.data() && d.data().url) ? d.data().url : (user.photoURL || '');
-        $('gd-pfp-mini').src = url || '';
-        const avatarUrlDisplay = $('gd-user-avatar-url');
-        if (avatarUrlDisplay) avatarUrlDisplay.textContent = url ? ('Avatar: ' + (url.length > 80 ? url.slice(0,80)+'…' : url)) : '';
-      } catch(e) {
-        console.warn('handleUserAfterLogin: avatar read failed', e);
-        $('gd-pfp-mini').src = user.photoURL || '';
-      }
-
+      $('gd-user-email').textContent = user.email || ''; $('gd-user-email').style.opacity='0';
+      try { const d = await getDoc(doc(db,'avatarURL',user.uid)); const url = (d.exists() && d.data() && d.data().url) ? d.data().url : (user.photoURL||''); $('gd-pfp-mini').src = url || ''; const ad = $('gd-user-avatar-url'); if (ad) ad.textContent = url ? ('Avatar: ' + (url.length>80?url.slice(0,80)+'…':url)) : ''; } catch(e){ console.warn('avatar read failed', e); $('gd-pfp-mini').src = user.photoURL || ''; }
       updateGDevelopVarsFromUser(user);
-
-      // After login, trigger sync of player save automatically (first-run sync behavior)
-      try {
-        await syncPlayerSaveIfNeeded(window._gd_runtimeScene);
-      } catch(e) { console.warn('player save sync after login failed', e); }
-
-    } catch(e) {
-      console.warn('handleUserAfterLogin error', e);
-    }
+      // NEW: read remote and apply it if present (readonly)
+      try { await reconcilePlayerSave_ReadOnly(window._gd_runtimeScene || runtimeScene); } catch(e){ console.warn('reconcile read-only failed', e); }
+    } catch(e){ console.warn('handleUserAfterLogin error', e); }
   }
 
-  // auth state listener
   onAuthStateChanged(auth, async (user) => {
     console.log('onAuthStateChanged', user);
-    if (user) {
-      try {
-        $('gd-auth-title').textContent = 'Perfil';
-        $('gd-login-form').style.display = 'none';
-        $('gd-register-form').style.display = 'none';
-        $('gd-auth-user').style.display = '';
-        $('gd-settings-panel').style.display = 'none';
-      } catch(e){}
-      await handleUserAfterLogin(user);
-    } else {
-      try {
-        const overlay = $('gd-firebase-auth-overlay');
-        if (overlay && overlay.style.display === 'flex') {
-          showLoginView();
-        }
-      } catch(e){}
-      updateGDevelopVarsFromUser(null);
-    }
+    if (user) { try { $('gd-auth-title').textContent='Perfil'; $('gd-login-form').style.display='none'; $('gd-register-form').style.display='none'; $('gd-auth-user').style.display=''; $('gd-settings-panel').style.display='none'; } catch(e){} await handleUserAfterLogin(user); }
+    else { try { const overlay = $('gd-firebase-auth-overlay'); if (overlay && overlay.style.display === 'flex') { $('gd-login-form').style.display=''; $('gd-register-form').style.display='none'; $('gd-auth-user').style.display='none'; $('gd-settings-panel').style.display='none'; } } catch(e){} updateGDevelopVarsFromUser(null); }
   });
 
   // public API
-  window.gdFirebaseAuthUI = {
-    show: () => {
-      const user = auth.currentUser;
-      showOverlay();
-      if (user) {
-        try {
-          $('gd-auth-title').textContent = 'Perfil';
-          $('gd-login-form').style.display = 'none';
-          $('gd-register-form').style.display = 'none';
-          $('gd-auth-user').style.display = '';
-          $('gd-settings-panel').style.display = 'none';
-        } catch(e){}
-        handleUserAfterLogin(user).catch(e => console.warn(e));
-        return;
-      }
-      showLoginView();
-    },
-    hide: hideOverlay,
-    getCurrentUser: () => auth.currentUser,
-    setRuntimeScene: (rs) => { window._gd_runtimeScene = rs; updateGDevelopVarsFromUser(auth.currentUser); },
-    openSettings: () => {
-      const user = auth.currentUser;
-      if (!user) {
-        window.gdFirebaseAuthUI.show();
-        return;
-      }
-      showOverlay();
-      try {
-        $('gd-auth-title').textContent = 'Perfil — Configurações';
-        $('gd-login-form').style.display = 'none';
-        $('gd-register-form').style.display = 'none';
-        $('gd-auth-user').style.display = 'none';
-        $('gd-settings-panel').style.display = 'block';
-      } catch(e){}
-      setTimeout(()=> populateSettingsFields(user), 60);
-    },
-    // NEW: explicit sync trigger
-    syncPlayerSaveNow: async () => {
-      try {
-        await syncPlayerSaveIfNeeded(window._gd_runtimeScene, { force: true });
-        return true;
-      } catch(e) { console.warn(e); return false; }
+  window.gdFirebaseAuthUI = window.gdFirebaseAuthUI || {};
+  window.gdFirebaseAuthUI.show = () => { showOverlay(); const user = auth.currentUser; if (user) { $('gd-auth-title').textContent='Perfil'; $('gd-login-form').style.display='none'; $('gd-register-form').style.display='none'; $('gd-auth-user').style.display=''; $('gd-settings-panel').style.display='none'; handleUserAfterLogin(user).catch(()=>{}); return; } $('gd-login-form').style.display=''; };
+  window.gdFirebaseAuthUI.hide = () => { hideOverlay(); };
+  window.gdFirebaseAuthUI.setRuntimeScene = (rs) => { window._gd_runtimeScene = rs; updateGDevelopVarsFromUser(auth.currentUser); };
+  window.gdFirebaseAuthUI.openSettings = () => { const user = auth.currentUser; if (!user) { window.gdFirebaseAuthUI.show(); return; } showOverlay(); $('gd-auth-title').textContent='Perfil — Configurações'; $('gd-login-form').style.display='none'; $('gd-register-form').style.display='none'; $('gd-auth-user').style.display='none'; $('gd-settings-panel').style.display='block'; setTimeout(()=> populateSettingsFields(user),60); };
+
+  // NEW: explicit save function to upload current local save to Firestore
+  window.gdFirebaseAuthUI.savePlayerNow = async function(maybeRuntimeScene){
+    const rs = maybeRuntimeScene || window._gd_runtimeScene || runtimeScene;
+    try {
+      const res = await createAndSaveEncryptedSaveInternal(rs);
+      return res;
+    } catch(e){
+      console.error('savePlayerNow error', e);
+      throw e;
     }
   };
 
-} // end createAuthOverlay
+} // end createAuthOverlayAndBind
 
-createAuthOverlay();
+createAuthOverlayAndBind();
 
-/* ============================
-   PlayerSave sync logic
-   - On first execution after login, does:
-     - check playerSave/{uid} in Firestore;
-     - if exists: decrypt and apply fields (like import UI did);
-     - if not exists or content differs from current plaintext save => encrypt current save and write to Firestore with hash.
-   - Public API: window.gdFirebaseAuthUI.syncPlayerSaveNow()
-   - Uses same encryption primitives above for compatibility.
-   ============================ */
-
-async function buildCurrentSavePlaintext(runtimeScene){
-  // Build the same structure {version:1, payload:{ BestScore, Pfcs, Points } }
-  try {
-    const gvars = runtimeScene.getGame().getVariables();
-    const pu = gvars.get('PlayerUniversal');
-    if (!pu) throw new Error('PlayerUniversal variable not found.');
-    const payload = {};
-    for (const k of EXPORT_FIELDS){
-      try { payload[k] = pu.getChild(k).toJSObject(); } catch(e){ try { payload[k] = (pu.getChild(k).getAsString? pu.getChild(k).getAsString() : null); } catch(e2){ payload[k] = null; } }
-    }
-    return JSON.stringify({ version:1, payload });
-  } catch(e){ throw e; }
-}
-
-async function applyDecryptedSaveToGame(runtimeScene, decryptedJsonText){
-  // identical to import: parse JSON -> payload -> set numeric fields and per-field encpt
-  const parsed = JSON.parse(decryptedJsonText);
-  const payload = parsed.payload || parsed;
-  const gvars = runtimeScene.getGame().getVariables();
-  const pu = gvars.get('PlayerUniversal');
-  if (!pu) throw new Error('PlayerUniversal missing');
-  try { pu.getChild('Encpt'); } catch(e){}
-  for (const k of EXPORT_FIELDS){
-    try {
-      const v = (payload && (k in payload)) ? payload[k] : null;
-      const num = parseToNumberOrZero(v);
-      try { pu.getChild(k).setNumber(num); } catch(e){ try { pu.getChild(k).setNumber(Number(num) || 0); } catch(e2){} }
-      try {
-        const token = getToken();
-        const username = getUsername();
-        const secret = username + (token ? ('|' + token) : '');
-        const ctxt = await encryptFieldString(secret, String(num));
-        pu.getChild('Encpt').getChild(k).setString(ctxt);
-      } catch(e){ console.warn('Per-field encrypt failed for', k, e); }
-    } catch(e){ console.warn('Apply field error', k, e); }
-  }
-  try { const pv = gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber === 'function') pv.setNumber(1); } catch(e){ console.warn('Failed set PlayerOnSave', e); }
-}
-
-// Read Firestore playerSave doc (returns { save: string, hash: string } or null)
-async function readPlayerSaveDoc(uid){
-  try {
-    const snap = await getDoc(doc(db, 'playerSave', uid));
-    if (!snap.exists()) return null;
-    const data = snap.data();
-    return { save: data.save || null, hash: data.hash || null };
-  } catch(e){ console.warn('readPlayerSaveDoc failed', e); return null; }
-}
-
-// Write playerSave doc with save string and hash
-async function writePlayerSaveDoc(uid, saveString, hashHex){
-  try {
-    await setDoc(doc(db, 'playerSave', uid), { save: saveString, hash: hashHex, updatedAt: serverTimestamp() }, { merge: true });
-    return true;
-  } catch(e){ console.warn('writePlayerSaveDoc failed', e); return false; }
-}
-
-// Core sync behavior
-async function syncPlayerSaveIfNeeded(runtimeScene, opts = { force: false }){
-  // opts.force = true -> always write current plaintext to firestore (unless identical)
-  if (!runtimeScene) {
-    console.warn('syncPlayerSaveIfNeeded: runtimeScene not provided');
-    return;
-  }
-  const user = auth.currentUser;
-  if (!user) {
-    console.log('syncPlayerSaveIfNeeded: no auth user, skipping');
-    return;
-  }
-  try {
-    // Build current plaintext JSON
-    const currentPlain = await buildCurrentSavePlaintext(runtimeScene);
-    const currentHash = await sha256Hex(currentPlain);
-
-    // read remote
-    const remote = await readPlayerSaveDoc(user.uid);
-
-    if (!remote || !remote.save) {
-      // no remote save -> encrypt current and write
-      const token = getToken();
-      const secret = getUsername() + (token ? ('|' + token) : '');
-      const enc = await encryptFilePayload(secret, currentPlain);
-      await writePlayerSaveDoc(user.uid, enc, currentHash);
-      console.log('syncPlayerSaveIfNeeded: saved current save to firestore (no previous).');
-      return;
-    }
-
-    // remote exists: compare hash: if identical, just apply remote (decrypt+apply)
-    if (remote.hash && remote.hash === currentHash && !opts.force) {
-      // hashes equal -> remote contents equal to current; but we still apply remote decrypted to ensure in-game Encpt updated
-      try {
-        const token = getToken();
-        const secret = getUsername() + (token ? ('|' + token) : '');
-        const plain = await decryptFilePayload(secret, remote.save);
-        await applyDecryptedSaveToGame(runtimeScene, plain);
-        console.log('syncPlayerSaveIfNeeded: remote save matches local (hash match). Decrypted and applied.');
-        return;
-      } catch(e) {
-        // if decryption fails, fallback to writing current save to firestore
-        console.warn('syncPlayerSaveIfNeeded: decryption failed for remote save even though hash matched - will overwrite remote', e);
-        const token = getToken();
-        const secret = getUsername() + (token ? ('|' + token) : '');
-        const enc = await encryptFilePayload(secret, currentPlain);
-        await writePlayerSaveDoc(user.uid, enc, currentHash);
-        return;
-      }
-    } else {
-      // hashes differ (remote different than current) -> decide: if opts.force true -> overwrite remote with current
-      if (opts.force) {
-        const token = getToken();
-        const secret = getUsername() + (token ? ('|' + token) : '');
-        const enc = await encryptFilePayload(secret, currentPlain);
-        await writePlayerSaveDoc(user.uid, enc, currentHash);
-        console.log('syncPlayerSaveIfNeeded: forced overwrite remote with current save.');
-        return;
-      }
-
-      // remote exists but different: prefer remote (user asked: "se ja existir o save na firebase ele só le e aplica os valores nas respectivas variaveis igual o js que eu enviei")
-      // So per your request: if there's a remote save, we should read & apply it.
-      try {
-        const token = getToken();
-        const secret = getUsername() + (token ? ('|' + token) : '');
-        const plain = await decryptFilePayload(secret, remote.save);
-        await applyDecryptedSaveToGame(runtimeScene, plain);
-        console.log('syncPlayerSaveIfNeeded: remote save exists and was applied (over local differences).');
-        // After applying remote, if you prefer to push local later you can call sync with force:true
-        return;
-      } catch(e) {
-        // If decryption fails (maybe tokens different), fallback to writing local
-        console.warn('syncPlayerSaveIfNeeded: failed to decrypt remote save, will attempt to upload local save', e);
-        try {
-          const token = getToken();
-          const secret = getUsername() + (token ? ('|' + token) : '');
-          const enc = await encryptFilePayload(secret, currentPlain);
-          await writePlayerSaveDoc(user.uid, enc, currentHash);
-          console.log('syncPlayerSaveIfNeeded: uploaded local save after decrypt failure.');
-          return;
-        } catch(e2){
-          console.error('syncPlayerSaveIfNeeded: failed to upload local save as fallback', e2);
-          return;
-        }
-      }
-    }
-  } catch(e){
-    console.error('syncPlayerSaveIfNeeded error', e);
-    throw e;
-  }
-}
-
-// Expose sync function globally too
-window.gdFirebaseAuthUI = window.gdFirebaseAuthUI || {};
-window.gdFirebaseAuthUI.syncPlayerSaveNow = async function(){ try{ await syncPlayerSaveIfNeeded(window._gd_runtimeScene, { force: true }); return true; } catch(e){ console.warn(e); return false; } };
-
-// Also attempt initial sync if user already logged and runtimeScene available
+// If user already logged at module load, attempt read-only reconcile (apply remote if present)
 (async ()=>{
   try {
-    const u = auth.currentUser;
-    if (u) {
-      // give a short delay to ensure runtimeScene is set
-      await new Promise(r=>setTimeout(r, 200));
-      if (window._gd_runtimeScene) {
-        try { await syncPlayerSaveIfNeeded(window._gd_runtimeScene); } catch(e){ console.warn('initial syncPlayerSaveIfNeeded failed', e); }
-      }
+    if (auth && auth.currentUser && auth.currentUser.uid) {
+      await new Promise(r=>setTimeout(r,120));
+      await reconcilePlayerSave_ReadOnly(window._gd_runtimeScene || null);
     }
-  } catch(e){ console.warn('initial player save sync error', e); }
+  } catch(e){ console.warn('initial reconcile attempt failed', e); }
 })();
 
-`; // end moduleCode string
+`; // end moduleCode
 
   const s = document.createElement('script');
   s.type = 'module';
   s.textContent = moduleCode;
   document.head.appendChild(s);
 
-  // keep runtimeScene reference for variable syncing
+  // keep runtimeScene ref
   window._gd_runtimeScene = runtimeScene;
 })(runtimeScene);
 
@@ -1845,7 +1492,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x12be3b8(runtimeScene);
+gdjs.InicioCode.userFunc0x1f215a0(runtimeScene);
 
 }
 
@@ -1871,7 +1518,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.InicioCode.userFunc0x936920(runtimeScene);
+gdjs.InicioCode.userFunc0x13814e8(runtimeScene);
 
 }
 
@@ -1914,7 +1561,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1464358 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x138b360 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -3261,12 +2908,12 @@ gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1464358(runtimeScene);
+gdjs.InicioCode.userFunc0x138b360(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x12bc898 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xc2a8d8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -3883,12 +3530,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x12bc898(runtimeScene);
+gdjs.InicioCode.userFunc0xc2a8d8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1821f40 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1f221c0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
@@ -3897,12 +3544,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1821f40(runtimeScene);
+gdjs.InicioCode.userFunc0x1f221c0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xae9770 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xc27240 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveExportUI(runtimeScene);
 };
@@ -3911,7 +3558,7 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xae9770(runtimeScene);
+gdjs.InicioCode.userFunc0xc27240(runtimeScene);
 
 }
 
