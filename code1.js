@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x1f215a0 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0xaaba30 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,25 +848,17 @@ gdjs.InicioCode.userFunc0x1f215a0 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.userFunc0x13814e8 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1901260 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
-  if (window._gd_firebase_ui_no_autosave_v1) {
+  if (window._gd_firebase_users_combined_v1) {
     window._gd_runtimeScene = runtimeScene;
     return;
   }
-  window._gd_firebase_ui_no_autosave_v1 = true;
+  window._gd_firebase_users_combined_v1 = true;
   window._gd_runtimeScene = runtimeScene;
 
   const moduleCode = `
-/* UI + Firebase module — NO automatic overwrite of remote playerSave.
-   - Reads remote first and applies it if present.
-   - Does NOT write to remote automatically if different; writing only via external call:
-     window.gdFirebaseAuthUI.savePlayerNow()
-   - Keeps avatar/name/description features and per-field Encpt behavior.
-   - API key lightly obfuscated; deobfuscated at runtime.
-*/
-
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
 import {
   getAuth,
@@ -888,7 +880,7 @@ import {
   arrayRemove
 } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
 
-// --- Obfuscation helper and obfuscated API key (replace if you regenerate) ---
+/* ---------- Light obfuscation / API key (deobfuscated at runtime) ---------- */
 function _obfDecode(b64xor) {
   const raw = atob(b64xor);
   let out = '';
@@ -897,7 +889,7 @@ function _obfDecode(b64xor) {
   }
   return out;
 }
-// Correct obfuscated API key for your project (XOR13 + btoa)
+// obfuscated value matching your API key (XOR13 + btoa)
 const _OBF_APIKEY = "TER3bF50T2hHOGNmQV9IQ2ZnX2FJYE46QWVBfko4VU9sPU9ESlJm";
 
 const firebaseConfig = {
@@ -914,7 +906,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- Crypto primitives (same scheme as before) ---
+/* ---------- Crypto primitives (compatible com seu import/export) ---------- */
 const PBKDF2_ITERATIONS = 150000;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
@@ -973,7 +965,7 @@ async function sha256Hex(text){
   return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-// --- GDevelop helpers (username/token etc) ---
+/* ---------- GDevelop helpers ---------- */
 function getUsername(){
   try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') return gdjs.playerAuthentication.getUsername(); }catch(e){}
   try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : ''); } catch(e){}
@@ -983,7 +975,6 @@ function getToken(){
   try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') return gdjs.playerAuthentication.getUserToken() || ''; } catch(e) {}
   return '';
 }
-
 function parseToNumberOrZero(v){
   if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
   if (typeof v === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v)) return Number(v);
@@ -993,10 +984,8 @@ function parseToNumberOrZero(v){
   return 0;
 }
 
-// --- Fixed fields to ensure exact format as your txt save ---
+/* ---------- Export fields (deterministic order to match your .txt) ---------- */
 const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
-
-// read numeric children in the exact order as EXPORT_FIELDS
 function readNumericChildrenOrdered(runtimeScene){
   try {
     const gameVars = runtimeScene.getGame().getVariables();
@@ -1006,11 +995,7 @@ function readNumericChildrenOrdered(runtimeScene){
     try {
       if (typeof pu.toJSObject === 'function') {
         const obj = pu.toJSObject();
-        for (const k of EXPORT_FIELDS) {
-          const raw = obj[k];
-          const num = parseToNumberOrZero(raw);
-          payload[k] = num;
-        }
+        for (const k of EXPORT_FIELDS) payload[k] = parseToNumberOrZero(obj[k]);
         return payload;
       }
     } catch(e){}
@@ -1030,37 +1015,50 @@ function readNumericChildrenOrdered(runtimeScene){
     }
     return payload;
   } catch(e){
-    console.warn('readNumericChildrenOrdered error', e);
-    const payload = {};
-    for (const k of EXPORT_FIELDS) payload[k] = 0;
-    return payload;
+    const payload = {}; for (const k of EXPORT_FIELDS) payload[k] = 0; return payload;
   }
 }
-
-// Build plaintext JSON in deterministic order
 function buildPlaintextSaveJson(runtimeScene){
-  const payload = readNumericChildrenOrdered(runtimeScene);
   const ordered = {};
+  const payload = readNumericChildrenOrdered(runtimeScene);
   for (const k of EXPORT_FIELDS) ordered[k] = payload[k];
   return JSON.stringify({ version: 1, payload: ordered });
 }
 
-// Firestore helpers
-async function readPlayerSaveDoc(uid){
+/* ---------- Firestore 'users/{uid}' helpers with session cache ---------- */
+const _gd_userDocCache = {}; // uid -> { data, ts }
+
+async function readUsersDoc(uid, opts = { force:false }){
+  // returns document data or null
+  if (!uid) return null;
+  if (!opts.force && _gd_userDocCache[uid] && _gd_userDocCache[uid].data) return _gd_userDocCache[uid].data;
   try {
-    const snap = await getDoc(doc(db, 'playerSave', uid));
-    if (!snap.exists()) return null;
-    return snap.data();
-  } catch(e){ console.warn('readPlayerSaveDoc failed', e); return null; }
-}
-async function writePlayerSaveDoc(uid, saveString, hashHex){
-  try {
-    await setDoc(doc(db, 'playerSave', uid), { save: saveString, hash: hashHex, updatedAt: serverTimestamp() }, { merge: true });
-    return true;
-  } catch(e){ console.warn('writePlayerSaveDoc failed', e); return false; }
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (!snap.exists()) {
+      _gd_userDocCache[uid] = { data: null, ts: Date.now() };
+      return null;
+    }
+    const data = snap.data();
+    _gd_userDocCache[uid] = { data, ts: Date.now() };
+    return data;
+  } catch(e){
+    console.warn('readUsersDoc failed', e);
+    return null;
+  }
 }
 
-// apply decrypted save into the game (sets numbers and per-field Encpt)
+async function writeUsersDocPartial(uid, partial){
+  if (!uid) throw new Error('uid required');
+  const ref = doc(db, 'users', uid);
+  await setDoc(ref, partial, { merge: true });
+  // update cache
+  _gd_userDocCache[uid] = _gd_userDocCache[uid] || { data: {}, ts: 0 };
+  _gd_userDocCache[uid].data = Object.assign({}, _gd_userDocCache[uid].data || {}, partial);
+  _gd_userDocCache[uid].ts = Date.now();
+  return true;
+}
+
+/* ---------- Apply decrypted save to game (same as before) ---------- */
 async function applyDecryptedSaveToGame(runtimeScene, decryptedJsonText){
   const parsed = JSON.parse(decryptedJsonText);
   const payload = parsed.payload || parsed;
@@ -1083,71 +1081,79 @@ async function applyDecryptedSaveToGame(runtimeScene, decryptedJsonText){
   } catch(e){ console.warn('applyDecryptedSaveToGame error', e); }
 }
 
-// ========== RECONCILE (READ-ONLY) ==========
-async function reconcilePlayerSave_ReadOnly(runtimeScene){
+/* ---------- Reconcile: READ-ONLY from users/{uid}.playerSave and apply it (no overwrite) ---------- */
+async function reconcilePlayerSave_ReadOnly(runtimeScene, opts = { forceRead:false }){
   const user = auth.currentUser;
-  if (!user) {
-    console.warn('reconcilePlayerSave: no user');
-    return;
-  }
+  if (!user) return;
   const uid = user.uid;
-  // run once per uid per session
+  // run once per uid unless forced
   window._gd_reconcile_ran = window._gd_reconcile_ran || {};
-  if (window._gd_reconcile_ran[uid]) {
-    // already applied remote once
-    return;
-  }
+  if (window._gd_reconcile_ran[uid] && !opts.forceRead) return;
+
   try {
-    const remoteDoc = await readPlayerSaveDoc(uid);
-    const token = getToken();
-    const secret = getUsername() + (token ? ('|' + token) : '');
-    if (remoteDoc && remoteDoc.save) {
+    const docData = await readUsersDoc(uid, { force: !!opts.forceRead });
+    if (docData && docData.playerSave && docData.playerSave.save) {
+      const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
       try {
-        const remotePlain = await decryptFilePayload(secret, remoteDoc.save);
-        // apply remote to game
-        if (runtimeScene) {
-          await applyDecryptedSaveToGame(runtimeScene, remotePlain);
-        } else if (window._gd_runtimeScene) {
-          await applyDecryptedSaveToGame(window._gd_runtimeScene, remotePlain);
-        }
-        console.log('reconcilePlayerSave: applied remote save for uid', uid);
-      } catch(err){
-        console.warn('reconcilePlayerSave: failed to decrypt remote save', err);
+        const remotePlain = await decryptFilePayload(secret, docData.playerSave.save);
+        // apply into game
+        await applyDecryptedSaveToGame(runtimeScene || window._gd_runtimeScene, remotePlain);
+        console.log('Applied remote playerSave from users/' + uid);
+      } catch(e){
+        console.warn('Failed to decrypt remote playerSave from users/' + uid, e);
       }
     } else {
-      console.log('reconcilePlayerSave: no remote save present for uid', uid, '- not uploading automatically (per config).');
+      console.log('No playerSave present in users/' + uid);
     }
     window._gd_reconcile_ran[uid] = true;
   } catch(e){
-    console.error('reconcilePlayerSave error', e);
+    console.error('reconcilePlayerSave_ReadOnly error', e);
   }
 }
 
-// ========== EXTERNAL SAVE FUNCTION ==========
+/* ---------- External: create & save encrypted save into users/{uid}.playerSave ---------- */
 async function createAndSaveEncryptedSaveInternal(runtimeScene){
-  if (!runtimeScene) {
-    runtimeScene = window._gd_runtimeScene;
-    if (!runtimeScene) throw new Error('runtimeScene not provided');
-  }
+  runtimeScene = runtimeScene || window._gd_runtimeScene;
+  if (!runtimeScene) throw new Error('runtimeScene required');
   const user = auth.currentUser;
   if (!user) throw new Error('User not authenticated');
 
+  const uid = user.uid;
   const plain = buildPlaintextSaveJson(runtimeScene);
   const hashHex = await sha256Hex(plain);
-  const token = getToken();
-  const secret = getUsername() + (token ? ('|' + token) : '');
+  const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
   const enc = await encryptFilePayload(secret, plain);
-  await writePlayerSaveDoc(user.uid, enc, hashHex);
-  // set PlayerOnSave = 1
+
+  // write under users/{uid}.playerSave
+  await writeUsersDocPartial(uid, { playerSave: { save: enc, hash: hashHex, updatedAt: serverTimestamp() } });
+
+  // set PlayerOnSave = 1 in game variables
   try {
     const gs = runtimeScene.getGame().getVariables();
     const v = gs.get('PlayerOnSave');
     if (v && typeof v.setNumber === 'function') v.setNumber(1);
-  } catch(e){}
-  return { uid: user.uid, hash: hashHex };
+  } catch(e){ console.warn('Failed set PlayerOnSave', e); }
+
+  return { uid, hash: hashHex };
 }
 
-// ---- UI injection & bindings (same structure as before, slightly trimmed)
+/* ---------- External: saveProfile -> writes avatarURL and description and displayName into users/{uid} ---------- */
+async function saveProfileInternal({ name, avatarURL, description }){
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  const uid = user.uid;
+  const toWrite = {};
+  if (name !== undefined) toWrite.displayName = name;
+  if (avatarURL !== undefined) toWrite.avatarURL = avatarURL;
+  if (description !== undefined) toWrite.description = description;
+  toWrite.updatedAt = serverTimestamp();
+  await writeUsersDocPartial(uid, toWrite);
+  // also update Firebase auth profile for displayName / photoURL (best-effort, may fail)
+  try { await updateProfile(user, { displayName: name || user.displayName, photoURL: avatarURL || user.photoURL }); } catch(e){ /* ignore */ }
+  return true;
+}
+
+/* ---------- UI injection & bindings (uses users/{uid} as single source) ---------- */
 function createAuthOverlayAndBind(){
   if (document.getElementById('gd-firebase-auth-overlay')) return;
 
@@ -1254,7 +1260,7 @@ function createAuthOverlayAndBind(){
   function showOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='flex'; }
   function hideOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='none'; }
 
-  // Minimal bindings (login/register/save settings/eye/logout)
+  // minimal bindings
   $('gd-auth-close').addEventListener('click', hideOverlay);
   $('gd-show-register-btn').addEventListener('click', ()=>{ $('gd-login-form').style.display='none'; $('gd-register-form').style.display=''; });
   $('gd-show-login-btn').addEventListener('click', ()=>{ $('gd-login-form').style.display=''; $('gd-register-form').style.display='none'; });
@@ -1278,10 +1284,15 @@ function createAuthOverlayAndBind(){
       if (list.includes(name)) { $('gd-auth-error-reg').textContent = 'Nome já em uso.'; return; }
       const uc = await createUserWithEmailAndPassword(auth, email, password);
       const uid = uc.user.uid;
-      await setDoc(doc(db, 'users', uid), { displayName: name, avatarURL: null, updatedAt: serverTimestamp() });
-      await setDoc(doc(db, 'avatarURL', uid), { url: null, updatedAt: serverTimestamp() });
+      // create users/{uid} doc with initial fields
+      await setDoc(doc(db, 'users', uid), {
+        displayName: name,
+        avatarURL: null,
+        description: '',
+        playerSave: null,
+        updatedAt: serverTimestamp()
+      });
       if (allSnap.exists()) await updateDoc(allRef, { list: arrayUnion(name) }); else await setDoc(allRef, { list: [name] });
-      await setDoc(doc(db, 'playerDescriptions', uid), { description: '', updatedAt: serverTimestamp() });
       try { await updateProfile(uc.user, { displayName: name }); } catch(e){}
       await handleUserAfterLogin(uc.user || auth.currentUser);
     } catch(err){ console.warn('register error', err); $('gd-auth-error-reg').textContent = err && err.message ? err.message : String(err); }
@@ -1304,6 +1315,7 @@ function createAuthOverlayAndBind(){
   let emailVisible = false;
   $('gd-eye-btn').addEventListener('click', ()=>{ emailVisible = !emailVisible; $('gd-user-email').style.opacity = emailVisible ? '1' : '0'; });
 
+  // settings open
   $('gd-settings-btn').addEventListener('click', async ()=>{
     const u = auth.currentUser;
     if (!u) { $('gd-login-form').style.display=''; showOverlay(); return; }
@@ -1312,27 +1324,35 @@ function createAuthOverlayAndBind(){
   });
   $('gd-settings-back').addEventListener('click', ()=>{ $('gd-settings-panel').style.display='none'; $('gd-auth-user').style.display=''; });
 
+  // remove pfp -> write users/{uid}.avatarURL = null
   $('gd-remove-pfp').addEventListener('click', async ()=>{
     const u = auth.currentUser; if (!u) { $('gd-settings-msg').textContent = 'Faça login primeiro.'; return; }
-    try { await setDoc(doc(db, 'avatarURL', u.uid), { url:null, updatedAt: serverTimestamp() }, { merge:true }); try { await updateProfile(u, { photoURL: null }); } catch(e){} $('gd-pfp-preview').src=''; $('gd-pfp-mini').src=''; $('gd-pfp-url').value=''; $('gd-settings-msg').textContent='PFP removida.'; } catch(err){ $('gd-settings-msg').textContent = 'Erro: '+(err.message||err); }
+    try {
+      await saveProfileInternal({ avatarURL: null });
+      $('gd-pfp-preview').src=''; $('gd-pfp-mini').src=''; $('gd-pfp-url').value='';
+      $('gd-settings-msg').textContent='PFP removida.';
+      updateGDevelopVarsFromUser(u);
+    } catch(err){ $('gd-settings-msg').textContent = 'Erro: '+(err.message||err); }
   });
 
+  // settings save uses saveProfileInternal
   $('gd-save-settings').addEventListener('click', async ()=>{
     const u = auth.currentUser; if (!u) { $('gd-settings-msg').textContent='Faça login primeiro.'; return; }
     const newName = $('gd-settings-name').value.trim(); const description=$('gd-settings-desc').value||''; const urlCandidate=$('gd-pfp-url').value.trim();
     if (!newName) { $('gd-settings-msg').textContent='Nome é obrigatório.'; return; }
     try {
+      // check names uniqueness (still uses names/AllNames)
       const allRef = doc(db, 'names', 'AllNames'); const allSnap = await getDoc(allRef); const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
-      let currentName = null; try { const userDoc=await getDoc(doc(db,'users',u.uid)); if(userDoc.exists()) currentName=userDoc.data().displayName||null; }catch(e){}
+      let currentName = null; try { const ud = await readUsersDoc(u.uid); if (ud && ud.displayName) currentName = ud.displayName; } catch(e){}
       if (list.includes(newName) && newName !== currentName) { $('gd-settings-msg').textContent='Nome já em uso.'; return; }
       try { if (currentName && currentName !== newName) await updateDoc(allRef, { list: arrayRemove(currentName) }).catch(()=>{}); if (!list.includes(newName)){ if (allSnap.exists()) await updateDoc(allRef, { list: arrayUnion(newName) }); else await setDoc(allRef, { list: [newName] }); } }catch(e){}
-      await setDoc(doc(db,'users',u.uid),{ displayName: newName, updatedAt: serverTimestamp() }, { merge:true });
-      await setDoc(doc(db,'playerDescriptions',u.uid),{ description: description, updatedAt: serverTimestamp() }, { merge:true });
-      if (urlCandidate){ await setDoc(doc(db,'avatarURL',u.uid),{ url:urlCandidate, updatedAt: serverTimestamp() }, { merge:true }); await updateDoc(doc(db,'users',u.uid), { avatarURL: urlCandidate }).catch(()=>{}); try { await updateProfile(u, { displayName: newName, photoURL: urlCandidate }); } catch(e){} $('gd-pfp-preview').src=urlCandidate; $('gd-pfp-mini').src=urlCandidate; } else { try { await updateProfile(u, { displayName: newName }); } catch(e){} }
-      $('gd-settings-msg').textContent='Configurações salvas.'; updateGDevelopVarsFromUser(u);
+      await saveProfileInternal({ name: newName, avatarURL: urlCandidate || null, description: description || '' });
+      $('gd-settings-msg').textContent='Configurações salvas.';
+      updateGDevelopVarsFromUser(u);
     } catch(err){ console.error('save settings error', err); $('gd-settings-msg').textContent='Erro ao salvar: '+(err&&err.message?err.message:String(err)); }
   });
 
+  // file input handler (resize to 256 and save into users/{uid}.avatarURL as dataURL)
   (function attachFileHandler(){
     const fileInput = $('gd-pfp-file'); if (!fileInput) return;
     fileInput.addEventListener('change', async (e)=>{
@@ -1360,9 +1380,7 @@ function createAuthOverlayAndBind(){
             reader.readAsDataURL(file);
           });
         })(file);
-        await setDoc(doc(db,'avatarURL',u.uid),{ url:dataUrl, updatedAt: serverTimestamp() }, { merge:true });
-        await setDoc(doc(db,'users',u.uid),{ avatarURL:dataUrl, updatedAt: serverTimestamp() }, { merge:true });
-        try { await updateProfile(u, { photoURL: dataUrl }); } catch(e){}
+        await saveProfileInternal({ avatarURL: dataUrl });
         $('gd-pfp-preview').src = dataUrl; $('gd-pfp-mini').src = dataUrl; $('gd-pfp-url').value = dataUrl; $('gd-settings-msg').textContent='Avatar salvo.'; updateGDevelopVarsFromUser(u);
       } catch(err){ console.error('avatar upload failed', err); $('gd-settings-msg').textContent='Erro ao salvar avatar.'; }
     });
@@ -1371,10 +1389,15 @@ function createAuthOverlayAndBind(){
   async function populateSettingsFields(user){
     try {
       const nameEl = $('gd-settings-name'); const urlEl = $('gd-pfp-url'); const preview=$('gd-pfp-preview'); const mini=$('gd-pfp-mini'); const msg=$('gd-settings-msg'); const descEl=$('gd-settings-desc'); const avatarUrlDisplay=$('gd-user-avatar-url');
-      nameEl.value = user && (user.displayName||'') || ''; urlEl.value = user && (user.photoURL||'') || ''; preview.src = user && (user.photoURL||'') || ''; mini.src = user && (user.photoURL||'') || '';
-      try { const userDoc = await getDoc(doc(db,'users',user.uid)); if (userDoc.exists()){ const udata = userDoc.data(); if (udata.displayName) nameEl.value = udata.displayName; if (udata.avatarURL){ preview.src=udata.avatarURL; mini.src=udata.avatarURL; urlEl.value=udata.avatarURL; } } } catch(e){ console.warn('users read failed',e); }
-      try { const d = await getDoc(doc(db,'avatarURL',user.uid)); if (d.exists()){ const url = d.data().url || null; if (url) { urlEl.value=url; preview.src=url; mini.src=url; if (avatarUrlDisplay) avatarUrlDisplay.textContent = 'Avatar: ' + (url.length>80 ? url.slice(0,80)+'…' : url); } } } catch(e){ console.warn('avatar read fail',e); if(msg) msg.textContent='Aviso: não foi possível ler avatar.'; }
-      try { const ddesc = await getDoc(doc(db,'playerDescriptions',user.uid)); if (ddesc.exists()) descEl.value = ddesc.data().description || ''; else descEl.value = ''; } catch(e){ console.warn('desc read fail', e); }
+      // read from users/{uid} but use cache (not forced)
+      const ud = await readUsersDoc(user.uid, { force:false });
+      nameEl.value = (ud && ud.displayName) ? ud.displayName : (user.displayName || '');
+      const avatar = (ud && ud.avatarURL) ? ud.avatarURL : (user.photoURL || '');
+      urlEl.value = avatar || '';
+      preview.src = avatar || '';
+      mini.src = avatar || '';
+      if (avatarUrlDisplay) avatarUrlDisplay.textContent = avatar ? ('Avatar: ' + (avatar.length>80 ? avatar.slice(0,80)+'…' : avatar)) : '';
+      descEl.value = (ud && ud.description) ? ud.description : (ud && ud.playerDescription ? ud.playerDescription : '');
       if (msg) msg.textContent = '';
     } catch(e){ console.warn('populateSettingsFields error', e); }
   }
@@ -1386,25 +1409,29 @@ function createAuthOverlayAndBind(){
       vars.get('auth_uid').setString(user ? user.uid : ''); vars.get('auth_email').setString(user ? (user.email||'') : ''); vars.get('auth_name').setString(user ? (user.displayName||'') : ''); vars.get('auth_photo').setString(user ? (user.photoURL||'') : '');
       try {
         if (user) {
-          const d = await getDoc(doc(db,'avatarURL',user.uid)); const url = (d.exists() && d.data() && d.data().url) ? d.data().url : (user.photoURL||'');
+          const ud = await readUsersDoc(user.uid, { force:false });
+          const url = (ud && ud.avatarURL) ? ud.avatarURL : (user.photoURL || '');
           vars.get('auth_avatar_url').setString(url || '');
-          const pd = await getDoc(doc(db,'playerDescriptions',user.uid)); const desc = (pd.exists() && pd.data() && pd.data().description) ? pd.data().description : '';
+          const desc = (ud && ud.description) ? ud.description : '';
           vars.get('auth_description').setString(desc || '');
-          const game = rs.getGame ? rs.getGame() : (typeof runtimeGame !== 'undefined' ? runtimeGame : null); if (game && game.getVariables){ game.getVariables().get('auth_avatar_url').setString(url||''); game.getVariables().get('auth_description').setString(desc||''); }
+          const game = rs.getGame ? rs.getGame() : (typeof runtimeGame !== 'undefined' ? runtimeGame : null);
+          if (game && game.getVariables){ game.getVariables().get('auth_avatar_url').setString(url||''); game.getVariables().get('auth_description').setString(desc||''); }
         } else { vars.get('auth_avatar_url').setString(''); vars.get('auth_description').setString(''); }
       } catch(e){ console.warn('updateGDevelopVarsFromUser avatar/desc read failed', e); }
     } catch(e){ console.warn('updateGDevelopVarsFromUser error', e); }
   }
 
+  // after login: read users/{uid} once (cached) and apply playerSave if present
   async function handleUserAfterLogin(user){
     if (!user) return;
     try {
       $('gd-auth-title').textContent = 'Perfil'; $('gd-login-form').style.display='none'; $('gd-register-form').style.display='none'; $('gd-settings-panel').style.display='none'; $('gd-auth-user').style.display='';
       $('gd-user-display').textContent = user.displayName || user.email || 'Usuário';
       $('gd-user-email').textContent = user.email || ''; $('gd-user-email').style.opacity='0';
-      try { const d = await getDoc(doc(db,'avatarURL',user.uid)); const url = (d.exists() && d.data() && d.data().url) ? d.data().url : (user.photoURL||''); $('gd-pfp-mini').src = url || ''; const ad = $('gd-user-avatar-url'); if (ad) ad.textContent = url ? ('Avatar: ' + (url.length>80?url.slice(0,80)+'…':url)) : ''; } catch(e){ console.warn('avatar read failed', e); $('gd-pfp-mini').src = user.photoURL || ''; }
+      // populate avatar preview from users/{uid} (cached)
+      try { const ud = await readUsersDoc(user.uid, { force:false }); const url = (ud && ud.avatarURL) ? ud.avatarURL : (user.photoURL||''); $('gd-pfp-mini').src = url || ''; const ad = $('gd-user-avatar-url'); if (ad) ad.textContent = url ? ('Avatar: ' + (url.length>80?url.slice(0,80)+'…':url)) : ''; } catch(e){ console.warn('avatar read failed', e); $('gd-pfp-mini').src = user.photoURL || ''; }
       updateGDevelopVarsFromUser(user);
-      // NEW: read remote and apply it if present (readonly)
+      // attempt read-only reconcile (apply remote save if present)
       try { await reconcilePlayerSave_ReadOnly(window._gd_runtimeScene || runtimeScene); } catch(e){ console.warn('reconcile read-only failed', e); }
     } catch(e){ console.warn('handleUserAfterLogin error', e); }
   }
@@ -1417,28 +1444,32 @@ function createAuthOverlayAndBind(){
 
   // public API
   window.gdFirebaseAuthUI = window.gdFirebaseAuthUI || {};
+  // shows UI (same as before)
   window.gdFirebaseAuthUI.show = () => { showOverlay(); const user = auth.currentUser; if (user) { $('gd-auth-title').textContent='Perfil'; $('gd-login-form').style.display='none'; $('gd-register-form').style.display='none'; $('gd-auth-user').style.display=''; $('gd-settings-panel').style.display='none'; handleUserAfterLogin(user).catch(()=>{}); return; } $('gd-login-form').style.display=''; };
   window.gdFirebaseAuthUI.hide = () => { hideOverlay(); };
   window.gdFirebaseAuthUI.setRuntimeScene = (rs) => { window._gd_runtimeScene = rs; updateGDevelopVarsFromUser(auth.currentUser); };
   window.gdFirebaseAuthUI.openSettings = () => { const user = auth.currentUser; if (!user) { window.gdFirebaseAuthUI.show(); return; } showOverlay(); $('gd-auth-title').textContent='Perfil — Configurações'; $('gd-login-form').style.display='none'; $('gd-register-form').style.display='none'; $('gd-auth-user').style.display='none'; $('gd-settings-panel').style.display='block'; setTimeout(()=> populateSettingsFields(user),60); };
 
-  // NEW: explicit save function to upload current local save to Firestore
+  // explicit save functions
   window.gdFirebaseAuthUI.savePlayerNow = async function(maybeRuntimeScene){
     const rs = maybeRuntimeScene || window._gd_runtimeScene || runtimeScene;
-    try {
-      const res = await createAndSaveEncryptedSaveInternal(rs);
-      return res;
-    } catch(e){
-      console.error('savePlayerNow error', e);
-      throw e;
-    }
+    return await createAndSaveEncryptedSaveInternal(rs);
+  };
+  window.gdFirebaseAuthUI.saveProfile = async function(profile){
+    // profile: { name, avatarURL, description }
+    return await saveProfileInternal(profile);
+  };
+  window.gdFirebaseAuthUI.readUserDoc = async function(force){
+    const u = auth.currentUser;
+    if (!u) return null;
+    return await readUsersDoc(u.uid, { force: !!force });
   };
 
 } // end createAuthOverlayAndBind
 
 createAuthOverlayAndBind();
 
-// If user already logged at module load, attempt read-only reconcile (apply remote if present)
+// initial: if logged in already, apply remote save (read-only) once
 (async ()=>{
   try {
     if (auth && auth.currentUser && auth.currentUser.uid) {
@@ -1447,7 +1478,6 @@ createAuthOverlayAndBind();
     }
   } catch(e){ console.warn('initial reconcile attempt failed', e); }
 })();
-
 `; // end moduleCode
 
   const s = document.createElement('script');
@@ -1455,14 +1485,34 @@ createAuthOverlayAndBind();
   s.textContent = moduleCode;
   document.head.appendChild(s);
 
-  // keep runtimeScene ref
   window._gd_runtimeScene = runtimeScene;
 })(runtimeScene);
 
 };
+gdjs.InicioCode.asyncCallback35064484 = function (runtimeScene, asyncObjectsList) {
+asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
+gdjs.InicioCode.localVariables.length = 0;
+}
+gdjs.InicioCode.idToCallbackMap.set(35064484, gdjs.InicioCode.asyncCallback35064484);
 gdjs.InicioCode.eventsList1 = function(runtimeScene) {
 
+{
+
+
+{
+{
+const asyncObjectsList = new gdjs.LongLivedObjectsList();
+asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(5), (runtimeScene) => (gdjs.InicioCode.asyncCallback35064484(runtimeScene, asyncObjectsList)), 35064484, asyncObjectsList);
+}
+}
+
+}
+
+
 };gdjs.InicioCode.eventsList2 = function(runtimeScene) {
+
+};gdjs.InicioCode.eventsList3 = function(runtimeScene) {
 
 {
 
@@ -1491,7 +1541,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x1f215a0(runtimeScene);
+gdjs.InicioCode.userFunc0xaaba30(runtimeScene);
 
 }
 
@@ -1517,7 +1567,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.InicioCode.userFunc0x13814e8(runtimeScene);
+gdjs.InicioCode.userFunc0x1901260(runtimeScene);
 
 }
 
@@ -1533,6 +1583,9 @@ if (isConditionTrue_0) {
 }
 {gdjs.evtTools.sound.setGlobalVolume(runtimeScene, 100);
 }
+
+{ //Subevents
+gdjs.InicioCode.eventsList1(runtimeScene);} //End of subevents
 }
 
 }
@@ -1560,7 +1613,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x138b360 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1015b40 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -2460,6 +2513,7 @@ if (true) {
 
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongDifficulty").setString(difficultyName); } catch(e){}
 
       setStatus("Listando arquivos (procura áudios: difficulty -> song -> mod)...");
 
@@ -2573,6 +2627,7 @@ if (true) {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongDifficulty").setString(difficultyName); } catch(e){}
 
       setStatus("Procurando áudios (difficulty -> song -> mod)...");
       const hintDifficulty = (subdirs && subdirs.length>0) ? (rootFolder + "/" + subdirs[0]) : rootFolder;
@@ -2902,17 +2957,17 @@ if (true) {
 })();
 
 };
-gdjs.InicioCode.eventsList3 = function(runtimeScene) {
+gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0x138b360(runtimeScene);
+gdjs.InicioCode.userFunc0x1015b40(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xc2a8d8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1901ac8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -3524,53 +3579,53 @@ gdjs.InicioCode.userFunc0x138b360(runtimeScene);
 })(runtimeScene);
 
 };
-gdjs.InicioCode.eventsList4 = function(runtimeScene) {
-
-{
-
-
-gdjs.InicioCode.userFunc0xc2a8d8(runtimeScene);
-
-}
-
-
-};gdjs.InicioCode.userFunc0x1f221c0 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
-};
 gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0x1f221c0(runtimeScene);
+gdjs.InicioCode.userFunc0x1901ac8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xc27240 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xfd19a0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-window.openPlayerSaveExportUI(runtimeScene);
+if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
 gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0xc27240(runtimeScene);
+gdjs.InicioCode.userFunc0xfd19a0(runtimeScene);
+
+}
+
+
+};gdjs.InicioCode.userFunc0x1ab2820 = function GDJSInlineCode(runtimeScene) {
+"use strict";
+window.openPlayerSaveImportUI(runtimeScene);
+};
+gdjs.InicioCode.eventsList7 = function(runtimeScene) {
+
+{
+
+
+gdjs.InicioCode.userFunc0x1ab2820(runtimeScene);
 
 }
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.eventsList7 = function(runtimeScene) {
+gdjs.InicioCode.eventsList8 = function(runtimeScene) {
 
 {
 
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(66)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(67)));
 }
 if (isConditionTrue_0) {
 {runtimeScene.getScene().getVariables().getFromIndex(6).setBoolean(true);
@@ -3585,21 +3640,21 @@ if (isConditionTrue_0) {
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() >= gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(66)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() >= gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(67)));
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(68).setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(69).setNumber(0);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback37418484 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35151956 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
-{gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(67), null);
+{gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(68), null);
 }
-{gdjs.evtsExt__ArrayTools__GlobalSplitString.func(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(67).getAsString(), "/", runtimeScene.getGame().getVariables().getFromIndex(66), null);
+{gdjs.evtsExt__ArrayTools__GlobalSplitString.func(runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(68).getAsString(), "/", runtimeScene.getGame().getVariables().getFromIndex(67), null);
 }
 {runtimeScene.getScene().getVariables().getFromIndex(6).setBoolean(true);
 }
@@ -3609,8 +3664,8 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(37418484, gdjs.InicioCode.asyncCallback37418484);
-gdjs.InicioCode.eventsList8 = function(runtimeScene) {
+gdjs.InicioCode.idToCallbackMap.set(35151956, gdjs.InicioCode.asyncCallback35151956);
+gdjs.InicioCode.eventsList9 = function(runtimeScene) {
 
 {
 
@@ -3619,18 +3674,18 @@ gdjs.InicioCode.eventsList8 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback37418484(runtimeScene, asyncObjectsList)), 37418484, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback35151956(runtimeScene, asyncObjectsList)), 35151956, asyncObjectsList);
 }
 }
 
 }
 
-
-};gdjs.InicioCode.eventsList9 = function(runtimeScene) {
 
 };gdjs.InicioCode.eventsList10 = function(runtimeScene) {
 
 };gdjs.InicioCode.eventsList11 = function(runtimeScene) {
+
+};gdjs.InicioCode.eventsList12 = function(runtimeScene) {
 
 {
 
@@ -3648,7 +3703,7 @@ if (true) {
     gdjs.InicioCode.GDbegfontObjects3[i].deleteFromScene(runtimeScene);
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(68).setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(69).setNumber(0);
 }
 }
 }
@@ -3691,13 +3746,13 @@ let isConditionTrue_0 = false;
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects2Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects2});
-gdjs.InicioCode.eventsList12 = function(runtimeScene) {
-
-};gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects2Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects2});
 gdjs.InicioCode.eventsList13 = function(runtimeScene) {
 
-};gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDOppIconObjects2Objects = Hashtable.newFrom({"OppIcon": gdjs.InicioCode.GDOppIconObjects2});
+};gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects2Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects2});
 gdjs.InicioCode.eventsList14 = function(runtimeScene) {
+
+};gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDOppIconObjects2Objects = Hashtable.newFrom({"OppIcon": gdjs.InicioCode.GDOppIconObjects2});
+gdjs.InicioCode.eventsList15 = function(runtimeScene) {
 
 {
 
@@ -3754,7 +3809,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.eventsList15 = function(runtimeScene) {
+};gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 
 {
 
@@ -3770,7 +3825,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.eventsList16 = function(runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.eventsList17 = function(runtimeScene, asyncObjectsList) {
 
 {
 
@@ -3784,37 +3839,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback37494084 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35303956 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
-gdjs.InicioCode.eventsList16(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.InicioCode.eventsList17(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(37494084, gdjs.InicioCode.asyncCallback37494084);
-gdjs.InicioCode.eventsList17 = function(runtimeScene) {
-
-{
-
-
-{
-{
-const asyncObjectsList = new gdjs.LongLivedObjectsList();
-asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback37494084(runtimeScene, asyncObjectsList)), 37494084, asyncObjectsList);
-}
-}
-
-}
-
-
-};gdjs.InicioCode.asyncCallback37504108 = function (runtimeScene, asyncObjectsList) {
-asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
-{runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
-}
-gdjs.InicioCode.localVariables.length = 0;
-}
-gdjs.InicioCode.idToCallbackMap.set(37504108, gdjs.InicioCode.asyncCallback37504108);
+gdjs.InicioCode.idToCallbackMap.set(35303956, gdjs.InicioCode.asyncCallback35303956);
 gdjs.InicioCode.eventsList18 = function(runtimeScene) {
 
 {
@@ -3824,24 +3856,20 @@ gdjs.InicioCode.eventsList18 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback37504108(runtimeScene, asyncObjectsList)), 37504108, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35303956(runtimeScene, asyncObjectsList)), 35303956, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback37509652 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35207908 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
-gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
-
-{for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Tween").addObjectOpacityTween2("OpaOutPT", 0, "easeInQuad", 2, false);
-}
+{runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(37509652, gdjs.InicioCode.asyncCallback37509652);
+gdjs.InicioCode.idToCallbackMap.set(35207908, gdjs.InicioCode.asyncCallback35207908);
 gdjs.InicioCode.eventsList19 = function(runtimeScene) {
 
 {
@@ -3851,35 +3879,62 @@ gdjs.InicioCode.eventsList19 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback35207908(runtimeScene, asyncObjectsList)), 35207908, asyncObjectsList);
+}
+}
+
+}
+
+
+};gdjs.InicioCode.asyncCallback35213508 = function (runtimeScene, asyncObjectsList) {
+asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
+gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
+
+{for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
+    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Tween").addObjectOpacityTween2("OpaOutPT", 0, "easeInQuad", 2, false);
+}
+}
+gdjs.InicioCode.localVariables.length = 0;
+}
+gdjs.InicioCode.idToCallbackMap.set(35213508, gdjs.InicioCode.asyncCallback35213508);
+gdjs.InicioCode.eventsList20 = function(runtimeScene) {
+
+{
+
+
+{
+{
+const asyncObjectsList = new gdjs.LongLivedObjectsList();
+asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback37509652(runtimeScene, asyncObjectsList)), 37509652, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35213508(runtimeScene, asyncObjectsList)), 35213508, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.eventsList20 = function(runtimeScene) {
+};gdjs.InicioCode.eventsList21 = function(runtimeScene) {
 
 {
 
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(88).getChild("PointsMessage").getAsNumber() > 0);
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(89).getChild("PointsMessage").getAsNumber() > 0);
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37507132);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35211076);
 }
 }
 if (isConditionTrue_0) {
 gdjs.copyArray(runtimeScene.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 {for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Text").setText("+" + runtimeScene.getGame().getVariables().getFromIndex(88).getChild("PointsMessage").getAsString() + " points");
+    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Text").setText("+" + runtimeScene.getGame().getVariables().getFromIndex(89).getChild("PointsMessage").getAsString() + " points");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(88).getChild("PointsMessage").setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(89).getChild("PointsMessage").setNumber(0);
 }
 {for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
     gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Tween").addObjectOpacityTween2("OpaInPT", 255, "easeInQuad", 0.5, false);
@@ -3906,19 +3961,19 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37509732);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35213588);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList19(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList20(runtimeScene);} //End of subevents
 }
 
 }
 
 
-};gdjs.InicioCode.eventsList21 = function(runtimeScene) {
+};gdjs.InicioCode.eventsList22 = function(runtimeScene) {
 
 {
 
@@ -3948,21 +4003,21 @@ gdjs.InicioCode.GDbegfontObjects1.length = 0;
     gdjs.InicioCode.GDbegfontObjects1[i].getBehavior("Text").setText("no");
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(80).setBoolean(false);
+{runtimeScene.getGame().getVariables().getFromIndex(81).setBoolean(false);
 }
 {gdjs.evtTools.sound.setGlobalVolume(runtimeScene, 100);
 }
-{runtimeScene.getGame().getVariables().getFromIndex(9).setNumber(1);
+{runtimeScene.getGame().getVariables().getFromIndex(10).setNumber(1);
+}
+{runtimeScene.getGame().getVariables().getFromIndex(15).setNumber(0);
 }
 {runtimeScene.getGame().getVariables().getFromIndex(14).setNumber(0);
-}
-{runtimeScene.getGame().getVariables().getFromIndex(13).setNumber(0);
 }
 {gdjs.multiplayer.endLobbyGame();
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList2(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList3(runtimeScene);} //End of subevents
 }
 
 }
@@ -3991,13 +4046,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37407956);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35053132);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList3(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList4(runtimeScene);} //End of subevents
 }
 
 }
@@ -4019,13 +4074,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37402356);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35057692);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList4(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList5(runtimeScene);} //End of subevents
 }
 
 }
@@ -4047,13 +4102,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDExportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDExportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37404028);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35058972);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList5(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList6(runtimeScene);} //End of subevents
 }
 
 }
@@ -4075,13 +4130,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDImportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDImportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37403452);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35058564);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList6(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList7(runtimeScene);} //End of subevents
 }
 
 }
@@ -4092,21 +4147,21 @@ gdjs.InicioCode.eventsList6(runtimeScene);} //End of subevents
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(92).getAsNumber() == 1);
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(93).getAsNumber() == 1);
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37414812);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35165212);
 }
 }
 if (isConditionTrue_0) {
-{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "BestScore", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("BestScore").getAsString());
+{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(2).getAsString(), "BestScore", runtimeScene.getGame().getVariables().getFromIndex(89).getChild("BestScore").getAsString());
 }
-{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Pfcs", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Pfcs").getAsString());
+{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(2).getAsString(), "Pfcs", runtimeScene.getGame().getVariables().getFromIndex(89).getChild("Encpt").getChild("Pfcs").getAsString());
 }
-{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(1).getAsString(), "Points", runtimeScene.getGame().getVariables().getFromIndex(88).getChild("Encpt").getChild("Points").getAsString());
+{gdjs.evtTools.storage.writeStringInJSONFile("Player" + runtimeScene.getGame().getVariables().getFromIndex(2).getAsString(), "Points", runtimeScene.getGame().getVariables().getFromIndex(89).getChild("Encpt").getChild("Points").getAsString());
 }
-{runtimeScene.getGame().getVariables().getFromIndex(92).setNumber(0);
+{runtimeScene.getGame().getVariables().getFromIndex(93).setNumber(0);
 }
 }
 
@@ -4122,11 +4177,11 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(66)));
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() < gdjs.evtTools.variable.getVariableChildCount(runtimeScene.getGame().getVariables().getFromIndex(67)));
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() == runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(70).getAsNumber() == runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
 }
 }
 }
@@ -4138,42 +4193,21 @@ gdjs.InicioCode.GDbegfontObjects1.length = 0;
 {gdjs.evtTools.object.createObjectOnScene(runtimeScene, gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects, 20, runtimeScene.getScene().getVariables().getFromIndex(7).getAsNumber(), "");
 }
 {for(var i = 0, len = gdjs.InicioCode.GDbegfontObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(0)).setString(runtimeScene.getGame().getVariables().getFromIndex(66).getChild(runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber()).getAsString());
+    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(0)).setString(runtimeScene.getGame().getVariables().getFromIndex(67).getChild(runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber()).getAsString());
 }
 }
 {for(var i = 0, len = gdjs.InicioCode.GDbegfontObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(1)).setString(runtimeScene.getGame().getVariables().getFromIndex(66).getChild(runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() + 1).getAsString());
+    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(1)).setString(runtimeScene.getGame().getVariables().getFromIndex(67).getChild(runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() + 1).getAsString());
 }
 }
 {for(var i = 0, len = gdjs.InicioCode.GDbegfontObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(2)).setString(runtimeScene.getGame().getVariables().getFromIndex(66).getChild(runtimeScene.getGame().getVariables().getFromIndex(68).getAsNumber() + 2).getAsString());
+    gdjs.InicioCode.GDbegfontObjects1[i].returnVariable(gdjs.InicioCode.GDbegfontObjects1[i].getVariables().getFromIndex(2)).setString(runtimeScene.getGame().getVariables().getFromIndex(67).getChild(runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() + 2).getAsString());
 }
 }
 {runtimeScene.getScene().getVariables().getFromIndex(7).add(180);
 }
-{runtimeScene.getGame().getVariables().getFromIndex(68).add(3);
+{runtimeScene.getGame().getVariables().getFromIndex(69).add(3);
 }
-
-{ //Subevents
-gdjs.InicioCode.eventsList7(runtimeScene);} //End of subevents
-}
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() == 0);
-}
-if (isConditionTrue_0) {
-isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37419020);
-}
-}
-if (isConditionTrue_0) {
 
 { //Subevents
 gdjs.InicioCode.eventsList8(runtimeScene);} //End of subevents
@@ -4187,16 +4221,37 @@ gdjs.InicioCode.eventsList8(runtimeScene);} //End of subevents
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(69).getAsNumber() != runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(70).getAsNumber() == 0);
 }
 if (isConditionTrue_0) {
-{runtimeScene.getGame().getVariables().getFromIndex(69).setNumber(runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+isConditionTrue_0 = false;
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35151884);
+}
+}
+if (isConditionTrue_0) {
+
+{ //Subevents
+gdjs.InicioCode.eventsList9(runtimeScene);} //End of subevents
+}
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+{isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(70).getAsNumber() != runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
+}
+if (isConditionTrue_0) {
+{runtimeScene.getGame().getVariables().getFromIndex(70).setNumber(runtimeScene.getScene().getVariables().getFromIndex(8).getAsNumber());
 }
 {runtimeScene.getScene().getVariables().getFromIndex(7).setNumber(200);
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList11(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList12(runtimeScene);} //End of subevents
 }
 
 }
@@ -4317,7 +4372,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.InicioCode.eventsList14(runtimeScene);} //Subevents end.
+gdjs.InicioCode.eventsList15(runtimeScene);} //Subevents end.
 }
 }
 
@@ -4374,15 +4429,15 @@ gdjs.copyArray(runtimeScene.getObjects("SwipeText"), gdjs.InicioCode.GDSwipeText
     gdjs.InicioCode.GDSwipeTextObjects1[i].getBehavior("Opacity").setOpacity(100);
 }
 }
-{runtimeScene.getGame().getVariables().getFromIndex(51).getChild(0).setString("BF");
+{runtimeScene.getGame().getVariables().getFromIndex(52).getChild(0).setString("BF");
 }
-{runtimeScene.getGame().getVariables().getFromIndex(51).getChild(1).setString("Dad");
-}
-{gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(47));
+{runtimeScene.getGame().getVariables().getFromIndex(52).getChild(1).setString("Dad");
 }
 {gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(48));
 }
-{gdjs.evtTools.storage.readNumberFromJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(57));
+{gdjs.evtTools.variable.variableClearChildren(runtimeScene.getGame().getVariables().getFromIndex(49));
+}
+{gdjs.evtTools.storage.readNumberFromJSONFile("CustomScrollSpeed", "CustomScrollSpeed", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(58));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDPauseButtonObjects1.length ;i < len;++i) {
     gdjs.InicioCode.GDPauseButtonObjects1[i].getBehavior("Opacity").setOpacity(155);
@@ -4392,7 +4447,7 @@ gdjs.copyArray(runtimeScene.getObjects("SwipeText"), gdjs.InicioCode.GDSwipeText
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList15(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList16(runtimeScene);} //End of subevents
 }
 
 }
@@ -4478,7 +4533,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37492276);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35304228);
 }
 }
 }
@@ -4495,7 +4550,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.InicioCode.eventsList17(runtimeScene);} //Subevents end.
+gdjs.InicioCode.eventsList18(runtimeScene);} //Subevents end.
 }
 }
 
@@ -4540,7 +4595,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37500380);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35292740);
 }
 }
 if (isConditionTrue_0) {
@@ -4549,39 +4604,39 @@ gdjs.copyArray(runtimeScene.getObjects("DownKeybind"), gdjs.InicioCode.GDDownKey
 gdjs.copyArray(runtimeScene.getObjects("LeftKeybind"), gdjs.InicioCode.GDLeftKeybindObjects1);
 gdjs.copyArray(runtimeScene.getObjects("RightKeybind"), gdjs.InicioCode.GDRightKeybindObjects1);
 gdjs.copyArray(runtimeScene.getObjects("UpKeybind"), gdjs.InicioCode.GDUpKeybindObjects1);
-{gdjs.evtTools.storage.readStringFromJSONFile("Left", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(27));
+{gdjs.evtTools.storage.readStringFromJSONFile("Left", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(28));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDLeftKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDLeftKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(27).getAsString());
+    gdjs.InicioCode.GDLeftKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(28).getAsString());
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Down", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(29));
+{gdjs.evtTools.storage.readStringFromJSONFile("Down", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(30));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDDownKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDDownKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(29).getAsString());
+    gdjs.InicioCode.GDDownKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(30).getAsString());
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Up", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(31));
+{gdjs.evtTools.storage.readStringFromJSONFile("Up", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(32));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDUpKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDUpKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(31).getAsString());
+    gdjs.InicioCode.GDUpKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(32).getAsString());
 }
 }
-{gdjs.evtTools.storage.readStringFromJSONFile("Right", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(33));
+{gdjs.evtTools.storage.readStringFromJSONFile("Right", "Keybinds", runtimeScene, runtimeScene.getGame().getVariables().getFromIndex(34));
 }
 {for(var i = 0, len = gdjs.InicioCode.GDRightKeybindObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDRightKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(33).getAsString());
+    gdjs.InicioCode.GDRightKeybindObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(34).getAsString());
 }
 }
 {for(var i = 0, len = gdjs.InicioCode.GDChartDelayInputObjects1.length ;i < len;++i) {
-    gdjs.InicioCode.GDChartDelayInputObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(35).getAsString());
+    gdjs.InicioCode.GDChartDelayInputObjects1[i].getBehavior("Text").setText(runtimeScene.getGame().getVariables().getFromIndex(36).getAsString());
 }
 }
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(false);
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList18(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList19(runtimeScene);} //End of subevents
 }
 
 }
@@ -4611,7 +4666,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37505484);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35209428);
 }
 }
 if (isConditionTrue_0) {
@@ -4627,7 +4682,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.eventsList20(runtimeScene);
+gdjs.InicioCode.eventsList21(runtimeScene);
 }
 
 
@@ -4688,7 +4743,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(37536196);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35226844);
 }
 }
 if (isConditionTrue_0) {
@@ -5005,7 +5060,7 @@ gdjs.InicioCode.GDStatistics2Objects3.length = 0;
 gdjs.InicioCode.GDStatistics2Objects4.length = 0;
 gdjs.InicioCode.GDStatistics2Objects5.length = 0;
 
-gdjs.InicioCode.eventsList21(runtimeScene);
+gdjs.InicioCode.eventsList22(runtimeScene);
 gdjs.InicioCode.GDBackObjects1.length = 0;
 gdjs.InicioCode.GDBackObjects2.length = 0;
 gdjs.InicioCode.GDBackObjects3.length = 0;
