@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0xaaba30 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0xf5e080 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,7 +848,7 @@ gdjs.InicioCode.userFunc0xaaba30 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.userFunc0x1901260 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x190ea30 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   if (window._gd_firebase_users_combined_v1) {
@@ -1522,8 +1522,6 @@ isConditionTrue_0 = false;
 {isConditionTrue_0 = runtimeScene.getScene().getVariables().getFromIndex(9).getAsBoolean();
 }
 if (isConditionTrue_0) {
-{gdjs.evtTools.sound.unloadAllAudio(runtimeScene);
-}
 {runtimeScene.getScene().getVariables().getFromIndex(9).setBoolean(false);
 }
 }
@@ -1541,7 +1539,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0xaaba30(runtimeScene);
+gdjs.InicioCode.userFunc0xf5e080(runtimeScene);
 
 }
 
@@ -1567,7 +1565,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.InicioCode.userFunc0x1901260(runtimeScene);
+gdjs.InicioCode.userFunc0x190ea30(runtimeScene);
 
 }
 
@@ -1613,7 +1611,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1015b40 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x19eec40 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -2962,12 +2960,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1015b40(runtimeScene);
+gdjs.InicioCode.userFunc0x19eec40(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1901ac8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1018b80 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -3584,12 +3582,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1901ac8(runtimeScene);
+gdjs.InicioCode.userFunc0x1018b80(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xfd19a0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x12f5468 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
@@ -3598,12 +3596,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xfd19a0(runtimeScene);
+gdjs.InicioCode.userFunc0x12f5468(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1ab2820 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1bdad28 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 };
@@ -3612,7 +3610,7 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1ab2820(runtimeScene);
+gdjs.InicioCode.userFunc0x1bdad28(runtimeScene);
 
 }
 
