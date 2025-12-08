@@ -9,7 +9,7 @@ gdjs.evtsExt__ExtendedVariables__DeleteSceneVariable = {};
 gdjs.evtsExt__ExtendedVariables__DeleteSceneVariable.idToCallbackMap = new Map();
 
 
-gdjs.evtsExt__ExtendedVariables__DeleteSceneVariable.userFunc0x10c3208 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__ExtendedVariables__DeleteSceneVariable.userFunc0x1b2c518 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 runtimeScene.getVariables().remove(eventsFunctionContext.getArgument("SceneVariableName"));
 };
@@ -18,7 +18,7 @@ gdjs.evtsExt__ExtendedVariables__DeleteSceneVariable.eventsList0 = function(runt
 {
 
 
-gdjs.evtsExt__ExtendedVariables__DeleteSceneVariable.userFunc0x10c3208(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__ExtendedVariables__DeleteSceneVariable.userFunc0x1b2c518(runtimeScene, eventsFunctionContext);
 
 }
 

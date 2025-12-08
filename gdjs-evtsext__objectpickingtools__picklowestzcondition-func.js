@@ -11,7 +11,7 @@ gdjs.evtsExt__ObjectPickingTools__PickLowestZCondition.GDObjectObjects1= [];
 gdjs.evtsExt__ObjectPickingTools__PickLowestZCondition.GDObjectObjects2= [];
 
 
-gdjs.evtsExt__ObjectPickingTools__PickLowestZCondition.userFunc0x12b2e90 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__ObjectPickingTools__PickLowestZCondition.userFunc0xa6c548 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 // Create an empty array to hold the objects with the lowest value
 let lowestValueObjects = [];
@@ -51,7 +51,7 @@ gdjs.evtsExt__ObjectPickingTools__PickLowestZCondition.eventsList0 = function(ru
 {
 
 
-gdjs.evtsExt__ObjectPickingTools__PickLowestZCondition.userFunc0x12b2e90(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__ObjectPickingTools__PickLowestZCondition.userFunc0xa6c548(runtimeScene, eventsFunctionContext);
 
 }
 
