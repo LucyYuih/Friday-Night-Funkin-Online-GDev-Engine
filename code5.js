@@ -1819,699 +1819,831 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
 }
 
 
-};gdjs.PlayCode.userFunc0x1e39958 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1e158d8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
-  // avoid double-init
-  if (window._gd_auto_save_compatible_v1) {
+  if (window._gd_auto_save_optimized_songqueue_v1) {
     window._gd_runtimeScene = runtimeScene;
-    console.log('gdAutoSaveUsers compat module already initialized.');
+    console.log('gdAutoSaveUsers module already initialized (optimized_songqueue v1).');
     return;
   }
-  window._gd_auto_save_compatible_v1 = true;
+  window._gd_auto_save_optimized_songqueue_v1 = true;
   window._gd_runtimeScene = runtimeScene;
 
-  // --- CONFIG: Firebase config (your provided keys) ---
-  const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyBeJ5nkLRENkjRlDmC7LhLsG5XBa0BIG_k",
-    authDomain: "fnf-gdev-online.firebaseapp.com",
-    projectId: "fnf-gdev-online",
-    storageBucket: "fnf-gdev-online.firebasestorage.app",
-    messagingSenderId: "595615246122",
-    appId: "1:595615246122:web:4b545361c1f01ea1c7a053",
-    measurementId: "G-MD2E4G1195"
-  };
+  const moduleCode = `
 
-  // --- URLs for UMD/compat firebase libs (stable-ish) ---
-  const FIREBASE_URLS = [
-    'https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js',
-    'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js',
-    'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js'
-  ];
+/* gdAutoSaveUsers - optimized (song-queue string) v1
+   - Calcula lastPoints imediatamente: floor((Score/20000) * CustomPitch)
+   - Empacota cada jogada como string compacta e grava em users/{uid}.songsPending via arrayUnion
+   - Flush da fila é feito em background (flushSongQueueForUid) com retries
+   - Mantém debounce/coalesce, compare-before-write, fallback criptografado e PlayerOnSave logic
+*/
 
-  // --- utility: load a script by URL and await it ---
-  function loadScript(url){
-    return new Promise((resolve, reject) => {
-      try {
-        // don't load same script twice
-        if (document.querySelector('script[data-gd-src="'+url+'"]')) return resolve();
-        const s = document.createElement('script');
-        s.src = url;
-        s.async = true;
-        s.setAttribute('data-gd-src', url);
-        s.onload = () => resolve();
-        s.onerror = (e) => reject(new Error('Failed loading script ' + url));
-        document.head.appendChild(s);
-      } catch(err){
-        reject(err);
-      }
-    });
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
+import { getAuth } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js';
+import { getFirestore, doc, setDoc, getDoc, serverTimestamp, arrayUnion, arrayRemove, updateDoc } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
+
+/* ---------- Firebase config (obfuscated API key) ---------- */
+function _obfDecode(b64xor) {
+  const raw = atob(b64xor);
+  let out = '';
+  for (let i=0;i<raw.length;i++) out += String.fromCharCode(raw.charCodeAt(i) ^ 13);
+  return out;
+}
+const _OBF_APIKEY = "TER3bF50T2hHOGNmQV9IQ2ZnX2FJYE46QWVBfko4VU9sPU9ESlJm";
+const firebaseConfig = {
+  apiKey: _obfDecode(_OBF_APIKEY),
+  authDomain: "fnf-gdev-online.firebaseapp.com",
+  projectId: "fnf-gdev-online",
+  storageBucket: "fnf-gdev-online.firebasestorage.app",
+  messagingSenderId: "595615246122",
+  appId: "1:595615246122:web:4b545361c1f01ea1c7a053",
+  measurementId: "G-MD2E4G1195"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+/* ---------- Crypto primitives (unchanged) ---------- */
+const PBKDF2_ITERATIONS = 150000;
+const SALT_BYTES = 16;
+const IV_BYTES = 12;
+const DERIVED_BITS = 512;
+function strToU8(s){ return new TextEncoder().encode(String(s)); }
+function u8ToStr(u){ return new TextDecoder().decode(u); }
+function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
+function abToB64(buf){ let binary=''; const bytes=new Uint8Array(buf); for(let i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]); return btoa(binary); }
+function b64ToU8(b64){ const binary=atob(b64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; }
+function concatU8(...arrs){ const total=arrs.reduce((s,a)=>s+a.length,0); const out=new Uint8Array(total); let off=0; for(const a of arrs){ out.set(a, off); off+=a.length;} return out; }
+
+async function deriveKeys(password, saltU8){
+  const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
+  const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
+  const dbuf = new Uint8Array(derived);
+  const aesBytes = dbuf.slice(0,32);
+  const hmacBytes = dbuf.slice(32,64);
+  const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
+  const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
+  return { aesKey, hmacKey };
+}
+async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8); return new Uint8Array(sig); }
+async function encryptFilePayload(secret, jsonText){
+  const salt = randomBytes(SALT_BYTES);
+  const iv = randomBytes(IV_BYTES);
+  const { aesKey, hmacKey } = await deriveKeys(secret, salt);
+  const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(jsonText));
+  const cipher = new Uint8Array(cipherBuf);
+  const macData = concatU8(salt, iv, cipher);
+  const hmac = await computeHmac(hmacKey, macData);
+  return \`\${abToB64(salt.buffer)}.\${abToB64(iv.buffer)}.\${abToB64(cipher.buffer)}.\${abToB64(hmac.buffer)}\`;
+}
+async function decryptFilePayload(secret, fileText){
+  const parts = fileText.trim().split('.');
+  if (parts.length !== 4) throw new Error("Invalid file format");
+  const salt = b64ToU8(parts[0]);
+  const iv = b64ToU8(parts[1]);
+  const cipher = b64ToU8(parts[2]);
+  const hmac = b64ToU8(parts[3]);
+  const { aesKey, hmacKey } = await deriveKeys(secret, salt);
+  const macData = concatU8(salt, iv, cipher);
+  const expected = await computeHmac(hmacKey, macData);
+  if (expected.length !== hmac.length) throw new Error("HMAC mismatch");
+  let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("HMAC mismatch");
+  const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv: iv}, aesKey, cipher);
+  return u8ToStr(new Uint8Array(plainBuf));
+}
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', strToU8(text));
+  const u8 = new Uint8Array(buf);
+  return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ---------- Helpers for GDevelop ---------- */
+function getUsername(){
+  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') return gdjs.playerAuthentication.getUsername(); }catch(e){}
+  try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : ''); } catch(e){}
+  return 'guest';
+}
+function getToken(){
+  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') return gdjs.playerAuthentication.getUserToken() || ''; } catch(e) {}
+  return '';
+}
+function parseToNumberOrZero(v){
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  if (typeof v === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v)) return Number(v);
+  if (v && typeof v === 'object') {
+    try { if ('getAsNumber' in v && typeof v.getAsNumber === 'function') return v.getAsNumber(); if ('value' in v && typeof v.value === 'number') return v.value; if ('value' in v && typeof v.value === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v.value)) return Number(v.value); } catch(e){}
   }
+  return 0;
+}
 
-  // --- Wait for firebase UMD libs to be available, then init ---
-  async function ensureFirebaseReady(){
-    // if already initialized:
-    if (window._gd_firebase_ready) {
-      return window._gd_firebase_ready;
-    }
-    // load libs sequentially (ensures availability)
-    for (const url of FIREBASE_URLS){
-      await loadScript(url).catch(err=>{
-        console.warn('Failed loading firebase script', url, err);
-        throw err;
-      });
-    }
-
-    if (!window.firebase || !window.firebase.initializeApp) {
-      throw new Error('Firebase UMD not available after loading scripts.');
-    }
-
-    // initialize if not already
+/* ---------- Save payload helpers (unchanged) ---------- */
+const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
+function readNumericChildrenOrdered(runtimeScene){
+  try {
+    const g = runtimeScene.getGame();
+    const gameVars = g.getVariables();
+    const pu = gameVars.get('PlayerUniversal');
+    if (!pu) throw new Error('PlayerUniversal not found');
+    const payload = {};
     try {
-      if (!window._gd_firebase_app) {
-        window._gd_firebase_app = window.firebase.initializeApp(FIREBASE_CONFIG);
-      }
-      window._gd_firebase_auth = window.firebase.auth();
-      window._gd_firebase_db = window.firebase.firestore();
-      // increase persistence? keep default.
-    } catch(e){
-      console.warn('Firebase init error', e);
-      throw e;
-    }
-    window._gd_firebase_ready = { app: window._gd_firebase_app, auth: window._gd_firebase_auth, db: window._gd_firebase_db };
-    return window._gd_firebase_ready;
-  }
-
-  // --- Small crypto helpers (still using Web Crypto) ---
-  const PBKDF2_ITERATIONS = 150000;
-  const SALT_BYTES = 16;
-  const IV_BYTES = 12;
-  const DERIVED_BITS = 512;
-  function strToU8(s){ return new TextEncoder().encode(String(s)); }
-  function u8ToStr(u){ return new TextDecoder().decode(u); }
-  function randomBytes(n){ const b=new Uint8Array(n); crypto.getRandomValues(b); return b; }
-  function abToB64(buf){
-    let binary='';
-    const bytes=new Uint8Array(buf);
-    for(let i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]);
-    return btoa(binary);
-  }
-  function b64ToU8(b64){
-    const binary=atob(b64);
-    const bytes=new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-    return bytes;
-  }
-  function concatU8(...arrs){ const total=arrs.reduce((s,a)=>s+a.length,0); const out=new Uint8Array(total); let off=0; for(const a of arrs){ out.set(a, off); off+=a.length;} return out; }
-
-  async function deriveKeys(password, saltU8){
-    const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-    const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
-    const dbuf = new Uint8Array(derived);
-    const aesBytes = dbuf.slice(0,32);
-    const hmacBytes = dbuf.slice(32,64);
-    const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
-    const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
-    return { aesKey, hmacKey };
-  }
-  async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8); return new Uint8Array(sig); }
-  async function encryptFilePayload(secret, jsonText){
-    const salt = randomBytes(SALT_BYTES);
-    const iv = randomBytes(IV_BYTES);
-    const { aesKey, hmacKey } = await deriveKeys(secret, salt);
-    const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(jsonText));
-    const cipher = new Uint8Array(cipherBuf);
-    const macData = concatU8(salt, iv, cipher);
-    const hmac = await computeHmac(hmacKey, macData);
-    return `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
-  }
-  async function decryptFilePayload(secret, fileText){
-    const parts = fileText.trim().split('.');
-    if (parts.length !== 4) throw new Error("Invalid file format");
-    const salt = b64ToU8(parts[0]);
-    const iv = b64ToU8(parts[1]);
-    const cipher = b64ToU8(parts[2]);
-    const hmac = b64ToU8(parts[3]);
-    const { aesKey, hmacKey } = await deriveKeys(secret, salt);
-    const macData = concatU8(salt, iv, cipher);
-    const expected = await computeHmac(hmacKey, macData);
-    if (expected.length !== hmac.length) throw new Error("HMAC mismatch");
-    let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("HMAC mismatch");
-    const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv: iv}, aesKey, cipher);
-    return u8ToStr(new Uint8Array(plainBuf));
-  }
-  async function sha256Hex(text){
-    const buf = await crypto.subtle.digest('SHA-256', strToU8(text));
-    const u8 = new Uint8Array(buf);
-    return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
-  }
-
-  // --- utilities / GDevelop variable helpers ---
-  function parseToNumberOrZero(v){
-    if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-    if (typeof v === 'string' && /^\s*[+-]?(?:\d+)(?:\.\d+)?\s*$/.test(v)) return Number(v);
-    if (v && typeof v === 'object') {
-      try { if ('getAsNumber' in v && typeof v.getAsNumber === 'function') return v.getAsNumber(); if ('value' in v && typeof v.value === 'number') return v.value; if ('value' in v && typeof v.value === 'string' && /^\s*[+-]?(?:\d+)(?:\.\d+)?\s*$/.test(v.value)) return Number(v.value); } catch(e){}
-    }
-    return 0;
-  }
-  function sanitizeFieldKey(s){
-    if (!s) return '__empty__';
-    return String(s).replace(/\./g,'_').replace(/\$/g,'_').replace(/\//g,'_').replace(/\[|\]|#/g,'_').replace(/\s+/g,'_').slice(0,90);
-  }
-
-  // --- pending local store helpers (same approach) ---
-  const PENDING_PREFIX = 'PendingSave_';
-  const MAX_PENDING = 30;
-  function getPendingKeysForUid(uid){
-    const out = [];
-    try {
-      for (let i=0;i<localStorage.length;i++){
-        const k = localStorage.key(i);
-        if (!k) continue;
-        if (k.startsWith(PENDING_PREFIX + uid + '_')) out.push(k);
+      if (typeof pu.toJSObject === 'function') {
+        const obj = pu.toJSObject();
+        for (const k of EXPORT_FIELDS) payload[k] = parseToNumberOrZero(obj[k]);
+        return payload;
       }
     } catch(e){}
-    out.sort();
-    return out;
-  }
-  function savePendingEncryptedKey(key, text){
-    try {
-      localStorage.setItem(key, text);
-      const uid = key.split('_')[1] || '';
-      const keys = getPendingKeysForUid(uid);
-      while (keys.length > MAX_PENDING){
-        const oldest = keys.shift();
-        try { localStorage.removeItem(oldest); } catch(e){}
+    for (const k of EXPORT_FIELDS){
+      try {
+        const child = pu.getChild(k);
+        let val = null;
+        if (child) {
+          if (typeof child.getAsNumber === 'function') val = child.getAsNumber();
+          else if (typeof child.getAsString === 'function') val = child.getAsString();
+          else if ('value' in child) val = child.value;
+        }
+        payload[k] = parseToNumberOrZero(val);
+      } catch(e){
+        payload[k] = 0;
       }
-      return true;
-    } catch(e){ console.warn('savePendingEncryptedKey failed', e); return false; }
+    }
+    return payload;
+  } catch(e){
+    const payload = {}; for (const k of EXPORT_FIELDS) payload[k] = 0; return payload;
   }
-  function removePendingKey(key){
-    try { localStorage.removeItem(key); return true; } catch(e){ return false; }
-  }
-  function showToast(msg, timeout = 5000){
-    try {
-      const id = 'gd-auto-save-toast';
-      let el = document.getElementById(id);
-      if (el) { el.textContent = msg; el.style.opacity = '1'; clearTimeout(el._hideTO); el._hideTO = setTimeout(()=>{ el.style.transition='opacity 300ms'; el.style.opacity='0'; setTimeout(()=>el.remove(),350); }, timeout); return; }
-      el = document.createElement('div');
-      el.id = id;
-      el.style.position = 'fixed';
-      el.style.left = '50%';
-      el.style.bottom = '18px';
-      el.style.transform = 'translateX(-50%)';
-      el.style.background = 'linear-gradient(90deg,#111827,#0b1220)';
-      el.style.color = '#e6eef8';
-      el.style.padding = '10px 14px';
-      el.style.borderRadius = '10px';
-      el.style.boxShadow = '0 6px 20px rgba(2,6,23,0.6)';
-      el.style.fontSize = '13px';
-      el.style.zIndex = 2147483647;
-      document.body.appendChild(el);
-      el.textContent = msg;
-      el._hideTO = setTimeout(()=>{ el.style.transition='opacity 300ms'; el.style.opacity='0'; setTimeout(()=>el.remove(),350); }, timeout);
-    } catch(e){ console.log('toast:', msg); }
-  }
+}
+function buildPlaintextSaveJson(runtimeScene){
+  const ordered = {};
+  const payload = readNumericChildrenOrdered(runtimeScene);
+  for (const k of EXPORT_FIELDS) ordered[k] = payload[k];
+  return JSON.stringify({ version: 1, payload: ordered });
+}
 
-  // --- error detection helpers (same) ---
-  function isTooRecentError(err){
-    try {
-      if (!err) return false;
-      const msg = (err && err.message) ? String(err.message).toLowerCase() : String(err).toLowerCase();
-      if (msg.includes('last entry was sent too little time ago') || msg.includes('too little time') || msg.includes('ignoring this one')) return true;
-      return false;
-    } catch(e){ return false; }
+/* ---------- Accuracy helpers (unchanged) ---------- */
+function normalizeAccuracyString(s) {
+  try {
+    if (s === null || typeof s === 'undefined') return '';
+    s = String(s).trim();
+    if (s === '') return '';
+    if (s.includes('%')) {
+      const num = Number(s.replace('%', '').trim().replace(',', '.'));
+      if (isNaN(num)) return s;
+      const rounded = Math.round(num * 100) / 100;
+      return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
+    }
+    let num = Number(s.replace(',', '.'));
+    if (isNaN(num)) return s;
+    if (Math.abs(num) <= 1) num = num * 100;
+    const rounded = Math.round(num * 100) / 100;
+    return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
+  } catch (e) {
+    return String(s);
   }
-  function isRateLimitError(err){
-    try {
-      if (!err) return false;
-      const msg = (err && err.message) ? String(err.message).toLowerCase() : String(err).toLowerCase();
-      if (msg.includes('rate') || msg.includes('quota') || msg.includes('exceeded') || msg.includes('resource-exhausted') || msg.includes('unavailable') || msg.includes('deadline')) return true;
-      if (isTooRecentError(err)) return true;
-      return false;
-    } catch(e){ return false; }
-  }
-
-  // --- accuracy helpers (same as before) ---
-  function normalizeAccuracyString(s) {
-    try {
-      if (s === null || typeof s === 'undefined') return '';
-      s = String(s).trim();
-      if (s === '') return '';
-      if (s.includes('%')) {
-        const num = Number(s.replace('%', '').trim().replace(',', '.'));
-        if (isNaN(num)) return s;
+}
+function normalizeAccuracyFromVar(runtimeScene) {
+  try {
+    if (!runtimeScene || !runtimeScene.getVariables) return '';
+    const accVar = runtimeScene.getVariables().get('Accuracy');
+    if (accVar) {
+      if (typeof accVar.getAsNumber === 'function') {
+        let num = Number(accVar.getAsNumber());
+        if (isNaN(num)) return '';
+        if (Math.abs(num) <= 1) num = num * 100;
         const rounded = Math.round(num * 100) / 100;
         return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
       }
-      let num = Number(s.replace(',', '.'));
-      if (isNaN(num)) return s;
-      if (Math.abs(num) <= 1) num = num * 100;
-      const rounded = Math.round(num * 100) / 100;
-      return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
-    } catch (e) {
-      return String(s);
-    }
-  }
-  function normalizeAccuracyFromVar(runtimeScene) {
-    try {
-      if (!runtimeScene || !runtimeScene.getVariables) return '';
-      const accVar = runtimeScene.getVariables().get('Accuracy');
-      if (accVar) {
-        if (typeof accVar.getAsNumber === 'function') {
-          let num = Number(accVar.getAsNumber());
-          if (isNaN(num)) return '';
-          if (Math.abs(num) <= 1) num = num * 100;
-          const rounded = Math.round(num * 100) / 100;
-          return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
-        }
-        if (typeof accVar.getAsString === 'function') {
-          return normalizeAccuracyString(accVar.getAsString());
-        }
-        return normalizeAccuracyString(String(accVar));
+      if (typeof accVar.getAsString === 'function') {
+        return normalizeAccuracyString(accVar.getAsString());
       }
-      return '';
-    } catch (e) {
-      return '';
+      return normalizeAccuracyString(String(accVar));
     }
+    return '';
+  } catch (e) {
+    return '';
   }
-  function computeAccuracyFromRatings(runtimeScene) {
+}
+function computeAccuracyFromRatings(runtimeScene) {
+  try {
+    const sceneVars = runtimeScene.getVariables ? runtimeScene.getVariables() : null;
+    const gameVars = runtimeScene.getGame && runtimeScene.getGame().getVariables ? runtimeScene.getGame().getVariables() : null;
+    let sick = 0, good = 0, bad = 0, misses = 0;
     try {
-      const sceneVars = runtimeScene.getVariables ? runtimeScene.getVariables() : null;
-      const gameVars = runtimeScene.getGame && runtimeScene.getGame().getVariables ? runtimeScene.getGame().getVariables() : null;
-      let sick = 0, good = 0, bad = 0, misses = 0;
-      try {
-        if (gameVars && gameVars.get('RatingsScene')) {
-          const rs = gameVars.get('RatingsScene');
-          if (rs && typeof rs.getChild === 'function') {
-            sick = Number(rs.getChild('Sick') && typeof rs.getChild('Sick').getAsNumber === 'function' ? rs.getChild('Sick').getAsNumber() : 0) || 0;
-            good = Number(rs.getChild('Good') && typeof rs.getChild('Good').getAsNumber === 'function' ? rs.getChild('Good').getAsNumber() : 0) || 0;
-            bad  = Number(rs.getChild('Bad')  && typeof rs.getChild('Bad').getAsNumber() === 'function'  ? rs.getChild('Bad').getAsNumber()  : 0) || 0;
-          }
-        }
-      } catch(e){}
-      try {
-        if (sceneVars && sceneVars.get('RatingsScene')) {
-          const rs2 = sceneVars.get('RatingsScene');
-          if (rs2 && typeof rs2.getChild === 'function') {
-            sick = sick || Number(rs2.getChild('Sick').getAsNumber() || 0);
-            good = good || Number(rs2.getChild('Good').getAsNumber() || 0);
-            bad  = bad  || Number(rs2.getChild('Bad').getAsNumber()  || 0);
-          }
-        }
-      } catch(e){}
-      try {
-        if ((!sick && !good && !bad) && (gameVars)) {
-          sick = sick || Number((gameVars.get('Sick') && typeof gameVars.get('Sick').getAsNumber === 'function') ? gameVars.get('Sick').getAsNumber() : 0);
-          good = good || Number((gameVars.get('Good') && typeof gameVars.get('Good').getAsNumber === 'function') ? gameVars.get('Good').getAsNumber() : 0);
-          bad  = bad  || Number((gameVars.get('Bad')  && typeof gameVars.get('Bad').getAsNumber === 'function') ? gameVars.get('Bad').getAsNumber()  : 0);
-        }
-      } catch(e){}
-      try {
-        if (gameVars && gameVars.get('Misses') && typeof gameVars.get('Misses').getAsNumber === 'function') {
-          misses = Number(gameVars.get('Misses').getAsNumber()) || 0;
-        } else if (sceneVars && sceneVars.get('Misses') && typeof sceneVars.get('Misses').getAsNumber === 'function') {
-          misses = Number(sceneVars.get('Misses').getAsNumber()) || 0;
-        } else {
-          const rs = gameVars && gameVars.get('RatingsScene') ? gameVars.get('RatingsScene') : (sceneVars && sceneVars.get('RatingsScene') ? sceneVars.get('RatingsScene') : null);
-          if (rs && typeof rs.getChild === 'function' && rs.getChild('Misses')) {
-            misses = Number(rs.getChild('Misses').getAsNumber()) || 0;
-          }
-        }
-      } catch(e){}
-      sick = Number(sick) || 0;
-      good = Number(good) || 0;
-      bad  = Number(bad)  || 0;
-      misses = Number(misses) || 0;
-      const denom = (sick + good + bad + misses) || 0;
-      if (denom <= 0) return '';
-      const numerator = (sick * 1.0) + (good * 0.75) + (bad * 0.5);
-      let acc = (numerator / denom) * 100;
-      const rounded = Math.round(acc * 100) / 100;
-      return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
-    } catch(e){
-      return '';
-    }
-  }
-
-  // --- PlayerOnSave finalize (tries Game var and Scene var) ---
-  async function finalizeSetPlayerOnSave(runtimeScene){
-    try {
-      try {
-        const gs = runtimeScene.getGame().getVariables();
-        const gv = gs.get('PlayerOnSave');
-        if (gv && typeof gv.setNumber === 'function') gv.setNumber(1);
-      } catch(e){ console.warn('set PlayerOnSave game var failed', e); }
-      try {
-        const sv = runtimeScene.getVariables().get('PlayerOnSave');
-        if (sv && typeof sv.setNumber === 'function') sv.setNumber(1);
-      } catch(e){ console.warn('set PlayerOnSave scene var failed', e); }
-      return true;
-    } catch(e){ return false; }
-  }
-
-  // --- Collect play info: Score, CustomPitch, lastPoints, accuracy ---
-  function collectSongPlayInfo(runtimeScene){
-    try {
-      const gvars = runtimeScene.getGame().getVariables();
-      const songName = (gvars && gvars.get && gvars.get('SongName') && typeof gvars.get('SongName').getAsString === 'function') ? gvars.get('SongName').getAsString()
-                     : (gvars && gvars.get && gvars.get('SongName') ? String(gvars.get('SongName')) : null);
-      const songDifficulty = (gvars && gvars.get && gvars.get('SongDifficulty') && typeof gvars.get('SongDifficulty').getAsString === 'function') ? gvars.get('SongDifficulty').getAsString()
-                           : (gvars && gvars.get && gvars.get('SongDifficulty') ? String(gvars.get('SongDifficulty')) : null);
-      let puBestScore = 0;
-      try {
-        const pu = gvars.get('PlayerUniversal');
-        if (pu && pu.getChild && pu.getChild('BestScore')) {
-          const ch = pu.getChild('BestScore');
-          if (typeof ch.getAsNumber === 'function') puBestScore = Number(ch.getAsNumber()) || 0;
-          else puBestScore = Number(ch.value || 0) || 0;
-        }
-      } catch(e){ puBestScore = 0; }
-      let sceneScore = 0;
-      try {
-        const scVar = runtimeScene.getVariables().get('Score');
-        if (scVar && typeof scVar.getAsNumber === 'function') sceneScore = Number(scVar.getAsNumber()) || 0;
-        else if (runtimeScene.getVariables().get('Score') !== undefined) sceneScore = Number(runtimeScene.getVariables().get('Score')) || 0;
-      } catch(e){ sceneScore = 0; }
-      let customPitch = 1;
-      try {
-        if (gvars && gvars.get && gvars.get('CustomPitch')) {
-          const cp = gvars.get('CustomPitch');
-          if (cp && typeof cp.getAsNumber === 'function') customPitch = Number(cp.getAsNumber()) || 1;
-          else customPitch = Number(cp) || 1;
-        } else {
-          const scp = runtimeScene.getVariables().get('CustomPitch');
-          if (scp && typeof scp.getAsNumber === 'function') customPitch = Number(scp.getAsNumber()) || 1;
-          else if (scp !== undefined) customPitch = Number(scp) || 1;
-        }
-      } catch(e){ customPitch = 1; }
-      let lastPoints = 0;
-      try {
-        const ratio = (Number(sceneScore) || 0) / 20000;
-        const calc = ratio * (Number(customPitch) || 1);
-        lastPoints = Math.floor(calc);
-        if (!Number.isFinite(lastPoints) || Number.isNaN(lastPoints)) lastPoints = 0;
-      } catch(e){ lastPoints = 0; }
-      let accuracyVal = normalizeAccuracyFromVar(runtimeScene);
-      if (!accuracyVal || accuracyVal === '0%' || accuracyVal === '') {
-        const compute = computeAccuracyFromRatings(runtimeScene);
-        if (compute && compute !== '') accuracyVal = compute;
-      }
-      console.log('[gdAutoSave] collectSongPlayInfo ->', { songName, songDifficulty, puBestScore, sceneScore, customPitch, lastPoints, accuracyVal });
-      return { songName, songDifficulty, puBestScore, sceneScore, customPitch, lastPoints, accuracyVal };
-    } catch(e){
-      console.warn('collectSongPlayInfo failed', e);
-      return { songName: null, songDifficulty: null, puBestScore: 0, sceneScore: 0, customPitch:1, lastPoints:0, accuracyVal: '' };
-    }
-  }
-
-  // --- Firestore wrappers using compat API (db = firebase.firestore()) ---
-  function firestoreServerTimestamp(){
-    return window.firebase.firestore.FieldValue.serverTimestamp();
-  }
-
-  async function getDocCompat(collection, docId){
-    const snap = await window._gd_firebase_db.collection(collection).doc(docId).get();
-    return snap;
-  }
-  async function setDocCompat(collection, docId, data, merge = true){
-    const docRef = window._gd_firebase_db.collection(collection).doc(docId);
-    if (merge) return await docRef.set(data, { merge: true });
-    return await docRef.set(data);
-  }
-
-  // --- write users.playerSave only if changed (compare hash) ---
-  async function writeUsersPlayerSaveIfChanged(uid, saveString, hashHex){
-    try {
-      const ref = window._gd_firebase_db.collection('users').doc(uid);
-      const snap = await ref.get();
-      if (snap && snap.exists){
-        const d = snap.data();
-        if (d && d.playerSave && String(d.playerSave.hash) === String(hashHex)) {
-          return { skipped: true, wrote: false };
+      if (gameVars && gameVars.get('RatingsScene')) {
+        const rs = gameVars.get('RatingsScene');
+        if (rs && typeof rs.getChild === 'function') {
+          sick = Number(rs.getChild('Sick') && typeof rs.getChild('Sick').getAsNumber === 'function' ? rs.getChild('Sick').getAsNumber() : 0) || 0;
+          good = Number(rs.getChild('Good') && typeof rs.getChild('Good').getAsNumber === 'function' ? rs.getChild('Good').getAsNumber() : 0) || 0;
+          bad  = Number(rs.getChild('Bad')  && typeof rs.getChild('Bad').getAsNumber === 'function'  ? rs.getChild('Bad').getAsNumber()  : 0) || 0;
         }
       }
-      await ref.set({ playerSave: { save: saveString, hash: hashHex, updatedAt: firestoreServerTimestamp() } }, { merge: true });
-      return { skipped: false, wrote: true };
+    } catch(e){}
+    try {
+      if (sceneVars && sceneVars.get('RatingsScene')) {
+        const rs2 = sceneVars.get('RatingsScene');
+        if (rs2 && typeof rs2.getChild === 'function') {
+          sick = sick || Number(rs2.getChild('Sick').getAsNumber() || 0);
+          good = good || Number(rs2.getChild('Good').getAsNumber() || 0);
+          bad  = bad  || Number(rs2.getChild('Bad').getAsNumber()  || 0);
+        }
+      }
+    } catch(e){}
+    try {
+      if ((!sick && !good && !bad) && (gameVars)) {
+        sick = sick || Number((gameVars.get('Sick') && typeof gameVars.get('Sick').getAsNumber === 'function') ? gameVars.get('Sick').getAsNumber() : 0);
+        good = good || Number((gameVars.get('Good') && typeof gameVars.get('Good').getAsNumber === 'function') ? gameVars.get('Good').getAsNumber() : 0);
+        bad  = bad  || Number((gameVars.get('Bad')  && typeof gameVars.get('Bad').getAsNumber === 'function') ? gameVars.get('Bad').getAsNumber()  : 0);
+      }
+    } catch(e){}
+    try {
+      if (gameVars && gameVars.get('Misses') && typeof gameVars.get('Misses').getAsNumber === 'function') {
+        misses = Number(gameVars.get('Misses').getAsNumber()) || 0;
+      } else if (sceneVars && sceneVars.get('Misses') && typeof sceneVars.get('Misses').getAsNumber === 'function') {
+        misses = Number(sceneVars.get('Misses').getAsNumber()) || 0;
+      } else {
+        const rs = gameVars && gameVars.get('RatingsScene') ? gameVars.get('RatingsScene') : (sceneVars && sceneVars.get('RatingsScene') ? sceneVars.get('RatingsScene') : null);
+        if (rs && typeof rs.getChild === 'function' && rs.getChild('Misses')) {
+          misses = Number(rs.getChild('Misses').getAsNumber()) || 0;
+        }
+      }
+    } catch(e){}
+    sick = Number(sick) || 0;
+    good = Number(good) || 0;
+    bad  = Number(bad)  || 0;
+    misses = Number(misses) || 0;
+    const denom = (sick + good + bad + misses) || 0;
+    if (denom <= 0) return '';
+    const numerator = (sick * 1.0) + (good * 0.75) + (bad * 0.5);
+    let acc = (numerator / denom) * 100;
+    const rounded = Math.round(acc * 100) / 100;
+    return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
+  } catch(e){
+    return '';
+  }
+}
+
+/* ---------- Pending local storage ---------- */
+const PENDING_PREFIX = 'PendingSave_';
+const MAX_PENDING = 30;
+function getPendingKeysForUid(uid){
+  const out = [];
+  try {
+    for (let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith(PENDING_PREFIX + uid + '_')) out.push(k);
+    }
+  } catch(e){}
+  out.sort();
+  return out;
+}
+function savePendingEncryptedKey(key, text){
+  try {
+    localStorage.setItem(key, text);
+    const uid = key.split('_')[1] || '';
+    const keys = getPendingKeysForUid(uid);
+    while (keys.length > MAX_PENDING){
+      const oldest = keys.shift();
+      try { localStorage.removeItem(oldest); } catch(e){}
+    }
+    return true;
+  } catch(e){ console.warn('savePendingEncryptedKey failed', e); return false; }
+}
+function removePendingKey(key){
+  try { localStorage.removeItem(key); return true; } catch(e){ return false; }
+}
+function showToast(msg, timeout = 7000){
+  try {
+    const id = 'gd-auto-save-toast';
+    let el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.style.opacity = '1'; clearTimeout(el._hideTO); el._hideTO = setTimeout(()=>{ el.style.transition='opacity 300ms'; el.style.opacity='0'; setTimeout(()=>el.remove(),350); }, timeout); return; }
+    el = document.createElement('div');
+    el.id = id;
+    el.style.position = 'fixed';
+    el.style.left = '50%';
+    el.style.bottom = '18px';
+    el.style.transform = 'translateX(-50%)';
+    el.style.background = 'linear-gradient(90deg,#111827,#0b1220)';
+    el.style.color = '#e6eef8';
+    el.style.padding = '10px 14px';
+    el.style.borderRadius = '10px';
+    el.style.boxShadow = '0 6px 20px rgba(2,6,23,0.6)';
+    el.style.fontSize = '13px';
+    el.style.zIndex = 2147483647;
+    document.body.appendChild(el);
+    el.textContent = msg;
+    el._hideTO = setTimeout(()=>{ el.style.transition='opacity 300ms'; el.style.opacity='0'; setTimeout(()=>el.remove(),350); }, timeout);
+  } catch(e){ console.log('toast:', msg); }
+}
+
+/* ---------- Firestore helpers (users compare & song-queue) ---------- */
+async function writeUsersPlayerSaveIfChanged(uid, saveString, hashHex){
+  try {
+    const ref = doc(db, 'users', uid);
+    const snap = await getDoc(ref);
+    if (snap && snap.exists()){
+      const d = snap.data();
+      if (d && d.playerSave && String(d.playerSave.hash) === String(hashHex)) {
+        return { skipped: true, wrote: false };
+      }
+    }
+    await setDoc(ref, { playerSave: { save: saveString, hash: hashHex, updatedAt: serverTimestamp() } }, { merge: true });
+    return { skipped: false, wrote: true };
+  } catch(e){
+    throw e;
+  }
+}
+function sanitizeFieldKey(s){
+  if (!s) return '__empty__';
+  return String(s).replace(/\\./g,'_').replace(/\\$/g,'_').replace(/\\//g,'_').replace(/\\[|\\]|#/g,'_').replace(/\\s+/g,'_').slice(0,90);
+}
+
+/* ---------- RETRY configuration ---------- */
+const RETRY_INTERVALS_MS = [5000, 10000, 20000, 40000, 80000, 160000, 320000];
+const MAX_RETRY_ATTEMPTS = RETRY_INTERVALS_MS.length;
+
+/* ---------- Error detection ---------- */
+function isTooRecentError(err){
+  try {
+    if (!err) return false;
+    const msg = (err.message || err.toString() || '').toLowerCase();
+    if (msg.includes('last entry was sent too little time ago') || msg.includes('too little time') || msg.includes('ignoring this one')) return true;
+    return false;
+  } catch(e){ return false; }
+}
+function isRateLimitError(err){
+  try {
+    if (!err) return false;
+    const code = err.code || '';
+    const msg = (err.message || '').toLowerCase();
+    if (typeof code === 'string' && (code.includes('resource-exhausted') || code.includes('quota') || code.includes('rate') || code.includes('unavailable') || code.includes('deadline'))) return true;
+    if (msg.includes('rate') || msg.includes('quota') || msg.includes('exceeded') || msg.includes('resource-exhausted') || msg.includes('unavailable') || msg.includes('deadline')) return true;
+    if (isTooRecentError(err)) return true;
+    return false;
+  } catch(e){ return false; }
+}
+
+/* ---------- finalize: set PlayerOnSave (game + scene) ---------- */
+async function finalizeSetPlayerOnSave(runtimeScene){
+  let ok = true;
+  try {
+    try {
+      const gs = runtimeScene.getGame().getVariables();
+      const gv = gs.get('PlayerOnSave');
+      if (gv && typeof gv.setNumber === 'function') gv.setNumber(1);
+    } catch(e){ ok = false; console.warn('set PlayerOnSave game var failed', e); }
+    try {
+      const sv = runtimeScene.getVariables().get('PlayerOnSave');
+      if (sv && typeof sv.setNumber === 'function') sv.setNumber(1);
+    } catch(e){ ok = false; console.warn('set PlayerOnSave scene var failed', e); }
+  } catch(e){ ok = false; }
+  return ok;
+}
+
+/* ---------- Collect song play info (CALCULA lastPoints primeiro) ---------- */
+function collectSongPlayInfo(runtimeScene){
+  try {
+    const gvars = runtimeScene.getGame().getVariables();
+
+    const songName = (gvars && gvars.get && gvars.get('SongName') && typeof gvars.get('SongName').getAsString === 'function')
+                      ? gvars.get('SongName').getAsString()
+                      : (gvars && gvars.get && gvars.get('SongName') ? String(gvars.get('SongName')) : null);
+
+    const songDifficulty = (gvars && gvars.get && gvars.get('SongDifficulty') && typeof gvars.get('SongDifficulty').getAsString === 'function')
+                      ? gvars.get('SongDifficulty').getAsString()
+                      : (gvars && gvars.get && gvars.get('SongDifficulty') ? String(gvars.get('SongDifficulty')) : null);
+
+    // PlayerUniversal BestScore fallback
+    let puBestScore = 0;
+    try {
+      const pu = gvars.get('PlayerUniversal');
+      if (pu && pu.getChild && pu.getChild('BestScore')) {
+        const ch = pu.getChild('BestScore');
+        if (typeof ch.getAsNumber === 'function') puBestScore = Number(ch.getAsNumber()) || 0;
+        else puBestScore = Number(ch.value || 0) || 0;
+      }
+    } catch(e){ puBestScore = 0; }
+
+    // Scene Score (decisivo)
+    let sceneScore = 0;
+    try {
+      const scVar = runtimeScene.getVariables().get('Score');
+      if (scVar && typeof scVar.getAsNumber === 'function') sceneScore = Number(scVar.getAsNumber()) || 0;
+      else if (runtimeScene.getVariables().get('Score') !== undefined) sceneScore = Number(runtimeScene.getVariables().get('Score')) || 0;
+    } catch(e){ sceneScore = 0; }
+
+    // CustomPitch: game var first, then scene; fallback 1
+    let customPitch = 1;
+    try {
+      if (gvars && gvars.get && gvars.get('CustomPitch')) {
+        const cp = gvars.get('CustomPitch');
+        if (cp && typeof cp.getAsNumber === 'function') customPitch = Number(cp.getAsNumber()) || 1;
+        else customPitch = Number(cp) || 1;
+      } else {
+        const scp = runtimeScene.getVariables().get('CustomPitch');
+        if (scp && typeof scp.getAsNumber === 'function') customPitch = Number(scp.getAsNumber()) || 1;
+        else if (scp !== undefined) customPitch = Number(scp) || 1;
+      }
+    } catch(e){ customPitch = 1; }
+
+    // Compute lastPoints immediately: floor((Score/20000) * CustomPitch)
+    let lastPoints = 0;
+    try {
+      const ratio = (Number(sceneScore) || 0) / 20000;
+      const calc = ratio * (Number(customPitch) || 1);
+      lastPoints = Math.floor(calc);
+      if (!Number.isFinite(lastPoints) || Number.isNaN(lastPoints)) lastPoints = 0;
+    } catch(e){ lastPoints = 0; }
+
+    // Accuracy
+    let accuracyVal = normalizeAccuracyFromVar(runtimeScene);
+    if (!accuracyVal || accuracyVal === '0%' || accuracyVal === '') {
+      const compute = computeAccuracyFromRatings(runtimeScene);
+      if (compute && compute !== '') accuracyVal = compute;
+    }
+
+    console.log('[gdAutoSave] collectSongPlayInfo ->', { songName, songDifficulty, puBestScore, sceneScore, customPitch, lastPoints, accuracyVal });
+    return { songName, songDifficulty, puBestScore, sceneScore, customPitch, lastPoints, accuracyVal };
+  } catch(e){
+    console.warn('collectSongPlayInfo failed', e);
+    return { songName: null, songDifficulty: null, puBestScore: 0, sceneScore: 0, customPitch:1, lastPoints:0, accuracyVal: '' };
+  }
+}
+
+/* ---------- Compact string builder for song play ---------- */
+function compactSongPlayString(playInfo, playerName){
+  // Fields: songId|diffKey|playerKey|best|lastPoints|accuracyNoPercent|customPitch
+  const songId = sanitizeFieldKey(String(playInfo.songName || '__'));
+  const diffKey = sanitizeFieldKey(String(playInfo.songDifficulty || '__'));
+  const playerKey = sanitizeFieldKey(String(playerName || 'anonymous'));
+  const best = Number(playInfo.puBestScore || 0) || 0; // keep puBestScore for history
+  const lastPoints = Number(playInfo.lastPoints || 0) || 0;
+  // accuracy: remove % and keep minimal repr (no trailing zeros)
+  let acc = String(playInfo.accuracyVal || '');
+  acc = acc.replace('%','').trim();
+  if (acc === '') acc = '0';
+  // customPitch minimal
+  const cp = Number(playInfo.customPitch || 1) || 1;
+  // compact: use '|' as separator (sanitized above)
+  return songId + '|' + diffKey + '|' + playerKey + '|' + best + '|' + lastPoints + '|' + acc + '|' + cp;
+}
+
+/* ---------- Enqueue song play: add compact string to users/{uid}.songsPending ---------- */
+async function enqueueSongPlayForUser(uid, compactStr){
+  try {
+    const userRef = doc(db, 'users', uid);
+    // single write to append the string to songsPending array (atomic)
+    await setDoc(userRef, { songsPending: arrayUnion(compactStr) }, { merge: true });
+    return true;
+  } catch(e){
+    throw e;
+  }
+}
+
+/* ---------- Flush song queue: try to apply queued strings to songs collection ----------
+   - Reads users/{uid}.songsPending, for each string parses and updates songs/{songId}
+   - If successful for an entry, removes it from users/{uid}.songsPending via arrayRemove
+   - Stops / bails on rate/too_recent errors to avoid flood; leaves remaining entries for next attempt
+*/
+async function flushSongQueueForUid(uid){
+  if (!uid) return { ok:false, reason:'no-uid' };
+  const userRef = doc(db, 'users', uid);
+  try {
+    const snap = await getDoc(userRef);
+    if (!snap || !snap.exists()) return { ok:true, processed:0 };
+    const data = snap.data() || {};
+    const arr = Array.isArray(data.songsPending) ? data.songsPending.slice() : [];
+    if (!arr.length) return { ok:true, processed:0 };
+    let processed = 0;
+    for (const s of arr){
+      try {
+        // parse compact string
+        // format: songId|diffKey|playerKey|best|lastPoints|acc|cp
+        const parts = String(s).split('|');
+        if (parts.length < 7) {
+          // malformed -> remove entry
+          try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
+          continue;
+        }
+        const [songId, diffKey, playerKey, bestStr, lastPointsStr, accStr, cpStr] = parts;
+        const docRef = doc(db, 'songs', String(songId));
+        const snapSong = await getDoc(docRef);
+        let base = snapSong && snapSong.exists() ? snapSong.data() : {};
+        if (!base || typeof base !== 'object') base = {};
+        if (!base[diffKey] || typeof base[diffKey] !== 'object') base[diffKey] = {};
+        const existingEntry = base[diffKey][playerKey] || {};
+        const existingBest = Number(existingEntry.bestScore) || 0;
+        const candidateBest = Number(bestStr) || 0;
+        const shouldUpdateBest = Number(candidateBest) > existingBest;
+        const lastPointsVal = Number(lastPointsStr) || 0;
+        const accuracyVal = accStr ? (String(accStr)) : '';
+        // decide needWrite
+        const needWrite = shouldUpdateBest ||
+                          (existingEntry.lastPoints === undefined) ||
+                          (Number(existingEntry.lastPoints) !== lastPointsVal) ||
+                          (String(existingEntry.accuracy || '') !== accuracyVal);
+        if (!needWrite) {
+          // remove processed entry from user queue
+          try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
+          processed++;
+          continue;
+        }
+        const entry = Object.assign({}, existingEntry);
+        entry.bestScore = shouldUpdateBest ? Number(candidateBest) : existingBest;
+        entry.lastPoints = lastPointsVal;
+        entry.accuracy = accuracyVal;
+        entry.customPitch = Number(cpStr) || 1; // store customPitch as well if present
+        entry.updatedAt = serverTimestamp();
+        base[diffKey][playerKey] = entry;
+        base.originalName = base.originalName || songId;
+        // write songs doc (single set)
+        await setDoc(docRef, base, { merge: true });
+        // on success, remove from queue
+        try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
+        processed++;
+      } catch(e){
+        // if rate/too_recent -> bail and return; queue stays intact
+        if (isRateLimitError(e) || isTooRecentError(e)){
+          console.warn('flushSongQueueForUid: rate/too_recent, bailing', e);
+          return { ok:false, processed, reason:'rate' };
+        }
+        // other errors -> remove offending entry to avoid being stuck
+        try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
+        console.warn('flushSongQueueForUid: entry failed and removed', e);
+      }
+    }
+    return { ok:true, processed };
+  } catch(e){
+    console.warn('flushSongQueueForUid failed', e);
+    return { ok:false, error: String(e) };
+  }
+}
+
+/* ---------- Pending encrypted fallback (unchanged logic) ---------- */
+async function storePendingEncrypted(runtimeScene, encSave, hashHex, playInfo){
+  try {
+    const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : ('guest');
+    // avoid duplicate pending with same hash
+    try {
+      const keys = getPendingKeysForUid(uid);
+      for (const k of keys){
+        try {
+          const encPayload = localStorage.getItem(k);
+          if (!encPayload) continue;
+          const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+          const plain = await decryptFilePayload(secret, encPayload);
+          const parsed = JSON.parse(plain);
+          if (parsed && parsed.hash && parsed.hash === hashHex) {
+            return k; // already stored
+          }
+        } catch(e){}
+      }
+    } catch(e){}
+    const payload = { encSave, hash: hashHex, songPlay: playInfo || null, ts: Date.now() };
+    const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+    const pjson = JSON.stringify(payload);
+    const encPayload = await encryptFilePayload(secret, pjson);
+    const key = PENDING_PREFIX + uid + '_' + Date.now();
+    const ok = savePendingEncryptedKey(key, encPayload);
+    if (!ok) throw new Error('Failed saving pending key');
+    return key;
+  } catch(e){ console.warn('storePendingEncrypted failed', e); return null; }
+}
+
+/* ---------- Background save manager & retry (keeps behavior) ---------- */
+const _bgSaves = {};
+function cancelBackgroundSaveForUid(uid){
+  try {
+    const rec = _bgSaves[uid];
+    if (!rec) return false;
+    rec.cancelToken.cancelled = true;
+    if (rec.timeoutId) clearTimeout(rec.timeoutId);
+    delete _bgSaves[uid];
+    return true;
+  } catch(e){ return false; }
+}
+
+async function attemptSaveOnce(runtimeScene, enc, hashHex, playInfo, options){
+  const result = { writeUsersOk:false, usersSkipped:false, songsQueued:false, songsFlushed:false, error:null };
+  const user = auth.currentUser;
+  if (!user || !user.uid) throw new Error('User not authenticated');
+
+  try {
+    const wres = await writeUsersPlayerSaveIfChanged(user.uid, enc, hashHex);
+    result.usersSkipped = !!wres.skipped;
+    result.writeUsersOk = !!wres.wrote;
+  } catch(e){
+    result.error = e;
+    throw e;
+  }
+
+  // Instead of writing songs/{songId} directly, enqueue compact string to users/{uid}.songsPending
+  if (playInfo && playInfo.songName && playInfo.songDifficulty){
+    try {
+      const compact = compactSongPlayString(playInfo, playInfo.playerName || getUsername());
+      await enqueueSongPlayForUser(user.uid, compact);
+      result.songsQueued = true;
+      // attempt immediate flush (best-effort) if options.requestFlush true
+      if (options && options.requestFlush) {
+        const flushRes = await flushSongQueueForUid(user.uid);
+        result.songsFlushed = !!(flushRes && flushRes.ok);
+      }
     } catch(e){
+      result.error = e;
       throw e;
     }
   }
 
-  // --- update songs (uses sceneScore as candidate best) ---
-  async function updateSongsCollectionForPlay(runtimeScene, playerName, candidateNewBestScore, lastPoints, accuracyStr, songNameRaw, songDifficulty){
-    if (!songNameRaw || !songDifficulty) return true;
-    const songDocId = sanitizeFieldKey(songNameRaw);
-    const coll = window._gd_firebase_db.collection('songs');
-    const docRef = coll.doc(songDocId);
-    try {
-      const snap = await docRef.get();
-      let base = snap && snap.exists ? snap.data() : {};
-      if (!base || typeof base !== 'object') base = {};
-      const diffKey = sanitizeFieldKey(String(songDifficulty));
-      const playerKey = sanitizeFieldKey(String(playerName || 'anonymous'));
-      if (!base[diffKey] || typeof base[diffKey] !== 'object') base[diffKey] = {};
-      const existingEntry = base[diffKey][playerKey] || {};
-      const existingBest = Number(existingEntry.bestScore) || 0;
-      const shouldUpdateBest = Number(candidateNewBestScore) > existingBest;
-      const lastPointsVal = Number(lastPoints) || 0;
-      const accuracyVal = (typeof accuracyStr === 'string' && accuracyStr !== '') ? String(accuracyStr) : '';
-      const needWrite = shouldUpdateBest ||
-                        (existingEntry.lastPoints === undefined) ||
-                        (Number(existingEntry.lastPoints) !== lastPointsVal) ||
-                        (String(existingEntry.accuracy || '') !== accuracyVal);
-      if (!needWrite) return true;
-      const entry = Object.assign({}, existingEntry);
-      entry.bestScore = shouldUpdateBest ? Number(candidateNewBestScore) : existingBest;
-      entry.lastPoints = lastPointsVal;
-      entry.accuracy = accuracyVal;
-      entry.updatedAt = firestoreServerTimestamp();
-      base[diffKey][playerKey] = entry;
-      base.originalName = songNameRaw;
-      await docRef.set(base, { merge: true });
-      return true;
-    } catch(e){
-      console.warn('updateSongsCollectionForPlay failed', e);
-      throw e;
-    }
-  }
+  return result;
+}
 
-  // --- pending encrypted store (checks duplicates) ---
-  async function storePendingEncrypted(runtimeScene, encSave, hashHex, playInfo){
+async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
+  if (!uid) return;
+  cancelBackgroundSaveForUid(uid);
+  const cancelToken = { cancelled: false };
+  _bgSaves[uid] = { running:true, cancelToken, attempts:0, timeoutId:null };
+
+  const doAttempt = async (attemptIndex) => {
+    if (cancelToken.cancelled) return { ok:false, cancelled:true };
     try {
-      const uid = (window._gd_firebase_auth && window._gd_firebase_auth.currentUser && window._gd_firebase_auth.currentUser.uid) ? window._gd_firebase_auth.currentUser.uid : 'guest';
-      // check existing pending keys for same hash
+      _bgSaves[uid].attempts = attemptIndex + 1;
+      const res = await attemptSaveOnce(runtimeScene, enc, hashHex, playInfo, { useScoreAsBest: true, requestFlush: true });
+      // on success, remove pending local matching hash
       try {
         const keys = getPendingKeysForUid(uid);
         for (const k of keys){
+          try {
+            const encPayload = localStorage.getItem(k);
+            if (!encPayload) { removePendingKey(k); continue; }
+            const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+            const plain = await decryptFilePayload(secret, encPayload);
+            const parsed = JSON.parse(plain);
+            if (parsed && parsed.hash && parsed.hash === hashHex) {
+              removePendingKey(k);
+            }
+          } catch(e){}
+        }
+      } catch(e){}
+      // also attempt to flush queue again after success
+      try { await flushSongQueueForUid(uid); } catch(e){}
+      return { ok:true, result: res };
+    } catch(e){
+      const tooRecent = isTooRecentError(e);
+      const rate = isRateLimitError(e);
+      const isRetryable = tooRecent || rate;
+      return { ok:false, err:e, retryable:isRetryable, tooRecent, rate };
+    }
+  };
+
+  for (let i=0;i<=MAX_RETRY_ATTEMPTS;i++){
+    if (cancelToken.cancelled) break;
+    const attemptIndex = i;
+    const attemptRes = await doAttempt(attemptIndex);
+    if (attemptRes.ok){
+      try { await finalizeSetPlayerOnSave(runtimeScene); } catch(e){}
+      delete _bgSaves[uid];
+      showToast('Save sincronizado com o servidor (incluindo fila de songs).');
+      return { ok:true, attempt: attemptIndex+1 };
+    }
+    if (attemptRes.retryable){
+      // ensure pending local exists
+      try {
+        const existingKeys = getPendingKeysForUid(uid);
+        let alreadyExists = false;
+        for (const k of existingKeys){
           try {
             const encPayload = localStorage.getItem(k);
             if (!encPayload) continue;
             const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
             const plain = await decryptFilePayload(secret, encPayload);
             const parsed = JSON.parse(plain);
-            if (parsed && parsed.hash && parsed.hash === hashHex) {
-              return k;
-            }
+            if (parsed && parsed.hash && parsed.hash === hashHex) { alreadyExists = true; break; }
           } catch(e){}
         }
+        if (!alreadyExists){
+          await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
+        }
       } catch(e){}
-      const payload = { encSave, hash: hashHex, songPlay: playInfo || null, ts: Date.now() };
-      const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-      const pjson = JSON.stringify(payload);
-      const encPayload = await encryptFilePayload(secret, pjson);
-      const key = PENDING_PREFIX + uid + '_' + Date.now();
-      const ok = savePendingEncryptedKey(key, encPayload);
-      if (!ok) throw new Error('Failed saving pending key');
-      return key;
-    } catch(e){ console.warn('storePendingEncrypted failed', e); return null; }
-  }
-
-  // --- background retry & debounce/coalesce manager (kept similar to optimized module) ---
-  const RETRY_INTERVALS_MS = [5000, 10000, 20000, 40000, 80000]; // shorter list for simplicity
-  const MAX_RETRY_ATTEMPTS = RETRY_INTERVALS_MS.length;
-  const _bgSaves = {};
-  const _debounceTimers = {};
-  const _latestRequest = {};
-  const DEBOUNCE_MS = 600;
-  const _savingNowForUid = {};
-
-  function getUsername(){
-    try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') return gdjs.playerAuthentication.getUsername(); }catch(e){}
-    try { if (window._gd_firebase_auth && window._gd_firebase_auth.currentUser) return window._gd_firebase_auth.currentUser.displayName || (window._gd_firebase_auth.currentUser.email ? window._gd_firebase_auth.currentUser.email.split('@')[0] : ''); } catch(e){}
-    return 'guest';
-  }
-  function getToken(){
-    try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') return gdjs.playerAuthentication.getUserToken() || ''; } catch(e) {}
-    try { if (window._gd_firebase_auth && window._gd_firebase_auth.currentUser) return window._gd_firebase_auth.currentUser.getIdToken ? window._gd_firebase_auth.currentUser.getIdToken() : ''; } catch(e){}
-    return '';
-  }
-
-  function cancelBackgroundSaveForUid(uid){
-    try {
-      const rec = _bgSaves[uid];
-      if (!rec) return false;
-      rec.cancelToken.cancelled = true;
-      if (rec.timeoutId) clearTimeout(rec.timeoutId);
+      const interval = RETRY_INTERVALS_MS[Math.min(attemptIndex, RETRY_INTERVALS_MS.length-1)];
+      if (cancelToken.cancelled) break;
+      showToast('Tentativa falhou (retryable). Tentando novamente em ' + Math.round(interval/1000) + 's — salvando localmente.');
+      await new Promise((resolve) => {
+        _bgSaves[uid].timeoutId = setTimeout(resolve, interval);
+      });
+      continue;
+    } else {
+      try {
+        const k = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
+        if (k) showToast('Erro não-recuperável — dados salvos localmente.');
+      } catch(e){}
+      try { await finalizeSetPlayerOnSave(runtimeScene); } catch(e){}
       delete _bgSaves[uid];
-      return true;
-    } catch(e){ return false; }
+      return { ok:false, attempt: attemptIndex+1, error: attemptRes.err };
+    }
   }
 
-  async function attemptSaveOnce(runtimeScene, enc, hashHex, playInfo, options){
-    const result = { writeUsersOk:false, usersSkipped:false, songsUpdated:false, fallbackCreated:false, error:null };
-    const user = window._gd_firebase_auth && window._gd_firebase_auth.currentUser;
-    if (!user || !user.uid) throw new Error('User not authenticated');
+  try { await finalizeSetPlayerOnSave(runtimeScene); } catch(e){}
+  delete _bgSaves[uid];
+  showToast('Máximo de tentativas atingido. Save gravado localmente.');
+  return { ok:false, error: 'max_retries' };
+}
+
+/* ---------- Debounce / coalesce queue (unchanged behavior) ---------- */
+const _debounceTimers = {};
+const _latestRequest = {};
+const DEBOUNCE_MS = 600;
+let _savingNowForUid = {};
+
+function _scheduleSaveForUid(uid, payload){
+  if (!_latestRequest[uid]) _latestRequest[uid] = { enc: payload.enc, hash: payload.hash, playInfo: payload.playInfo, runtimeScene: payload.runtimeScene, resolves: [], rejects: [] };
+  else {
+    _latestRequest[uid].enc = payload.enc;
+    _latestRequest[uid].hash = payload.hash;
+    _latestRequest[uid].playInfo = payload.playInfo;
+    _latestRequest[uid].runtimeScene = payload.runtimeScene;
+  }
+  if (payload._resolve) _latestRequest[uid].resolves.push(payload._resolve);
+  if (payload._reject) _latestRequest[uid].rejects.push(payload._reject);
+  if (_debounceTimers[uid]) clearTimeout(_debounceTimers[uid]);
+  _debounceTimers[uid] = setTimeout(async () => {
+    delete _debounceTimers[uid];
+    await _executeQueuedSave(uid);
+  }, DEBOUNCE_MS);
+}
+
+async function _executeQueuedSave(uid){
+  const entry = _latestRequest[uid];
+  if (!entry) return;
+  if (_savingNowForUid[uid]) { return; }
+  _savingNowForUid[uid] = true;
+  const runEntry = Object.assign({}, entry);
+  delete _latestRequest[uid];
+  try {
+    const res = await _performSaveFlow(runEntry.runtimeScene, runEntry.enc, runEntry.hash, runEntry.playInfo, uid);
+    for (const r of (runEntry.resolves || [])) { try{ r(res); } catch(e){} }
+  } catch(err){
+    for (const rej of (runEntry.rejects || [])) { try{ rej(err); } catch(e){} }
+  } finally {
+    _savingNowForUid[uid] = false;
+    if (_latestRequest[uid]) {
+      setTimeout(()=> _executeQueuedSave(uid), 0);
+    }
+  }
+}
+
+/* ---------- Core one-shot save flow (now queues songs as strings) ---------- */
+async function _performSaveFlow(runtimeScene, enc, hashHex, playInfo, uid){
+  runtimeScene = runtimeScene || window._gd_runtimeScene;
+  if (!runtimeScene) throw new Error('runtimeScene required');
+  const user = auth.currentUser;
+  if (!user || !user.uid) throw new Error('User not authenticated');
+
+  let longRunningTimerFired = false;
+  const longRunningTimer = setTimeout(async () => {
+    try { await finalizeSetPlayerOnSave(runtimeScene); longRunningTimerFired = true; showToast('Save demorando — continuando em segundo plano.'); } catch(e){} 
+  }, 6000);
+
+  let immediate = { writeUsersOk:false, usersSkipped:false, songsQueued:false, fallbackKey:null, background:false, error:null };
+
+  try {
     try {
       const wres = await writeUsersPlayerSaveIfChanged(user.uid, enc, hashHex);
-      result.usersSkipped = !!wres.skipped;
-      result.writeUsersOk = !!wres.wrote;
+      immediate.usersSkipped = !!wres.skipped;
+      immediate.writeUsersOk = !!wres.wrote;
     } catch(e){
-      result.error = e;
-      throw e;
-    }
-    if (playInfo && playInfo.songName && playInfo.songDifficulty){
-      const candidate = (options && options.useScoreAsBest) ? (playInfo.sceneScore || 0) : (playInfo.puBestScore || 0);
-      try {
-        await updateSongsCollectionForPlay(runtimeScene, playInfo.playerName || getUsername(), candidate, playInfo.lastPoints || 0, playInfo.accuracyVal || '', playInfo.songName, playInfo.songDifficulty);
-        result.songsUpdated = true;
-      } catch(e){
-        result.error = e;
-        throw e;
-      }
-    }
-    return result;
-  }
-
-  async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
-    if (!uid) return;
-    cancelBackgroundSaveForUid(uid);
-    const cancelToken = { cancelled: false };
-    _bgSaves[uid] = { running:true, cancelToken, attempts:0, timeoutId:null };
-    const doAttempt = async (attemptIndex) => {
-      if (cancelToken.cancelled) return { ok:false, cancelled:true };
-      try {
-        _bgSaves[uid].attempts = attemptIndex + 1;
-        const res = await attemptSaveOnce(runtimeScene, enc, hashHex, playInfo, { useScoreAsBest: true });
-        // remove pending matching hash
-        try {
-          const keys = getPendingKeysForUid(uid);
-          for (const k of keys){
-            try {
-              const encPayload = localStorage.getItem(k);
-              if (!encPayload) { removePendingKey(k); continue; }
-              const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-              const plain = await decryptFilePayload(secret, encPayload);
-              const parsed = JSON.parse(plain);
-              if (parsed && parsed.hash && parsed.hash === hashHex) removePendingKey(k);
-            } catch(e){}
-          }
-        } catch(e){}
-        return { ok:true, result: res };
-      } catch(e){
-        const tooRecent = isTooRecentError(e);
-        const rate = isRateLimitError(e);
-        const isRetryable = tooRecent || rate;
-        return { ok:false, err:e, retryable:isRetryable, tooRecent, rate };
-      }
-    };
-    for (let i=0;i<=MAX_RETRY_ATTEMPTS;i++){
-      if (cancelToken.cancelled) break;
-      const attemptIndex = i;
-      const attemptRes = await doAttempt(attemptIndex);
-      if (attemptRes.ok){
-        try { await finalizeSetPlayerOnSave(runtimeScene); } catch(e){}
-        delete _bgSaves[uid];
-        showToast('Save sincronizado com o servidor.');
-        return { ok:true, attempt: attemptIndex+1 };
-      }
-      if (attemptRes.retryable){
-        try {
-          const existingKeys = getPendingKeysForUid(uid);
-          let alreadyExists = false;
-          for (const k of existingKeys){
-            try {
-              const encPayload = localStorage.getItem(k);
-              if (!encPayload) continue;
-              const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-              const plain = await decryptFilePayload(secret, encPayload);
-              const parsed = JSON.parse(plain);
-              if (parsed && parsed.hash && parsed.hash === hashHex) { alreadyExists = true; break; }
-            } catch(e){}
-          }
-          if (!alreadyExists) await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
-        } catch(e){}
-        const interval = RETRY_INTERVALS_MS[Math.min(attemptIndex, RETRY_INTERVALS_MS.length-1)];
-        if (cancelToken.cancelled) break;
-        showToast('Tentativa falhou (retryable). Tentando novamente em ' + Math.round(interval/1000) + 's — salvando localmente.');
-        await new Promise((resolve) => { _bgSaves[uid].timeoutId = setTimeout(resolve, interval); });
-        continue;
+      immediate.error = e;
+      if (isTooRecentError(e) || isRateLimitError(e)){
+        const pendingKey = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
+        immediate.fallbackKey = pendingKey;
+        immediate.background = true;
+        immediate.error = isTooRecentError(e) ? 'too_recent' : 'rate_limit';
+        startBackgroundSave(runtimeScene, enc, hashHex, playInfo, user.uid).catch(()=>{});
+        clearTimeout(longRunningTimer);
+        await finalizeSetPlayerOnSave(runtimeScene);
+        return immediate;
       } else {
-        try {
-          const k = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
-          if (k) showToast('Erro não-recuperável — dados salvos localmente.');
-        } catch(e){}
-        try { await finalizeSetPlayerOnSave(runtimeScene); } catch(e){}
-        delete _bgSaves[uid];
-        return { ok:false, attempt: attemptIndex+1, error: attemptRes.err };
+        const pendingKey = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
+        immediate.fallbackKey = pendingKey;
+        immediate.background = true;
+        immediate.error = 'users_write_failed';
+        startBackgroundSave(runtimeScene, enc, hashHex, playInfo, user.uid).catch(()=>{});
+        clearTimeout(longRunningTimer);
+        await finalizeSetPlayerOnSave(runtimeScene);
+        return immediate;
       }
     }
-    try { await finalizeSetPlayerOnSave(runtimeScene); } catch(e){}
-    delete _bgSaves[uid];
-    showToast('Máximo de tentativas atingido. Save gravado localmente.');
-    return { ok:false, error: 'max_retries' };
-  }
 
-  function _scheduleSaveForUid(uid, payload){
-    if (!_latestRequest[uid]) _latestRequest[uid] = { enc: payload.enc, hash: payload.hash, playInfo: payload.playInfo, runtimeScene: payload.runtimeScene, resolves: [], rejects: [] };
-    else {
-      _latestRequest[uid].enc = payload.enc;
-      _latestRequest[uid].hash = payload.hash;
-      _latestRequest[uid].playInfo = payload.playInfo;
-      _latestRequest[uid].runtimeScene = payload.runtimeScene;
-    }
-    if (payload._resolve) _latestRequest[uid].resolves.push(payload._resolve);
-    if (payload._reject) _latestRequest[uid].rejects.push(payload._reject);
-    if (_debounceTimers[uid]) clearTimeout(_debounceTimers[uid]);
-    _debounceTimers[uid] = setTimeout(async () => { delete _debounceTimers[uid]; await _executeQueuedSave(uid); }, DEBOUNCE_MS);
-  }
-
-  async function _executeQueuedSave(uid){
-    const entry = _latestRequest[uid];
-    if (!entry) return;
-    if (_savingNowForUid[uid]) return;
-    _savingNowForUid[uid] = true;
-    const runEntry = Object.assign({}, entry);
-    delete _latestRequest[uid];
-    try {
-      const res = await _performSaveFlow(runEntry.runtimeScene, runEntry.enc, runEntry.hash, runEntry.playInfo, uid);
-      for (const r of (runEntry.resolves || [])) { try{ r(res); } catch(e){} }
-    } catch(err){
-      for (const rej of (runEntry.rejects || [])) { try{ rej(err); } catch(e){} }
-    } finally {
-      _savingNowForUid[uid] = false;
-      if (_latestRequest[uid]) setTimeout(()=> _executeQueuedSave(uid), 0);
-    }
-  }
-
-  async function _performSaveFlow(runtimeScene, enc, hashHex, playInfo, uid){
-    runtimeScene = runtimeScene || window._gd_runtimeScene;
-    if (!runtimeScene) throw new Error('runtimeScene required');
-    const user = window._gd_firebase_auth && window._gd_firebase_auth.currentUser;
-    if (!user || !user.uid) throw new Error('User not authenticated');
-    let longRunningTimerFired = false;
-    const longRunningTimer = setTimeout(async () => {
-      try { await finalizeSetPlayerOnSave(runtimeScene); longRunningTimerFired = true; showToast('Save demorando — continuando em segundo plano.'); } catch(e){} 
-    }, 6000);
-    let immediate = { writeUsersOk:false, usersSkipped:false, songsUpdated:false, fallbackKey:null, background:false, error:null };
-    try {
+    if (playInfo && playInfo.songName && playInfo.songDifficulty){
       try {
-        const wres = await writeUsersPlayerSaveIfChanged(user.uid, enc, hashHex);
-        immediate.usersSkipped = !!wres.skipped;
-        immediate.writeUsersOk = !!wres.wrote;
+        const compact = compactSongPlayString(playInfo, playInfo.playerName || getUsername());
+        await enqueueSongPlayForUser(user.uid, compact);
+        immediate.songsQueued = true;
+        // try flush immediate (best-effort) to reduce time-to-leaderboard, but bail if rate
+        try {
+          const flushRes = await flushSongQueueForUid(user.uid);
+          if (flushRes && flushRes.ok) immediate.songsFlushed = true;
+        } catch(e){}
       } catch(e){
-        immediate.error = e;
         if (isTooRecentError(e) || isRateLimitError(e)){
           const pendingKey = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
           immediate.fallbackKey = pendingKey;
@@ -2524,195 +2656,140 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
         } else {
           const pendingKey = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
           immediate.fallbackKey = pendingKey;
-          immediate.background = true;
-          immediate.error = 'users_write_failed';
-          startBackgroundSave(runtimeScene, enc, hashHex, playInfo, user.uid).catch(()=>{});
+          immediate.background = false;
+          immediate.error = 'songs_enqueue_failed';
           clearTimeout(longRunningTimer);
           await finalizeSetPlayerOnSave(runtimeScene);
           return immediate;
         }
       }
-      if (playInfo && playInfo.songName && playInfo.songDifficulty){
-        try {
-          const candidate = playInfo.sceneScore || 0;
-          await updateSongsCollectionForPlay(runtimeScene, playInfo.playerName, candidate, playInfo.lastPoints || 0, playInfo.accuracyVal || '', playInfo.songName, playInfo.songDifficulty);
-          immediate.songsUpdated = true;
-        } catch(e){
-          if (isTooRecentError(e) || isRateLimitError(e)){
-            const pendingKey = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
-            immediate.fallbackKey = pendingKey;
-            immediate.background = true;
-            immediate.error = isTooRecentError(e) ? 'too_recent' : 'rate_limit';
-            startBackgroundSave(runtimeScene, enc, hashHex, playInfo, user.uid).catch(()=>{});
-            clearTimeout(longRunningTimer);
-            await finalizeSetPlayerOnSave(runtimeScene);
-            return immediate;
-          } else {
-            const pendingKey = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo);
-            immediate.fallbackKey = pendingKey;
-            immediate.background = false;
-            immediate.error = 'songs_write_failed';
-            clearTimeout(longRunningTimer);
-            await finalizeSetPlayerOnSave(runtimeScene);
-            return immediate;
-          }
-        }
-      }
-      clearTimeout(longRunningTimer);
-      await finalizeSetPlayerOnSave(runtimeScene);
+    }
+
+    clearTimeout(longRunningTimer);
+    await finalizeSetPlayerOnSave(runtimeScene);
+    immediate.background = false;
+    return immediate;
+
+  } catch(err){
+    clearTimeout(longRunningTimer);
+    let pendingKey = null;
+    try { pendingKey = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo); } catch(e){}
+    try { await finalizeSetPlayerOnSave(runtimeScene); } catch(e){}
+    if (isTooRecentError(err) || isRateLimitError(err)){
+      immediate.fallbackKey = pendingKey;
+      immediate.background = true;
+      startBackgroundSave(runtimeScene, enc, hashHex, playInfo, user.uid).catch(()=>{});
+    } else {
+      immediate.fallbackKey = pendingKey;
       immediate.background = false;
-      return immediate;
-    } catch(err){
-      clearTimeout(longRunningTimer);
-      let pendingKey = null;
-      try { pendingKey = await storePendingEncrypted(runtimeScene, enc, hashHex, playInfo); } catch(e){}
-      try { await finalizeSetPlayerOnSave(runtimeScene); } catch(e){}
-      if (isTooRecentError(err) || isRateLimitError(err)){
-        immediate.fallbackKey = pendingKey;
-        immediate.background = true;
-        startBackgroundSave(runtimeScene, enc, hashHex, playInfo, user.uid).catch(()=>{});
-      } else {
-        immediate.fallbackKey = pendingKey;
-        immediate.background = false;
-      }
-      immediate.error = err && err.message ? err.message : String(err);
-      return immediate;
     }
+    immediate.error = err && err.message ? err.message : String(err);
+    return immediate;
   }
+}
 
-  // --- Exposed API (after firebase ready) ---
-  async function createAndSaveEncryptedSavePublic(maybeRuntimeScene){
-    const runtimeSceneLocal = maybeRuntimeScene || window._gd_runtimeScene;
-    if (!runtimeSceneLocal) throw new Error('runtimeScene required');
-    // ensure firebase ready
-    await ensureFirebaseReady();
-    const plain = (function buildPlaintextSaveJson(runtimeScene){
-      // same simple exporter: read few numeric children from PlayerUniversal
-      const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
-      const g = runtimeScene.getGame();
-      const gameVars = g.getVariables();
-      const pu = gameVars.get('PlayerUniversal');
-      const ordered = {};
-      try {
-        for (const k of EXPORT_FIELDS){
-          let v = 0;
-          try {
-            const child = pu.getChild(k);
-            if (child && typeof child.getAsNumber === 'function') v = child.getAsNumber();
-            else if (child && typeof child.getAsString === 'function') v = Number(child.getAsString()) || 0;
-            else if (child && 'value' in child) v = Number(child.value) || 0;
-          } catch(e){ v = 0; }
-          ordered[k] = Number(v) || 0;
-        }
-      } catch(e){
-        for (const k of EXPORT_FIELDS) ordered[k] = 0;
-      }
-      return JSON.stringify({ version: 1, payload: ordered });
-    })(runtimeSceneLocal);
+/* ---------- Public API (debounced/coalesced) ---------- */
+window.gdAutoSaveUsers = window.gdAutoSaveUsers || {};
+window.gdAutoSaveUsers.createAndSaveEncryptedSave = async function(maybeRuntimeScene){
+  const runtimeSceneLocal = maybeRuntimeScene || window._gd_runtimeScene;
+  if (!runtimeSceneLocal) throw new Error('runtimeScene required');
 
-    const hashHex = await sha256Hex(plain);
-    const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-    const enc = await encryptFilePayload(secret, plain);
+  const user = auth.currentUser;
+  if (!user || !user.uid) throw new Error('User not authenticated');
 
-    const rawPlay = collectSongPlayInfo(runtimeSceneLocal);
-    const playInfo = Object.assign({}, rawPlay, { playerName: (window._gd_firebase_auth && window._gd_firebase_auth.currentUser && window._gd_firebase_auth.currentUser.displayName) ? window._gd_firebase_auth.currentUser.displayName : (window._gd_firebase_auth && window._gd_firebase_auth.currentUser && window._gd_firebase_auth.currentUser.email ? window._gd_firebase_auth.currentUser.email.split('@')[0] : getUsername()) });
+  // Build plaintext & encrypt
+  const plain = buildPlaintextSaveJson(runtimeSceneLocal);
+  const hashHex = await sha256Hex(plain);
+  const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+  const enc = await encryptFilePayload(secret, plain);
 
-    // schedule/coalesce using uid
-    const user = window._gd_firebase_auth && window._gd_firebase_auth.currentUser;
-    if (!user || !user.uid) throw new Error('User not authenticated');
-    return new Promise((resolve, reject) => {
-      _scheduleSaveForUid(user.uid, { enc, hash: hashHex, playInfo, runtimeScene: runtimeSceneLocal, _resolve: resolve, _reject: reject });
-    });
-  }
+  // collect play info (includes sceneScore, customPitch, lastPoints)
+  const rawPlay = collectSongPlayInfo(runtimeSceneLocal);
+  const playInfo = Object.assign({}, rawPlay, { playerName: (auth.currentUser && auth.currentUser.displayName) ? auth.currentUser.displayName : (auth.currentUser && auth.currentUser.email ? auth.currentUser.email.split('@')[0] : getUsername()) });
 
-  // retryPendingSaves - attempt to flush pending local saves
-  async function retryPendingSavesPublic(maybeRuntimeScene){
-    const runtimeSceneLocal = maybeRuntimeScene || window._gd_runtimeScene;
-    await ensureFirebaseReady();
-    const user = window._gd_firebase_auth && window._gd_firebase_auth.currentUser;
-    if (!user || !user.uid) throw new Error('User not authenticated');
-    const uid = user.uid;
-    const keys = getPendingKeysForUid(uid);
-    const results = [];
-    for (const key of keys){
-      try {
-        const encPayload = localStorage.getItem(key);
-        if (!encPayload) { removePendingKey(key); continue; }
-        const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-        let plain = null;
-        try { plain = await decryptFilePayload(secret, encPayload); } catch(e){ results.push({ key, ok:false, err:'decrypt' }); continue; }
-        const parsed = JSON.parse(plain);
-        // attempt to write users
-        try {
-          const snap = await window._gd_firebase_db.collection('users').doc(uid).get();
-          const serverData = snap && snap.exists ? snap.data() : null;
-          let needWriteUser = true;
-          if (serverData && serverData.playerSave && parsed.hash && serverData.playerSave.hash && String(serverData.playerSave.hash) === String(parsed.hash)) needWriteUser = false;
-          if (needWriteUser) await window._gd_firebase_db.collection('users').doc(uid).set({ playerSave: { save: parsed.encSave, hash: parsed.hash, updatedAt: firestoreServerTimestamp() } }, { merge: true });
-        } catch(e){ results.push({ key, ok:false, err:'users_write_failed' }); continue; }
-        // attempt songs if present
-        if (parsed.songPlay && parsed.songPlay.songName && parsed.songPlay.songDifficulty){
-          try {
-            await updateSongsCollectionForPlay(runtimeSceneLocal, parsed.songPlay.playerName || getUsername(), parsed.songPlay.bestScore || 0, parsed.songPlay.lastPoints || 0, parsed.songPlay.accuracy || '', parsed.songPlay.songName, parsed.songPlay.songDifficulty);
-            removePendingKey(key);
-            results.push({ key, ok:true });
-            continue;
-          } catch(e){
-            results.push({ key, ok:false, err:'songs_update_failed' });
-            continue;
-          }
-        } else {
-          // no songPlay, check user save OK then delete pending
-          try {
-            const snap2 = await window._gd_firebase_db.collection('users').doc(uid).get();
-            const sd = snap2 && snap2.exists ? snap2.data() : null;
-            if (sd && sd.playerSave && sd.playerSave.hash && parsed.hash && String(sd.playerSave.hash) === String(parsed.hash)){
-              removePendingKey(key);
-              results.push({ key, ok:true, note:'user_saved' });
-              continue;
-            } else {
-              results.push({ key, ok:false, err:'user_not_saved_yet' });
-              continue;
-            }
-          } catch(e){ results.push({ key, ok:false, err:'user_check_failed' }); continue; }
-        }
-      } catch(e){
-        results.push({ key, ok:false, err: String(e) });
-      }
-    }
-    return results;
-  }
-
-  // list pending keys
-  function listPendingSavesPublic(){
-    try {
-      const user = window._gd_firebase_auth && window._gd_firebase_auth.currentUser;
-      const uid = user && user.uid ? user.uid : 'guest';
-      const keys = getPendingKeysForUid(uid);
-      return keys.map(k => { const parts=k.split('_'); return { key:k, ts: parts.length>2 ? Number(parts[2]) : 0 }; });
-    } catch(e){ return []; }
-  }
-
-  // cancel background
-  function cancelBackgroundSavePublic(uid){
-    return cancelBackgroundSaveForUid(uid);
-  }
-
-  // initialize firebase lazily (don't block)
-  ensureFirebaseReady().then(()=> {
-    console.log('Firebase compat libs loaded & initialized for gdAutoSaveUsers.');
-  }).catch(e=>{
-    console.warn('Firebase compat load failed:', e);
+  return new Promise((resolve, reject) => {
+    _scheduleSaveForUid(user.uid, { enc, hash: hashHex, playInfo, runtimeScene: runtimeSceneLocal, _resolve: resolve, _reject: reject });
   });
+};
 
-  // expose API
-  window.gdAutoSaveUsers = window.gdAutoSaveUsers || {};
-  window.gdAutoSaveUsers.createAndSaveEncryptedSave = createAndSaveEncryptedSavePublic;
-  window.gdAutoSaveUsers.retryPendingSaves = retryPendingSavesPublic;
-  window.gdAutoSaveUsers.listPendingSaves = listPendingSavesPublic;
-  window.gdAutoSaveUsers.cancelBackgroundSave = cancelBackgroundSavePublic;
+window.gdAutoSaveUsers.retryPendingSaves = async function(maybeRuntimeScene){
+  const rs = maybeRuntimeScene || window._gd_runtimeScene;
+  // Try to retry pending encrypted saves first
+  try {
+    const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : null;
+    if (!uid) return { ok:false, reason:'not-auth' };
+    // Try flush queue for user
+    const flush = await flushSongQueueForUid(uid);
+    // Attempt to send local encrypted pending saves too (best-effort)
+    const keys = getPendingKeysForUid(uid);
+    for (const k of keys){
+      try {
+        const encPayload = localStorage.getItem(k);
+        if (!encPayload) continue;
+        const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+        const plain = await decryptFilePayload(secret, encPayload);
+        const parsed = JSON.parse(plain);
+        if (!parsed || !parsed.encSave) { removePendingKey(k); continue; }
+        // try write users
+        try {
+          const writeRes = await writeUsersPlayerSaveIfChanged(uid, parsed.encSave, parsed.hash);
+          if (writeRes && !writeRes.skipped) {
+            // if songPlay present, also enqueue it to users.songsPending so flushSongQueue picks it
+            if (parsed.songPlay) {
+              try {
+                const compact = compactSongPlayString(parsed.songPlay, parsed.songPlay.playerName || getUsername());
+                await enqueueSongPlayForUser(uid, compact);
+              } catch(e){}
+            }
+            removePendingKey(k);
+          } else {
+            // skip - nothing to do
+            removePendingKey(k);
+          }
+        } catch(e){
+          // retry later
+          if (isRateLimitError(e) || isTooRecentError(e)) { /* leave key */ }
+          else { removePendingKey(k); }
+        }
+      } catch(e){}
+    }
+    return { ok:true, flush, pendingKeys: keys.length };
+  } catch(e){
+    return { ok:false, error: String(e) };
+  }
+};
+window.gdAutoSaveUsers.listPendingSaves = function(){
+  try {
+    const user = auth.currentUser;
+    const uid = user && user.uid ? user.uid : 'guest';
+    const keys = getPendingKeysForUid(uid);
+    const out = keys.map(k => {
+      const parts = k.split('_'); const ts = parts.length>2 ? Number(parts[2]) : 0;
+      return { key: k, ts };
+    });
+    return out;
+  } catch(e){ return []; }
+};
+window.gdAutoSaveUsers.cancelBackgroundSave = function(uid){
+  return cancelBackgroundSaveForUid(uid);
+};
+// Force flush song queue now (public)
+window.gdAutoSaveUsers.flushSongQueueNow = async function(maybeRuntimeScene){
+  const rs = maybeRuntimeScene || window._gd_runtimeScene;
+  const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : null;
+  if (!uid) throw new Error('not authenticated');
+  return await flushSongQueueForUid(uid);
+};
 
-  console.log('gdAutoSaveUsers compatible module injected.');
+console.log('gdAutoSaveUsers optimized_songqueue v1 loaded (song queue strings).');
+`; // end moduleCode
+
+  const s = document.createElement('script');
+  s.type = 'module';
+  s.textContent = moduleCode;
+  document.head.appendChild(s);
+
+  window._gd_runtimeScene = runtimeScene;
 })(runtimeScene);
 
 };
@@ -2779,7 +2856,7 @@ gdjs.copyArray(runtimeScene.getObjects("OppSideLifeBar"), gdjs.PlayCode.GDOppSid
 {
 
 
-gdjs.PlayCode.userFunc0x1e39958(runtimeScene);
+gdjs.PlayCode.userFunc0x1e158d8(runtimeScene);
 
 }
 
@@ -18839,7 +18916,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1e26940 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1b852b8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19022,18 +19099,16 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1d151c0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x18e4358 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
-  .then(r => console.log('save result', r))
-  .catch(e => console.error('save failed', e));
 };
 gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 
 {
 
 
-gdjs.PlayCode.userFunc0x1e26940(runtimeScene);
+gdjs.PlayCode.userFunc0x1b852b8(runtimeScene);
 
 }
 
@@ -19109,7 +19184,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1d151c0(runtimeScene);
+gdjs.PlayCode.userFunc0x18e4358(runtimeScene);
 
 }
 
@@ -19209,7 +19284,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1d7fa10 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1baf2e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19392,18 +19467,16 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1dbb900 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xa9ea30 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
-  .then(r => console.log('save result', r))
-  .catch(e => console.error('save failed', e));
 };
 gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 
 {
 
 
-gdjs.PlayCode.userFunc0x1d7fa10(runtimeScene);
+gdjs.PlayCode.userFunc0x1baf2e0(runtimeScene);
 
 }
 
@@ -19479,7 +19552,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1dbb900(runtimeScene);
+gdjs.PlayCode.userFunc0xa9ea30(runtimeScene);
 
 }
 
@@ -23190,7 +23263,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x1420848 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xaa4bc8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -23209,7 +23282,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x14208e8 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x18afbe0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -23474,7 +23547,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x1420848(runtimeScene);
+gdjs.PlayCode.userFunc0xaa4bc8(runtimeScene);
 
 }
 
@@ -23482,7 +23555,7 @@ gdjs.PlayCode.userFunc0x1420848(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x14208e8(runtimeScene);
+gdjs.PlayCode.userFunc0x18afbe0(runtimeScene);
 
 }
 
@@ -23604,7 +23677,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1381cf0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xf26820 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -24523,7 +24596,7 @@ gdjs.PlayCode.eventsList273 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x1381cf0(runtimeScene);
+gdjs.PlayCode.userFunc0xf26820(runtimeScene);
 
 }
 
@@ -24603,7 +24676,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0xf38538 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1e070e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -25547,7 +25620,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0xf38538(runtimeScene);
+gdjs.PlayCode.userFunc0x1e070e0(runtimeScene);
 
 }
 
