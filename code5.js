@@ -1819,7 +1819,7 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
 }
 
 
-};gdjs.PlayCode.userFunc0x1c25250 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a33160 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   if (window._gd_auto_save_optimized_songqueue_with_ui_v1) {
@@ -3019,7 +3019,7 @@ gdjs.copyArray(runtimeScene.getObjects("OppSideLifeBar"), gdjs.PlayCode.GDOppSid
 {
 
 
-gdjs.PlayCode.userFunc0x1c25250(runtimeScene);
+gdjs.PlayCode.userFunc0x1a33160(runtimeScene);
 
 }
 
@@ -19079,7 +19079,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1e7d1c0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1eb2470 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19262,7 +19262,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1a85088 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1eaa4b8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19273,7 +19273,7 @@ gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x1e7d1c0(runtimeScene);
+gdjs.PlayCode.userFunc0x1eb2470(runtimeScene);
 
 }
 
@@ -19349,7 +19349,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1a85088(runtimeScene);
+gdjs.PlayCode.userFunc0x1eaa4b8(runtimeScene);
 
 }
 
@@ -19449,7 +19449,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x18b1df0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x11a7238 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19632,7 +19632,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xf915c8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1add050 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19643,7 +19643,7 @@ gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x18b1df0(runtimeScene);
+gdjs.PlayCode.userFunc0x11a7238(runtimeScene);
 
 }
 
@@ -19719,7 +19719,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xf915c8(runtimeScene);
+gdjs.PlayCode.userFunc0x1add050(runtimeScene);
 
 }
 
@@ -19855,6 +19855,11 @@ if (isConditionTrue_0) {
 isConditionTrue_0 = false;
 {isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(15).getAsNumber() == 1);
 }
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(16711212);
+}
+}
 }
 }
 }
@@ -19883,6 +19888,11 @@ isConditionTrue_0 = false;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
 {isConditionTrue_0 = (runtimeScene.getGame().getVariables().getFromIndex(15).getAsNumber() == 1);
+}
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(16513500);
+}
 }
 }
 }
@@ -23430,7 +23440,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0xf3fa80 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1ad5120 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -23449,7 +23459,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x8c9398 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x1ad51c0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -23714,7 +23724,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0xf3fa80(runtimeScene);
+gdjs.PlayCode.userFunc0x1ad5120(runtimeScene);
 
 }
 
@@ -23722,7 +23732,7 @@ gdjs.PlayCode.userFunc0xf3fa80(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x8c9398(runtimeScene);
+gdjs.PlayCode.userFunc0x1ad51c0(runtimeScene);
 
 }
 
@@ -23844,7 +23854,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1395a50 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x19e7d90 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -24763,7 +24773,7 @@ gdjs.PlayCode.eventsList273 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x1395a50(runtimeScene);
+gdjs.PlayCode.userFunc0x19e7d90(runtimeScene);
 
 }
 
@@ -24843,7 +24853,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1c26898 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x19e99c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -25787,7 +25797,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x1c26898(runtimeScene);
+gdjs.PlayCode.userFunc0x19e99c8(runtimeScene);
 
 }
 
