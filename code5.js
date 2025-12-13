@@ -1819,24 +1819,23 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
 }
 
 
-};gdjs.PlayCode.userFunc0x1e158d8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1c25250 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
-  if (window._gd_auto_save_optimized_songqueue_v1) {
+  if (window._gd_auto_save_optimized_songqueue_with_ui_v1) {
     window._gd_runtimeScene = runtimeScene;
-    console.log('gdAutoSaveUsers module already initialized (optimized_songqueue v1).');
+    console.log('gdAutoSaveUsers module already initialized (optimized_songqueue_with_ui v1).');
     return;
   }
-  window._gd_auto_save_optimized_songqueue_v1 = true;
+  window._gd_auto_save_optimized_songqueue_with_ui_v1 = true;
   window._gd_runtimeScene = runtimeScene;
 
   const moduleCode = `
 
-/* gdAutoSaveUsers - optimized (song-queue string) v1
-   - Calcula lastPoints imediatamente: floor((Score/20000) * CustomPitch)
-   - Empacota cada jogada como string compacta e grava em users/{uid}.songsPending via arrayUnion
-   - Flush da fila é feito em background (flushSongQueueForUid) com retries
-   - Mantém debounce/coalesce, compare-before-write, fallback criptografado e PlayerOnSave logic
+/* gdAutoSaveUsers - optimized (song-queue string) v1 + Mobile log UI
+   - Automatic log window created when createAndSaveEncryptedSave(...) is called
+   - Shows console.log/warn/error messages so you can debug on Android/exports
+   - All previous behaviors preserved (queue, debounce, compare-before-write, fallback)
 */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
@@ -1864,6 +1863,183 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+/* ---------- Simple mobile log UI ----------
+   - createLogUI() builds a floating modal with logs
+   - console.log/warn/error monkeypatched to append to UI
+   - UI opens automatically on first save call
+*/
+let _logUI = null;
+let _logBuffer = []; // keep logs until UI created
+function createLogUI(){
+  if (_logUI) return _logUI;
+  try {
+    const id = 'gd-auto-save-log-ui';
+    // modal container
+    const container = document.createElement('div');
+    container.id = id;
+    container.style.position = 'fixed';
+    container.style.right = '12px';
+    container.style.bottom = '12px';
+    container.style.width = '92%';
+    container.style.maxWidth = '760px';
+    container.style.height = '46vh';
+    container.style.background = 'linear-gradient(180deg, rgba(6,7,11,0.98), rgba(15,18,25,0.96))';
+    container.style.color = '#e6eef8';
+    container.style.border = '1px solid rgba(255,255,255,0.06)';
+    container.style.borderRadius = '10px';
+    container.style.boxShadow = '0 8px 32px rgba(0,0,0,0.6)';
+    container.style.zIndex = 2147483647;
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.overflow = 'hidden';
+    container.style.fontFamily = 'sans-serif';
+    container.style.fontSize = '12px';
+
+    // header
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.justifyContent = 'space-between';
+    header.style.padding = '8px 10px';
+    header.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+    header.style.background = 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))';
+
+    const title = document.createElement('div');
+    title.textContent = 'Logs — gdAutoSave';
+    title.style.fontWeight = '600';
+    title.style.fontSize = '13px';
+    title.style.opacity = '0.95';
+
+    const controls = document.createElement('div');
+    controls.style.display = 'flex';
+    controls.style.gap = '8px';
+    controls.style.alignItems = 'center';
+
+    const btnCopy = document.createElement('button');
+    btnCopy.textContent = 'Copiar';
+    btnCopy.style.padding = '6px 8px';
+    btnCopy.style.borderRadius = '8px';
+    btnCopy.style.border = 'none';
+    btnCopy.style.background = 'rgba(255,255,255,0.06)';
+    btnCopy.style.color = '#e6eef8';
+    btnCopy.style.cursor = 'pointer';
+    btnCopy.onclick = () => {
+      try {
+        const text = _logBuffer.join('\\n');
+        navigator.clipboard.writeText(text);
+        appendLog('[UI] Logs copiados para a área de transferência', 'info');
+      } catch(e){
+        appendLog('[UI] Falha ao copiar logs: ' + String(e), 'error');
+      }
+    };
+
+    const btnClear = document.createElement('button');
+    btnClear.textContent = 'Limpar';
+    btnClear.style.padding = '6px 8px';
+    btnClear.style.borderRadius = '8px';
+    btnClear.style.border = 'none';
+    btnClear.style.background = 'rgba(255,255,255,0.04)';
+    btnClear.style.color = '#e6eef8';
+    btnClear.style.cursor = 'pointer';
+    btnClear.onclick = () => {
+      _logBuffer = [];
+      if (logBody) logBody.textContent = '';
+    };
+
+    const btnClose = document.createElement('button');
+    btnClose.textContent = 'X';
+    btnClose.style.padding = '6px 8px';
+    btnClose.style.borderRadius = '8px';
+    btnClose.style.border = 'none';
+    btnClose.style.background = 'rgba(255,255,255,0.02)';
+    btnClose.style.color = '#fff';
+    btnClose.style.cursor = 'pointer';
+    btnClose.onclick = () => { container.style.display = 'none'; };
+
+    controls.appendChild(btnCopy);
+    controls.appendChild(btnClear);
+    controls.appendChild(btnClose);
+
+    header.appendChild(title);
+    header.appendChild(controls);
+
+    // body (log area)
+    const logBody = document.createElement('div');
+    logBody.style.flex = '1';
+    logBody.style.padding = '8px 10px';
+    logBody.style.overflow = 'auto';
+    logBody.style.whiteSpace = 'pre-wrap';
+    logBody.style.wordBreak = 'break-word';
+    logBody.style.fontFamily = "monospace, monospace";
+    logBody.style.fontSize = '12px';
+    logBody.style.lineHeight = '1.25';
+    logBody.id = id + '-body';
+
+    // footer small info
+    const footer = document.createElement('div');
+    footer.style.padding = '6px 10px';
+    footer.style.borderTop = '1px solid rgba(255,255,255,0.03)';
+    footer.style.fontSize = '11px';
+    footer.style.opacity = '0.85';
+    footer.style.display = 'flex';
+    footer.style.justifyContent = 'space-between';
+    footer.textContent = 'Touch "Copiar" para enviar logs. Fecha para continuar.';
+    const right = document.createElement('div');
+    right.style.opacity = '0.9';
+    right.style.fontWeight = '600';
+    right.textContent = 'gdAutoSave';
+    footer.appendChild(right);
+
+    container.appendChild(header);
+    container.appendChild(logBody);
+    container.appendChild(footer);
+    document.body.appendChild(container);
+
+    // populate buffer
+    if (_logBuffer && _logBuffer.length){
+      logBody.textContent = _logBuffer.join('\\n');
+      logBody.scrollTop = logBody.scrollHeight;
+    }
+
+    _logUI = { container, logBody };
+    return _logUI;
+  } catch(e){
+    console.warn('createLogUI failed', e);
+    return null;
+  }
+}
+function appendLog(message, level){
+  try {
+    const time = new Date().toLocaleTimeString();
+    const line = '[' + time + '] ' + (level ? ('['+level.toUpperCase()+'] ') : '') + String(message);
+    _logBuffer.push(line);
+    // keep buffer to reasonable size
+    if (_logBuffer.length > 2000) _logBuffer.shift();
+    if (_logUI && _logUI.logBody){
+      _logUI.logBody.textContent += ( (_logUI.logBody.textContent && _logUI.logBody.textContent.length) ? '\\n' : '') + line;
+      _logUI.logBody.scrollTop = _logUI.logBody.scrollHeight;
+    }
+  } catch(e){}
+}
+
+// Monkey-patch console to also show UI logs (preserve original)
+(function patchConsoleForUI(){
+  try {
+    const origLog = console.log.bind(console);
+    const origWarn = console.warn.bind(console);
+    const origError = console.error.bind(console);
+    console.log = function(...args){
+      try { origLog(...args); appendLog(args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '),'info'); } catch(e){ origLog(...args); }
+    };
+    console.warn = function(...args){
+      try { origWarn(...args); appendLog(args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '),'warn'); } catch(e){ origWarn(...args); }
+    };
+    console.error = function(...args){
+      try { origError(...args); appendLog(args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '),'error'); } catch(e){ origError(...args); }
+    };
+  } catch(e){}
+})();
 
 /* ---------- Crypto primitives (unchanged) ---------- */
 const PBKDF2_ITERATIONS = 150000;
@@ -2112,6 +2288,8 @@ function savePendingEncryptedKey(key, text){
 function removePendingKey(key){
   try { localStorage.removeItem(key); return true; } catch(e){ return false; }
 }
+
+/* ---------- Show toast (unchanged) ---------- */
 function showToast(msg, timeout = 7000){
   try {
     const id = 'gd-auto-save-toast';
@@ -2144,12 +2322,15 @@ async function writeUsersPlayerSaveIfChanged(uid, saveString, hashHex){
     if (snap && snap.exists()){
       const d = snap.data();
       if (d && d.playerSave && String(d.playerSave.hash) === String(hashHex)) {
+        console.log('[gdAutoSave] writeUsersPlayerSaveIfChanged: skip (same hash)');
         return { skipped: true, wrote: false };
       }
     }
     await setDoc(ref, { playerSave: { save: saveString, hash: hashHex, updatedAt: serverTimestamp() } }, { merge: true });
+    console.log('[gdAutoSave] writeUsersPlayerSaveIfChanged: wrote');
     return { skipped: false, wrote: true };
   } catch(e){
+    console.warn('[gdAutoSave] writeUsersPlayerSaveIfChanged error', e);
     throw e;
   }
 }
@@ -2158,11 +2339,11 @@ function sanitizeFieldKey(s){
   return String(s).replace(/\\./g,'_').replace(/\\$/g,'_').replace(/\\//g,'_').replace(/\\[|\\]|#/g,'_').replace(/\\s+/g,'_').slice(0,90);
 }
 
-/* ---------- RETRY configuration ---------- */
+/* ---------- RETRY configuration (unchanged) ---------- */
 const RETRY_INTERVALS_MS = [5000, 10000, 20000, 40000, 80000, 160000, 320000];
 const MAX_RETRY_ATTEMPTS = RETRY_INTERVALS_MS.length;
 
-/* ---------- Error detection ---------- */
+/* ---------- Error detection (unchanged) ---------- */
 function isTooRecentError(err){
   try {
     if (!err) return false;
@@ -2272,39 +2453,32 @@ function collectSongPlayInfo(runtimeScene){
 
 /* ---------- Compact string builder for song play ---------- */
 function compactSongPlayString(playInfo, playerName){
-  // Fields: songId|diffKey|playerKey|best|lastPoints|accuracyNoPercent|customPitch
   const songId = sanitizeFieldKey(String(playInfo.songName || '__'));
   const diffKey = sanitizeFieldKey(String(playInfo.songDifficulty || '__'));
   const playerKey = sanitizeFieldKey(String(playerName || 'anonymous'));
-  const best = Number(playInfo.puBestScore || 0) || 0; // keep puBestScore for history
+  const best = Number(playInfo.puBestScore || 0) || 0;
   const lastPoints = Number(playInfo.lastPoints || 0) || 0;
-  // accuracy: remove % and keep minimal repr (no trailing zeros)
   let acc = String(playInfo.accuracyVal || '');
   acc = acc.replace('%','').trim();
   if (acc === '') acc = '0';
-  // customPitch minimal
   const cp = Number(playInfo.customPitch || 1) || 1;
-  // compact: use '|' as separator (sanitized above)
   return songId + '|' + diffKey + '|' + playerKey + '|' + best + '|' + lastPoints + '|' + acc + '|' + cp;
 }
 
-/* ---------- Enqueue song play: add compact string to users/{uid}.songsPending ---------- */
+/* ---------- Enqueue song play (users/{uid}.songsPending via arrayUnion) ---------- */
 async function enqueueSongPlayForUser(uid, compactStr){
   try {
     const userRef = doc(db, 'users', uid);
-    // single write to append the string to songsPending array (atomic)
     await setDoc(userRef, { songsPending: arrayUnion(compactStr) }, { merge: true });
+    console.log('[gdAutoSave] Enqueued song play for user', uid, compactStr);
     return true;
   } catch(e){
+    console.warn('[gdAutoSave] enqueueSongPlayForUser failed', e);
     throw e;
   }
 }
 
-/* ---------- Flush song queue: try to apply queued strings to songs collection ----------
-   - Reads users/{uid}.songsPending, for each string parses and updates songs/{songId}
-   - If successful for an entry, removes it from users/{uid}.songsPending via arrayRemove
-   - Stops / bails on rate/too_recent errors to avoid flood; leaves remaining entries for next attempt
-*/
+/* ---------- Flush song queue for uid (applies queued strings to songs collection) ---------- */
 async function flushSongQueueForUid(uid){
   if (!uid) return { ok:false, reason:'no-uid' };
   const userRef = doc(db, 'users', uid);
@@ -2317,11 +2491,8 @@ async function flushSongQueueForUid(uid){
     let processed = 0;
     for (const s of arr){
       try {
-        // parse compact string
-        // format: songId|diffKey|playerKey|best|lastPoints|acc|cp
         const parts = String(s).split('|');
         if (parts.length < 7) {
-          // malformed -> remove entry
           try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
           continue;
         }
@@ -2337,13 +2508,11 @@ async function flushSongQueueForUid(uid){
         const shouldUpdateBest = Number(candidateBest) > existingBest;
         const lastPointsVal = Number(lastPointsStr) || 0;
         const accuracyVal = accStr ? (String(accStr)) : '';
-        // decide needWrite
         const needWrite = shouldUpdateBest ||
                           (existingEntry.lastPoints === undefined) ||
                           (Number(existingEntry.lastPoints) !== lastPointsVal) ||
                           (String(existingEntry.accuracy || '') !== accuracyVal);
         if (!needWrite) {
-          // remove processed entry from user queue
           try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
           processed++;
           continue;
@@ -2352,38 +2521,33 @@ async function flushSongQueueForUid(uid){
         entry.bestScore = shouldUpdateBest ? Number(candidateBest) : existingBest;
         entry.lastPoints = lastPointsVal;
         entry.accuracy = accuracyVal;
-        entry.customPitch = Number(cpStr) || 1; // store customPitch as well if present
+        entry.customPitch = Number(cpStr) || 1;
         entry.updatedAt = serverTimestamp();
         base[diffKey][playerKey] = entry;
         base.originalName = base.originalName || songId;
-        // write songs doc (single set)
         await setDoc(docRef, base, { merge: true });
-        // on success, remove from queue
         try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
         processed++;
       } catch(e){
-        // if rate/too_recent -> bail and return; queue stays intact
         if (isRateLimitError(e) || isTooRecentError(e)){
-          console.warn('flushSongQueueForUid: rate/too_recent, bailing', e);
+          console.warn('[gdAutoSave] flushSongQueueForUid rate/too_recent, bailing', e);
           return { ok:false, processed, reason:'rate' };
         }
-        // other errors -> remove offending entry to avoid being stuck
         try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
-        console.warn('flushSongQueueForUid: entry failed and removed', e);
+        console.warn('[gdAutoSave] flushSongQueueForUid removed malformed entry', e);
       }
     }
     return { ok:true, processed };
   } catch(e){
-    console.warn('flushSongQueueForUid failed', e);
+    console.warn('[gdAutoSave] flushSongQueueForUid failed', e);
     return { ok:false, error: String(e) };
   }
 }
 
-/* ---------- Pending encrypted fallback (unchanged logic) ---------- */
+/* ---------- Pending encrypted fallback (unchanged) ---------- */
 async function storePendingEncrypted(runtimeScene, encSave, hashHex, playInfo){
   try {
     const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : ('guest');
-    // avoid duplicate pending with same hash
     try {
       const keys = getPendingKeysForUid(uid);
       for (const k of keys){
@@ -2394,7 +2558,8 @@ async function storePendingEncrypted(runtimeScene, encSave, hashHex, playInfo){
           const plain = await decryptFilePayload(secret, encPayload);
           const parsed = JSON.parse(plain);
           if (parsed && parsed.hash && parsed.hash === hashHex) {
-            return k; // already stored
+            console.log('[gdAutoSave] storePendingEncrypted: already exists', k);
+            return k;
           }
         } catch(e){}
       }
@@ -2406,8 +2571,9 @@ async function storePendingEncrypted(runtimeScene, encSave, hashHex, playInfo){
     const key = PENDING_PREFIX + uid + '_' + Date.now();
     const ok = savePendingEncryptedKey(key, encPayload);
     if (!ok) throw new Error('Failed saving pending key');
+    console.log('[gdAutoSave] storePendingEncrypted: saved', key);
     return key;
-  } catch(e){ console.warn('storePendingEncrypted failed', e); return null; }
+  } catch(e){ console.warn('[gdAutoSave] storePendingEncrypted failed', e); return null; }
 }
 
 /* ---------- Background save manager & retry (keeps behavior) ---------- */
@@ -2419,6 +2585,7 @@ function cancelBackgroundSaveForUid(uid){
     rec.cancelToken.cancelled = true;
     if (rec.timeoutId) clearTimeout(rec.timeoutId);
     delete _bgSaves[uid];
+    console.log('[gdAutoSave] cancelBackgroundSaveForUid', uid);
     return true;
   } catch(e){ return false; }
 }
@@ -2437,13 +2604,11 @@ async function attemptSaveOnce(runtimeScene, enc, hashHex, playInfo, options){
     throw e;
   }
 
-  // Instead of writing songs/{songId} directly, enqueue compact string to users/{uid}.songsPending
   if (playInfo && playInfo.songName && playInfo.songDifficulty){
     try {
       const compact = compactSongPlayString(playInfo, playInfo.playerName || getUsername());
       await enqueueSongPlayForUser(user.uid, compact);
       result.songsQueued = true;
-      // attempt immediate flush (best-effort) if options.requestFlush true
       if (options && options.requestFlush) {
         const flushRes = await flushSongQueueForUid(user.uid);
         result.songsFlushed = !!(flushRes && flushRes.ok);
@@ -2468,7 +2633,6 @@ async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
     try {
       _bgSaves[uid].attempts = attemptIndex + 1;
       const res = await attemptSaveOnce(runtimeScene, enc, hashHex, playInfo, { useScoreAsBest: true, requestFlush: true });
-      // on success, remove pending local matching hash
       try {
         const keys = getPendingKeysForUid(uid);
         for (const k of keys){
@@ -2484,7 +2648,6 @@ async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
           } catch(e){}
         }
       } catch(e){}
-      // also attempt to flush queue again after success
       try { await flushSongQueueForUid(uid); } catch(e){}
       return { ok:true, result: res };
     } catch(e){
@@ -2506,7 +2669,6 @@ async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
       return { ok:true, attempt: attemptIndex+1 };
     }
     if (attemptRes.retryable){
-      // ensure pending local exists
       try {
         const existingKeys = getPendingKeysForUid(uid);
         let alreadyExists = false;
@@ -2548,7 +2710,7 @@ async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
   return { ok:false, error: 'max_retries' };
 }
 
-/* ---------- Debounce / coalesce queue (unchanged behavior) ---------- */
+/* ---------- Debounce / coalesce (unchanged) ---------- */
 const _debounceTimers = {};
 const _latestRequest = {};
 const DEBOUNCE_MS = 600;
@@ -2591,12 +2753,15 @@ async function _executeQueuedSave(uid){
   }
 }
 
-/* ---------- Core one-shot save flow (now queues songs as strings) ---------- */
+/* ---------- Core one-shot save flow (queues songs as strings) ---------- */
 async function _performSaveFlow(runtimeScene, enc, hashHex, playInfo, uid){
   runtimeScene = runtimeScene || window._gd_runtimeScene;
   if (!runtimeScene) throw new Error('runtimeScene required');
   const user = auth.currentUser;
   if (!user || !user.uid) throw new Error('User not authenticated');
+
+  // ensure log UI exists and show
+  try { createLogUI(); if (_logUI && _logUI.container) _logUI.container.style.display = 'flex'; } catch(e){}
 
   let longRunningTimerFired = false;
   const longRunningTimer = setTimeout(async () => {
@@ -2638,7 +2803,6 @@ async function _performSaveFlow(runtimeScene, enc, hashHex, playInfo, uid){
         const compact = compactSongPlayString(playInfo, playInfo.playerName || getUsername());
         await enqueueSongPlayForUser(user.uid, compact);
         immediate.songsQueued = true;
-        // try flush immediate (best-effort) to reduce time-to-leaderboard, but bail if rate
         try {
           const flushRes = await flushSongQueueForUid(user.uid);
           if (flushRes && flushRes.ok) immediate.songsFlushed = true;
@@ -2694,18 +2858,21 @@ window.gdAutoSaveUsers.createAndSaveEncryptedSave = async function(maybeRuntimeS
   const runtimeSceneLocal = maybeRuntimeScene || window._gd_runtimeScene;
   if (!runtimeSceneLocal) throw new Error('runtimeScene required');
 
+  // ensure log UI exists now (user requested UI on call)
+  try { createLogUI(); if (_logUI && _logUI.container) _logUI.container.style.display = 'flex'; } catch(e){}
+
   const user = auth.currentUser;
   if (!user || !user.uid) throw new Error('User not authenticated');
 
-  // Build plaintext & encrypt
   const plain = buildPlaintextSaveJson(runtimeSceneLocal);
   const hashHex = await sha256Hex(plain);
   const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
   const enc = await encryptFilePayload(secret, plain);
 
-  // collect play info (includes sceneScore, customPitch, lastPoints)
   const rawPlay = collectSongPlayInfo(runtimeSceneLocal);
   const playInfo = Object.assign({}, rawPlay, { playerName: (auth.currentUser && auth.currentUser.displayName) ? auth.currentUser.displayName : (auth.currentUser && auth.currentUser.email ? auth.currentUser.email.split('@')[0] : getUsername()) });
+
+  console.log('[gdAutoSave] createAndSaveEncryptedSave called; enqueueing (debounced).');
 
   return new Promise((resolve, reject) => {
     _scheduleSaveForUid(user.uid, { enc, hash: hashHex, playInfo, runtimeScene: runtimeSceneLocal, _resolve: resolve, _reject: reject });
@@ -2714,13 +2881,10 @@ window.gdAutoSaveUsers.createAndSaveEncryptedSave = async function(maybeRuntimeS
 
 window.gdAutoSaveUsers.retryPendingSaves = async function(maybeRuntimeScene){
   const rs = maybeRuntimeScene || window._gd_runtimeScene;
-  // Try to retry pending encrypted saves first
   try {
     const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : null;
     if (!uid) return { ok:false, reason:'not-auth' };
-    // Try flush queue for user
     const flush = await flushSongQueueForUid(uid);
-    // Attempt to send local encrypted pending saves too (best-effort)
     const keys = getPendingKeysForUid(uid);
     for (const k of keys){
       try {
@@ -2730,11 +2894,9 @@ window.gdAutoSaveUsers.retryPendingSaves = async function(maybeRuntimeScene){
         const plain = await decryptFilePayload(secret, encPayload);
         const parsed = JSON.parse(plain);
         if (!parsed || !parsed.encSave) { removePendingKey(k); continue; }
-        // try write users
         try {
           const writeRes = await writeUsersPlayerSaveIfChanged(uid, parsed.encSave, parsed.hash);
           if (writeRes && !writeRes.skipped) {
-            // if songPlay present, also enqueue it to users.songsPending so flushSongQueue picks it
             if (parsed.songPlay) {
               try {
                 const compact = compactSongPlayString(parsed.songPlay, parsed.songPlay.playerName || getUsername());
@@ -2743,11 +2905,9 @@ window.gdAutoSaveUsers.retryPendingSaves = async function(maybeRuntimeScene){
             }
             removePendingKey(k);
           } else {
-            // skip - nothing to do
             removePendingKey(k);
           }
         } catch(e){
-          // retry later
           if (isRateLimitError(e) || isTooRecentError(e)) { /* leave key */ }
           else { removePendingKey(k); }
         }
@@ -2757,6 +2917,12 @@ window.gdAutoSaveUsers.retryPendingSaves = async function(maybeRuntimeScene){
   } catch(e){
     return { ok:false, error: String(e) };
   }
+};
+window.gdAutoSaveUsers.flushSongQueueNow = async function(maybeRuntimeScene){
+  const rs = maybeRuntimeScene || window._gd_runtimeScene;
+  const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : null;
+  if (!uid) throw new Error('not authenticated');
+  return await flushSongQueueForUid(uid);
 };
 window.gdAutoSaveUsers.listPendingSaves = function(){
   try {
@@ -2773,15 +2939,9 @@ window.gdAutoSaveUsers.listPendingSaves = function(){
 window.gdAutoSaveUsers.cancelBackgroundSave = function(uid){
   return cancelBackgroundSaveForUid(uid);
 };
-// Force flush song queue now (public)
-window.gdAutoSaveUsers.flushSongQueueNow = async function(maybeRuntimeScene){
-  const rs = maybeRuntimeScene || window._gd_runtimeScene;
-  const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : null;
-  if (!uid) throw new Error('not authenticated');
-  return await flushSongQueueForUid(uid);
-};
 
-console.log('gdAutoSaveUsers optimized_songqueue v1 loaded (song queue strings).');
+console.log('gdAutoSaveUsers optimized_songqueue_with_ui v1 loaded (song queue strings + mobile log UI).');
+
 `; // end moduleCode
 
   const s = document.createElement('script');
@@ -2790,7 +2950,10 @@ console.log('gdAutoSaveUsers optimized_songqueue v1 loaded (song queue strings).
   document.head.appendChild(s);
 
   window._gd_runtimeScene = runtimeScene;
-})(runtimeScene);
+
+  // ensure that if logs were generated before UI render, we attempt to create it on first save call:
+  // (module's createAndSaveEncryptedSave will call createLogUI as well)
+})();
 
 };
 gdjs.PlayCode.eventsList10 = function(runtimeScene) {
@@ -2856,7 +3019,7 @@ gdjs.copyArray(runtimeScene.getObjects("OppSideLifeBar"), gdjs.PlayCode.GDOppSid
 {
 
 
-gdjs.PlayCode.userFunc0x1e158d8(runtimeScene);
+gdjs.PlayCode.userFunc0x1c25250(runtimeScene);
 
 }
 
@@ -18916,7 +19079,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1b852b8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1e7d1c0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19099,16 +19262,18 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x18e4358 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a85088 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
+  .then(r => console.log('save scheduled/result', r))
+  .catch(e => console.error('save failed', e));
 };
 gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 
 {
 
 
-gdjs.PlayCode.userFunc0x1b852b8(runtimeScene);
+gdjs.PlayCode.userFunc0x1e7d1c0(runtimeScene);
 
 }
 
@@ -19184,7 +19349,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x18e4358(runtimeScene);
+gdjs.PlayCode.userFunc0x1a85088(runtimeScene);
 
 }
 
@@ -19284,7 +19449,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1baf2e0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x18b1df0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19467,16 +19632,18 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xa9ea30 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xf915c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
+  .then(r => console.log('save scheduled/result', r))
+  .catch(e => console.error('save failed', e));
 };
 gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 
 {
 
 
-gdjs.PlayCode.userFunc0x1baf2e0(runtimeScene);
+gdjs.PlayCode.userFunc0x18b1df0(runtimeScene);
 
 }
 
@@ -19552,7 +19719,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xa9ea30(runtimeScene);
+gdjs.PlayCode.userFunc0xf915c8(runtimeScene);
 
 }
 
@@ -23263,7 +23430,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0xaa4bc8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xf3fa80 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -23282,7 +23449,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x18afbe0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x8c9398 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -23547,7 +23714,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0xaa4bc8(runtimeScene);
+gdjs.PlayCode.userFunc0xf3fa80(runtimeScene);
 
 }
 
@@ -23555,7 +23722,7 @@ gdjs.PlayCode.userFunc0xaa4bc8(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x18afbe0(runtimeScene);
+gdjs.PlayCode.userFunc0x8c9398(runtimeScene);
 
 }
 
@@ -23677,7 +23844,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0xf26820 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1395a50 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -24596,7 +24763,7 @@ gdjs.PlayCode.eventsList273 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0xf26820(runtimeScene);
+gdjs.PlayCode.userFunc0x1395a50(runtimeScene);
 
 }
 
@@ -24676,7 +24843,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1e070e0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1c26898 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -25620,7 +25787,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x1e070e0(runtimeScene);
+gdjs.PlayCode.userFunc0x1c26898(runtimeScene);
 
 }
 
