@@ -1819,28 +1819,29 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
 }
 
 
-};gdjs.PlayCode.userFunc0x1a33160 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x18d5cf0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
-  if (window._gd_auto_save_optimized_songqueue_with_ui_v1) {
+  if (window._gd_auto_save_songqueue_local_v2) {
     window._gd_runtimeScene = runtimeScene;
-    console.log('gdAutoSaveUsers module already initialized (optimized_songqueue_with_ui v1).');
+    console.log('gdAutoSaveUsers module already initialized (songqueue_local v2).');
     return;
   }
-  window._gd_auto_save_optimized_songqueue_with_ui_v1 = true;
+  window._gd_auto_save_songqueue_local_v2 = true;
   window._gd_runtimeScene = runtimeScene;
 
   const moduleCode = `
 
-/* gdAutoSaveUsers - optimized (song-queue string) v1 + Mobile log UI
-   - Automatic log window created when createAndSaveEncryptedSave(...) is called
-   - Shows console.log/warn/error messages so you can debug on Android/exports
-   - All previous behaviors preserved (queue, debounce, compare-before-write, fallback)
+/* gdAutoSaveUsers - song queue local v2
+   - accuracy stored as NUMBER (0..100)
+   - songsPending removed from Firestore; local queue in localStorage used instead
+   - reads Game variable PlayerOnline: 0/1 => "BF", 2 => "Opponent" and stores Side in songs entries
+   - keeps previous features: debounce/coalesce, compare-before-write for users, encrypted fallback, retry/backoff, PlayerOnSave
 */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js';
-import { getFirestore, doc, setDoc, getDoc, serverTimestamp, arrayUnion, arrayRemove, updateDoc } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
+import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
 
 /* ---------- Firebase config (obfuscated API key) ---------- */
 function _obfDecode(b64xor) {
@@ -1863,183 +1864,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-/* ---------- Simple mobile log UI ----------
-   - createLogUI() builds a floating modal with logs
-   - console.log/warn/error monkeypatched to append to UI
-   - UI opens automatically on first save call
-*/
-let _logUI = null;
-let _logBuffer = []; // keep logs until UI created
-function createLogUI(){
-  if (_logUI) return _logUI;
-  try {
-    const id = 'gd-auto-save-log-ui';
-    // modal container
-    const container = document.createElement('div');
-    container.id = id;
-    container.style.position = 'fixed';
-    container.style.right = '12px';
-    container.style.bottom = '12px';
-    container.style.width = '92%';
-    container.style.maxWidth = '760px';
-    container.style.height = '46vh';
-    container.style.background = 'linear-gradient(180deg, rgba(6,7,11,0.98), rgba(15,18,25,0.96))';
-    container.style.color = '#e6eef8';
-    container.style.border = '1px solid rgba(255,255,255,0.06)';
-    container.style.borderRadius = '10px';
-    container.style.boxShadow = '0 8px 32px rgba(0,0,0,0.6)';
-    container.style.zIndex = 2147483647;
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.overflow = 'hidden';
-    container.style.fontFamily = 'sans-serif';
-    container.style.fontSize = '12px';
-
-    // header
-    const header = document.createElement('div');
-    header.style.display = 'flex';
-    header.style.alignItems = 'center';
-    header.style.justifyContent = 'space-between';
-    header.style.padding = '8px 10px';
-    header.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
-    header.style.background = 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))';
-
-    const title = document.createElement('div');
-    title.textContent = 'Logs — gdAutoSave';
-    title.style.fontWeight = '600';
-    title.style.fontSize = '13px';
-    title.style.opacity = '0.95';
-
-    const controls = document.createElement('div');
-    controls.style.display = 'flex';
-    controls.style.gap = '8px';
-    controls.style.alignItems = 'center';
-
-    const btnCopy = document.createElement('button');
-    btnCopy.textContent = 'Copiar';
-    btnCopy.style.padding = '6px 8px';
-    btnCopy.style.borderRadius = '8px';
-    btnCopy.style.border = 'none';
-    btnCopy.style.background = 'rgba(255,255,255,0.06)';
-    btnCopy.style.color = '#e6eef8';
-    btnCopy.style.cursor = 'pointer';
-    btnCopy.onclick = () => {
-      try {
-        const text = _logBuffer.join('\\n');
-        navigator.clipboard.writeText(text);
-        appendLog('[UI] Logs copiados para a área de transferência', 'info');
-      } catch(e){
-        appendLog('[UI] Falha ao copiar logs: ' + String(e), 'error');
-      }
-    };
-
-    const btnClear = document.createElement('button');
-    btnClear.textContent = 'Limpar';
-    btnClear.style.padding = '6px 8px';
-    btnClear.style.borderRadius = '8px';
-    btnClear.style.border = 'none';
-    btnClear.style.background = 'rgba(255,255,255,0.04)';
-    btnClear.style.color = '#e6eef8';
-    btnClear.style.cursor = 'pointer';
-    btnClear.onclick = () => {
-      _logBuffer = [];
-      if (logBody) logBody.textContent = '';
-    };
-
-    const btnClose = document.createElement('button');
-    btnClose.textContent = 'X';
-    btnClose.style.padding = '6px 8px';
-    btnClose.style.borderRadius = '8px';
-    btnClose.style.border = 'none';
-    btnClose.style.background = 'rgba(255,255,255,0.02)';
-    btnClose.style.color = '#fff';
-    btnClose.style.cursor = 'pointer';
-    btnClose.onclick = () => { container.style.display = 'none'; };
-
-    controls.appendChild(btnCopy);
-    controls.appendChild(btnClear);
-    controls.appendChild(btnClose);
-
-    header.appendChild(title);
-    header.appendChild(controls);
-
-    // body (log area)
-    const logBody = document.createElement('div');
-    logBody.style.flex = '1';
-    logBody.style.padding = '8px 10px';
-    logBody.style.overflow = 'auto';
-    logBody.style.whiteSpace = 'pre-wrap';
-    logBody.style.wordBreak = 'break-word';
-    logBody.style.fontFamily = "monospace, monospace";
-    logBody.style.fontSize = '12px';
-    logBody.style.lineHeight = '1.25';
-    logBody.id = id + '-body';
-
-    // footer small info
-    const footer = document.createElement('div');
-    footer.style.padding = '6px 10px';
-    footer.style.borderTop = '1px solid rgba(255,255,255,0.03)';
-    footer.style.fontSize = '11px';
-    footer.style.opacity = '0.85';
-    footer.style.display = 'flex';
-    footer.style.justifyContent = 'space-between';
-    footer.textContent = 'Touch "Copiar" para enviar logs. Fecha para continuar.';
-    const right = document.createElement('div');
-    right.style.opacity = '0.9';
-    right.style.fontWeight = '600';
-    right.textContent = 'gdAutoSave';
-    footer.appendChild(right);
-
-    container.appendChild(header);
-    container.appendChild(logBody);
-    container.appendChild(footer);
-    document.body.appendChild(container);
-
-    // populate buffer
-    if (_logBuffer && _logBuffer.length){
-      logBody.textContent = _logBuffer.join('\\n');
-      logBody.scrollTop = logBody.scrollHeight;
-    }
-
-    _logUI = { container, logBody };
-    return _logUI;
-  } catch(e){
-    console.warn('createLogUI failed', e);
-    return null;
-  }
-}
-function appendLog(message, level){
-  try {
-    const time = new Date().toLocaleTimeString();
-    const line = '[' + time + '] ' + (level ? ('['+level.toUpperCase()+'] ') : '') + String(message);
-    _logBuffer.push(line);
-    // keep buffer to reasonable size
-    if (_logBuffer.length > 2000) _logBuffer.shift();
-    if (_logUI && _logUI.logBody){
-      _logUI.logBody.textContent += ( (_logUI.logBody.textContent && _logUI.logBody.textContent.length) ? '\\n' : '') + line;
-      _logUI.logBody.scrollTop = _logUI.logBody.scrollHeight;
-    }
-  } catch(e){}
-}
-
-// Monkey-patch console to also show UI logs (preserve original)
-(function patchConsoleForUI(){
-  try {
-    const origLog = console.log.bind(console);
-    const origWarn = console.warn.bind(console);
-    const origError = console.error.bind(console);
-    console.log = function(...args){
-      try { origLog(...args); appendLog(args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '),'info'); } catch(e){ origLog(...args); }
-    };
-    console.warn = function(...args){
-      try { origWarn(...args); appendLog(args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '),'warn'); } catch(e){ origWarn(...args); }
-    };
-    console.error = function(...args){
-      try { origError(...args); appendLog(args.map(a=> (typeof a==='object'? JSON.stringify(a): String(a))).join(' '),'error'); } catch(e){ origError(...args); }
-    };
-  } catch(e){}
-})();
 
 /* ---------- Crypto primitives (unchanged) ---------- */
 const PBKDF2_ITERATIONS = 150000;
@@ -2156,50 +1980,32 @@ function buildPlaintextSaveJson(runtimeScene){
   return JSON.stringify({ version: 1, payload: ordered });
 }
 
-/* ---------- Accuracy helpers (unchanged) ---------- */
-function normalizeAccuracyString(s) {
+/* ---------- Accuracy helpers (NUMERIC) ---------- */
+function getAccuracyNumberFromVar(runtimeScene){
   try {
-    if (s === null || typeof s === 'undefined') return '';
-    s = String(s).trim();
-    if (s === '') return '';
-    if (s.includes('%')) {
-      const num = Number(s.replace('%', '').trim().replace(',', '.'));
-      if (isNaN(num)) return s;
-      const rounded = Math.round(num * 100) / 100;
-      return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
-    }
-    let num = Number(s.replace(',', '.'));
-    if (isNaN(num)) return s;
-    if (Math.abs(num) <= 1) num = num * 100;
-    const rounded = Math.round(num * 100) / 100;
-    return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
-  } catch (e) {
-    return String(s);
-  }
-}
-function normalizeAccuracyFromVar(runtimeScene) {
-  try {
-    if (!runtimeScene || !runtimeScene.getVariables) return '';
+    if (!runtimeScene || !runtimeScene.getVariables) return 0;
     const accVar = runtimeScene.getVariables().get('Accuracy');
     if (accVar) {
+      // prefer numeric representation
       if (typeof accVar.getAsNumber === 'function') {
         let num = Number(accVar.getAsNumber());
-        if (isNaN(num)) return '';
+        if (isNaN(num)) return 0;
         if (Math.abs(num) <= 1) num = num * 100;
-        const rounded = Math.round(num * 100) / 100;
-        return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
+        return Math.round(num * 100) / 100;
       }
-      if (typeof accVar.getAsString === 'function') {
-        return normalizeAccuracyString(accVar.getAsString());
-      }
-      return normalizeAccuracyString(String(accVar));
+      // string
+      const s = (typeof accVar.getAsString === 'function') ? accVar.getAsString() : String(accVar);
+      if (!s) return 0;
+      let cleaned = String(s).replace('%','').trim().replace(',', '.');
+      let n = Number(cleaned);
+      if (isNaN(n)) return 0;
+      if (Math.abs(n) <= 1) n = n * 100;
+      return Math.round(n * 100) / 100;
     }
-    return '';
-  } catch (e) {
-    return '';
-  }
+    return 0;
+  } catch(e){ return 0; }
 }
-function computeAccuracyFromRatings(runtimeScene) {
+function computeAccuracyNumberFromRatings(runtimeScene) {
   try {
     const sceneVars = runtimeScene.getVariables ? runtimeScene.getVariables() : null;
     const gameVars = runtimeScene.getGame && runtimeScene.getGame().getVariables ? runtimeScene.getGame().getVariables() : null;
@@ -2248,73 +2054,59 @@ function computeAccuracyFromRatings(runtimeScene) {
     bad  = Number(bad)  || 0;
     misses = Number(misses) || 0;
     const denom = (sick + good + bad + misses) || 0;
-    if (denom <= 0) return '';
+    if (denom <= 0) return 0;
     const numerator = (sick * 1.0) + (good * 0.75) + (bad * 0.5);
     let acc = (numerator / denom) * 100;
     const rounded = Math.round(acc * 100) / 100;
-    return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2)) + '%';
+    return rounded;
   } catch(e){
-    return '';
+    return 0;
   }
 }
 
-/* ---------- Pending local storage ---------- */
-const PENDING_PREFIX = 'PendingSave_';
-const MAX_PENDING = 30;
-function getPendingKeysForUid(uid){
-  const out = [];
+/* ---------- Local song queue (localStorage) ---------- */
+const SONG_QUEUE_PREFIX = 'SongQueue_';
+const MAX_QUEUE_ITEMS = 200;
+
+function _songQueueKey(uid){ return SONG_QUEUE_PREFIX + String(uid); }
+function getLocalSongQueue(uid){
   try {
-    for (let i=0;i<localStorage.length;i++){
-      const k = localStorage.key(i);
-      if (!k) continue;
-      if (k.startsWith(PENDING_PREFIX + uid + '_')) out.push(k);
-    }
-  } catch(e){}
-  out.sort();
-  return out;
+    const k = _songQueueKey(uid);
+    const raw = localStorage.getItem(k);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr;
+  } catch(e){ return []; }
 }
-function savePendingEncryptedKey(key, text){
+function saveLocalSongQueue(uid, arr){
   try {
-    localStorage.setItem(key, text);
-    const uid = key.split('_')[1] || '';
-    const keys = getPendingKeysForUid(uid);
-    while (keys.length > MAX_PENDING){
-      const oldest = keys.shift();
-      try { localStorage.removeItem(oldest); } catch(e){}
-    }
+    const k = _songQueueKey(uid);
+    localStorage.setItem(k, JSON.stringify(arr.slice(0, MAX_QUEUE_ITEMS)));
     return true;
-  } catch(e){ console.warn('savePendingEncryptedKey failed', e); return false; }
+  } catch(e){ return false; }
 }
-function removePendingKey(key){
-  try { localStorage.removeItem(key); return true; } catch(e){ return false; }
-}
-
-/* ---------- Show toast (unchanged) ---------- */
-function showToast(msg, timeout = 7000){
+function addSongToLocalQueue(uid, compactStr){
   try {
-    const id = 'gd-auto-save-toast';
-    let el = document.getElementById(id);
-    if (el) { el.textContent = msg; el.style.opacity = '1'; clearTimeout(el._hideTO); el._hideTO = setTimeout(()=>{ el.style.transition='opacity 300ms'; el.style.opacity='0'; setTimeout(()=>el.remove(),350); }, timeout); return; }
-    el = document.createElement('div');
-    el.id = id;
-    el.style.position = 'fixed';
-    el.style.left = '50%';
-    el.style.bottom = '18px';
-    el.style.transform = 'translateX(-50%)';
-    el.style.background = 'linear-gradient(90deg,#111827,#0b1220)';
-    el.style.color = '#e6eef8';
-    el.style.padding = '10px 14px';
-    el.style.borderRadius = '10px';
-    el.style.boxShadow = '0 6px 20px rgba(2,6,23,0.6)';
-    el.style.fontSize = '13px';
-    el.style.zIndex = 2147483647;
-    document.body.appendChild(el);
-    el.textContent = msg;
-    el._hideTO = setTimeout(()=>{ el.style.transition='opacity 300ms'; el.style.opacity='0'; setTimeout(()=>el.remove(),350); }, timeout);
-  } catch(e){ console.log('toast:', msg); }
+    const arr = getLocalSongQueue(uid);
+    arr.push(compactStr);
+    // trim oldest if beyond MAX_QUEUE_ITEMS
+    while (arr.length > MAX_QUEUE_ITEMS) arr.shift();
+    saveLocalSongQueue(uid, arr);
+    return true;
+  } catch(e){ return false; }
+}
+function removeSongFromLocalQueueByIndex(uid, idx){
+  try {
+    const arr = getLocalSongQueue(uid);
+    if (idx < 0 || idx >= arr.length) return false;
+    arr.splice(idx,1);
+    saveLocalSongQueue(uid, arr);
+    return true;
+  } catch(e){ return false; }
 }
 
-/* ---------- Firestore helpers (users compare & song-queue) ---------- */
+/* ---------- Firestore helpers (users compare & songs update) ---------- */
 async function writeUsersPlayerSaveIfChanged(uid, saveString, hashHex){
   try {
     const ref = doc(db, 'users', uid);
@@ -2322,15 +2114,12 @@ async function writeUsersPlayerSaveIfChanged(uid, saveString, hashHex){
     if (snap && snap.exists()){
       const d = snap.data();
       if (d && d.playerSave && String(d.playerSave.hash) === String(hashHex)) {
-        console.log('[gdAutoSave] writeUsersPlayerSaveIfChanged: skip (same hash)');
         return { skipped: true, wrote: false };
       }
     }
     await setDoc(ref, { playerSave: { save: saveString, hash: hashHex, updatedAt: serverTimestamp() } }, { merge: true });
-    console.log('[gdAutoSave] writeUsersPlayerSaveIfChanged: wrote');
     return { skipped: false, wrote: true };
   } catch(e){
-    console.warn('[gdAutoSave] writeUsersPlayerSaveIfChanged error', e);
     throw e;
   }
 }
@@ -2339,11 +2128,41 @@ function sanitizeFieldKey(s){
   return String(s).replace(/\\./g,'_').replace(/\\$/g,'_').replace(/\\//g,'_').replace(/\\[|\\]|#/g,'_').replace(/\\s+/g,'_').slice(0,90);
 }
 
-/* ---------- RETRY configuration (unchanged) ---------- */
-const RETRY_INTERVALS_MS = [5000, 10000, 20000, 40000, 80000, 160000, 320000];
-const MAX_RETRY_ATTEMPTS = RETRY_INTERVALS_MS.length;
+async function updateSongsDocEntry(docRef, sideKey, diffKey, playerKey, candidateNewBestScore, lastPoints, accuracyNum, customPitch, songNameRaw){
+  try {
+    const snap = await getDoc(docRef);
+    let base = snap && snap.exists() ? snap.data() : {};
+    if (!base || typeof base !== 'object') base = {};
+    if (!base[sideKey] || typeof base[sideKey] !== 'object') base[sideKey] = {};
+    if (!base[sideKey][diffKey] || typeof base[sideKey][diffKey] !== 'object') base[sideKey][diffKey] = {};
+    const existingEntry = base[sideKey][diffKey][playerKey] || {};
+    const existingBest = Number(existingEntry.bestScore) || 0;
+    const shouldUpdateBest = Number(candidateNewBestScore) > existingBest;
+    const lastPointsVal = Number(lastPoints) || 0;
+    const accuracyValNum = (typeof accuracyNum === 'number') ? accuracyNum : (Number(accuracyNum) || 0);
+    const needWrite = shouldUpdateBest ||
+                      (existingEntry.lastPoints === undefined) ||
+                      (Number(existingEntry.lastPoints) !== lastPointsVal) ||
+                      (Number(existingEntry.accuracy || 0) !== accuracyValNum);
+    if (!needWrite) return { wrote:false, skipped:true };
+    const entry = Object.assign({}, existingEntry);
+    entry.bestScore = shouldUpdateBest ? Number(candidateNewBestScore) : existingBest;
+    entry.lastPoints = lastPointsVal;
+    entry.accuracy = accuracyValNum; // NUMBER now
+    entry.customPitch = Number(customPitch) || 1;
+    entry.updatedAt = serverTimestamp();
+    base[sideKey][diffKey][playerKey] = entry;
+    base.originalName = base.originalName || songNameRaw;
+    await setDoc(docRef, base, { merge: true });
+    return { wrote:true };
+  } catch(e){
+    throw e;
+  }
+}
 
-/* ---------- Error detection (unchanged) ---------- */
+/* ---------- RETRY config & error detection ---------- */
+const RETRY_INTERVALS_MS = [1000, 5000, 10000, 20000, 40000, 80000];
+const MAX_RETRY_ATTEMPTS = RETRY_INTERVALS_MS.length;
 function isTooRecentError(err){
   try {
     if (!err) return false;
@@ -2364,7 +2183,7 @@ function isRateLimitError(err){
   } catch(e){ return false; }
 }
 
-/* ---------- finalize: set PlayerOnSave (game + scene) ---------- */
+/* ---------- finalize: set PlayerOnSave ---------- */
 async function finalizeSetPlayerOnSave(runtimeScene){
   let ok = true;
   try {
@@ -2381,7 +2200,22 @@ async function finalizeSetPlayerOnSave(runtimeScene){
   return ok;
 }
 
-/* ---------- Collect song play info (CALCULA lastPoints primeiro) ---------- */
+/* ---------- Side detection from global PlayerOnline ---------- */
+function getSideFromPlayerOnline(runtimeScene){
+  try {
+    const gv = runtimeScene.getGame().getVariables();
+    const po = gv.get('PlayerOnline');
+    let val = null;
+    if (po && typeof po.getAsNumber === 'function') val = Number(po.getAsNumber());
+    else if (po !== undefined) val = Number(po) || 0;
+    else val = 0;
+    if (val === 2) return 'Opponent';
+    // 0 or 1 => BF
+    return 'BF';
+  } catch(e){ return 'BF'; }
+}
+
+/* ---------- Collect song play info (calculates lastPoints first; accuracy as number) ---------- */
 function collectSongPlayInfo(runtimeScene){
   try {
     const gvars = runtimeScene.getGame().getVariables();
@@ -2436,118 +2270,130 @@ function collectSongPlayInfo(runtimeScene){
       if (!Number.isFinite(lastPoints) || Number.isNaN(lastPoints)) lastPoints = 0;
     } catch(e){ lastPoints = 0; }
 
-    // Accuracy
-    let accuracyVal = normalizeAccuracyFromVar(runtimeScene);
-    if (!accuracyVal || accuracyVal === '0%' || accuracyVal === '') {
-      const compute = computeAccuracyFromRatings(runtimeScene);
-      if (compute && compute !== '') accuracyVal = compute;
+    // Accuracy as NUMBER (0..100)
+    let accuracyNum = getAccuracyNumberFromVar(runtimeScene);
+    if ((!accuracyNum || accuracyNum === 0) || isNaN(accuracyNum)){
+      const compute = computeAccuracyNumberFromRatings(runtimeScene);
+      if (compute && !isNaN(compute)) accuracyNum = compute;
     }
+    if (!Number.isFinite(accuracyNum)) accuracyNum = 0;
+    // Side
+    const side = getSideFromPlayerOnline(runtimeScene);
 
-    console.log('[gdAutoSave] collectSongPlayInfo ->', { songName, songDifficulty, puBestScore, sceneScore, customPitch, lastPoints, accuracyVal });
-    return { songName, songDifficulty, puBestScore, sceneScore, customPitch, lastPoints, accuracyVal };
+    console.log('[gdAutoSave] collectSongPlayInfo ->', { songName, songDifficulty, puBestScore, sceneScore, customPitch, lastPoints, accuracyNum, side });
+    return { songName, songDifficulty, puBestScore, sceneScore, customPitch, lastPoints, accuracyNum, side };
   } catch(e){
     console.warn('collectSongPlayInfo failed', e);
-    return { songName: null, songDifficulty: null, puBestScore: 0, sceneScore: 0, customPitch:1, lastPoints:0, accuracyVal: '' };
+    return { songName: null, songDifficulty: null, puBestScore: 0, sceneScore: 0, customPitch:1, lastPoints:0, accuracyNum: 0, side: 'BF' };
   }
 }
 
-/* ---------- Compact string builder for song play ---------- */
+/* ---------- Compact string builder for song play (accuracy numeric; includes side) ---------- */
 function compactSongPlayString(playInfo, playerName){
+  // Fields: songId|diffKey|playerKey|best|lastPoints|accuracyNum|customPitch|side
   const songId = sanitizeFieldKey(String(playInfo.songName || '__'));
   const diffKey = sanitizeFieldKey(String(playInfo.songDifficulty || '__'));
   const playerKey = sanitizeFieldKey(String(playerName || 'anonymous'));
-  const best = Number(playInfo.puBestScore || 0) || 0;
+  const best = Number(playInfo.sceneScore || 0) || 0;
   const lastPoints = Number(playInfo.lastPoints || 0) || 0;
-  let acc = String(playInfo.accuracyVal || '');
-  acc = acc.replace('%','').trim();
-  if (acc === '') acc = '0';
+  const accuracyNum = Number((playInfo.accuracyNum || 0));
+  const accStr = (Number.isFinite(accuracyNum)) ? String(Math.round(accuracyNum * 100)/100) : '0';
   const cp = Number(playInfo.customPitch || 1) || 1;
-  return songId + '|' + diffKey + '|' + playerKey + '|' + best + '|' + lastPoints + '|' + acc + '|' + cp;
+  const side = sanitizeFieldKey(String(playInfo.side || 'BF'));
+  return songId + '|' + diffKey + '|' + playerKey + '|' + best + '|' + lastPoints + '|' + accStr + '|' + cp + '|' + side;
 }
 
-/* ---------- Enqueue song play (users/{uid}.songsPending via arrayUnion) ---------- */
-async function enqueueSongPlayForUser(uid, compactStr){
-  try {
-    const userRef = doc(db, 'users', uid);
-    await setDoc(userRef, { songsPending: arrayUnion(compactStr) }, { merge: true });
-    console.log('[gdAutoSave] Enqueued song play for user', uid, compactStr);
-    return true;
-  } catch(e){
-    console.warn('[gdAutoSave] enqueueSongPlayForUser failed', e);
-    throw e;
-  }
-}
-
-/* ---------- Flush song queue for uid (applies queued strings to songs collection) ---------- */
+/* ---------- Local queue flush: reads local queue and writes songs/{songId} ----------
+   - Processes entries in order; on rate/too_recent bails and retries later
+*/
 async function flushSongQueueForUid(uid){
   if (!uid) return { ok:false, reason:'no-uid' };
-  const userRef = doc(db, 'users', uid);
   try {
-    const snap = await getDoc(userRef);
-    if (!snap || !snap.exists()) return { ok:true, processed:0 };
-    const data = snap.data() || {};
-    const arr = Array.isArray(data.songsPending) ? data.songsPending.slice() : [];
+    const arr = getLocalSongQueue(uid);
     if (!arr.length) return { ok:true, processed:0 };
     let processed = 0;
-    for (const s of arr){
+    for (let i=0;i<arr.length;i++){
+      const s = arr[i];
       try {
         const parts = String(s).split('|');
-        if (parts.length < 7) {
-          try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
+        if (parts.length < 8) {
+          // malformed -> remove
+          removeSongFromLocalQueueByIndex(uid, i);
+          i--; // adjust index due to removal
           continue;
         }
-        const [songId, diffKey, playerKey, bestStr, lastPointsStr, accStr, cpStr] = parts;
+        const [songId, diffKey, playerKey, bestStr, lastPointsStr, accStr, cpStr, sideStr] = parts;
         const docRef = doc(db, 'songs', String(songId));
-        const snapSong = await getDoc(docRef);
-        let base = snapSong && snapSong.exists() ? snapSong.data() : {};
-        if (!base || typeof base !== 'object') base = {};
-        if (!base[diffKey] || typeof base[diffKey] !== 'object') base[diffKey] = {};
-        const existingEntry = base[diffKey][playerKey] || {};
-        const existingBest = Number(existingEntry.bestScore) || 0;
         const candidateBest = Number(bestStr) || 0;
-        const shouldUpdateBest = Number(candidateBest) > existingBest;
         const lastPointsVal = Number(lastPointsStr) || 0;
-        const accuracyVal = accStr ? (String(accStr)) : '';
-        const needWrite = shouldUpdateBest ||
-                          (existingEntry.lastPoints === undefined) ||
-                          (Number(existingEntry.lastPoints) !== lastPointsVal) ||
-                          (String(existingEntry.accuracy || '') !== accuracyVal);
-        if (!needWrite) {
-          try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
+        const accuracyNum = Number(accStr) || 0;
+        const customPitch = Number(cpStr) || 1;
+        const side = String(sideStr || 'BF');
+        // update songs doc entry via helper
+        try {
+          const res = await updateSongsDocEntry(docRef, side, diffKey, playerKey, candidateBest, lastPointsVal, accuracyNum, customPitch, songId);
+          // remove processed
+          removeSongFromLocalQueueByIndex(uid, i);
+          i--; // adjust after removal
           processed++;
-          continue;
+        } catch(e){
+          // if rate/too_recent -> bail to retry later without removing this entry
+          if (isRateLimitError(e) || isTooRecentError(e)) {
+            console.warn('flushSongQueueForUid: rate/too_recent, bailing', e);
+            return { ok:false, processed, reason:'rate' };
+          }
+          // other errors -> remove offending entry to avoid blockage
+          console.warn('flushSongQueueForUid: entry failed, removing', e);
+          removeSongFromLocalQueueByIndex(uid, i);
+          i--;
         }
-        const entry = Object.assign({}, existingEntry);
-        entry.bestScore = shouldUpdateBest ? Number(candidateBest) : existingBest;
-        entry.lastPoints = lastPointsVal;
-        entry.accuracy = accuracyVal;
-        entry.customPitch = Number(cpStr) || 1;
-        entry.updatedAt = serverTimestamp();
-        base[diffKey][playerKey] = entry;
-        base.originalName = base.originalName || songId;
-        await setDoc(docRef, base, { merge: true });
-        try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
-        processed++;
       } catch(e){
-        if (isRateLimitError(e) || isTooRecentError(e)){
-          console.warn('[gdAutoSave] flushSongQueueForUid rate/too_recent, bailing', e);
-          return { ok:false, processed, reason:'rate' };
-        }
-        try { await updateDoc(userRef, { songsPending: arrayRemove(s) }); } catch(e){}
-        console.warn('[gdAutoSave] flushSongQueueForUid removed malformed entry', e);
+        // malformed or unexpected -> remove
+        removeSongFromLocalQueueByIndex(uid, i);
+        i--;
       }
     }
     return { ok:true, processed };
   } catch(e){
-    console.warn('[gdAutoSave] flushSongQueueForUid failed', e);
+    console.warn('flushSongQueueForUid failed', e);
     return { ok:false, error: String(e) };
   }
 }
 
 /* ---------- Pending encrypted fallback (unchanged) ---------- */
+const PENDING_PREFIX = 'PendingSave_';
+const MAX_PENDING = 30;
+function getPendingKeysForUid(uid){
+  const out = [];
+  try {
+    for (let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith(PENDING_PREFIX + uid + '_')) out.push(k);
+    }
+  } catch(e){}
+  out.sort();
+  return out;
+}
+function savePendingEncryptedKey(key, text){
+  try {
+    localStorage.setItem(key, text);
+    const uid = key.split('_')[1] || '';
+    const keys = getPendingKeysForUid(uid);
+    while (keys.length > MAX_PENDING){
+      const oldest = keys.shift();
+      try { localStorage.removeItem(oldest); } catch(e){}
+    }
+    return true;
+  } catch(e){ console.warn('savePendingEncryptedKey failed', e); return false; }
+}
+function removePendingKey(key){
+  try { localStorage.removeItem(key); return true; } catch(e){ return false; }
+}
 async function storePendingEncrypted(runtimeScene, encSave, hashHex, playInfo){
   try {
     const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : ('guest');
+    // avoid duplicate pending with same hash
     try {
       const keys = getPendingKeysForUid(uid);
       for (const k of keys){
@@ -2558,8 +2404,7 @@ async function storePendingEncrypted(runtimeScene, encSave, hashHex, playInfo){
           const plain = await decryptFilePayload(secret, encPayload);
           const parsed = JSON.parse(plain);
           if (parsed && parsed.hash && parsed.hash === hashHex) {
-            console.log('[gdAutoSave] storePendingEncrypted: already exists', k);
-            return k;
+            return k; // already stored
           }
         } catch(e){}
       }
@@ -2571,12 +2416,11 @@ async function storePendingEncrypted(runtimeScene, encSave, hashHex, playInfo){
     const key = PENDING_PREFIX + uid + '_' + Date.now();
     const ok = savePendingEncryptedKey(key, encPayload);
     if (!ok) throw new Error('Failed saving pending key');
-    console.log('[gdAutoSave] storePendingEncrypted: saved', key);
     return key;
-  } catch(e){ console.warn('[gdAutoSave] storePendingEncrypted failed', e); return null; }
+  } catch(e){ console.warn('storePendingEncrypted failed', e); return null; }
 }
 
-/* ---------- Background save manager & retry (keeps behavior) ---------- */
+/* ---------- Background save manager & retry (uses local queue) ---------- */
 const _bgSaves = {};
 function cancelBackgroundSaveForUid(uid){
   try {
@@ -2585,7 +2429,6 @@ function cancelBackgroundSaveForUid(uid){
     rec.cancelToken.cancelled = true;
     if (rec.timeoutId) clearTimeout(rec.timeoutId);
     delete _bgSaves[uid];
-    console.log('[gdAutoSave] cancelBackgroundSaveForUid', uid);
     return true;
   } catch(e){ return false; }
 }
@@ -2604,11 +2447,13 @@ async function attemptSaveOnce(runtimeScene, enc, hashHex, playInfo, options){
     throw e;
   }
 
+  // add compact string to local queue
   if (playInfo && playInfo.songName && playInfo.songDifficulty){
     try {
       const compact = compactSongPlayString(playInfo, playInfo.playerName || getUsername());
-      await enqueueSongPlayForUser(user.uid, compact);
+      addSongToLocalQueue(user.uid, compact);
       result.songsQueued = true;
+      // attempt immediate flush if requested
       if (options && options.requestFlush) {
         const flushRes = await flushSongQueueForUid(user.uid);
         result.songsFlushed = !!(flushRes && flushRes.ok);
@@ -2633,6 +2478,7 @@ async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
     try {
       _bgSaves[uid].attempts = attemptIndex + 1;
       const res = await attemptSaveOnce(runtimeScene, enc, hashHex, playInfo, { useScoreAsBest: true, requestFlush: true });
+      // remove pending encrypted with same hash if present
       try {
         const keys = getPendingKeysForUid(uid);
         for (const k of keys){
@@ -2648,6 +2494,7 @@ async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
           } catch(e){}
         }
       } catch(e){}
+      // attempt flush local queue again
       try { await flushSongQueueForUid(uid); } catch(e){}
       return { ok:true, result: res };
     } catch(e){
@@ -2665,7 +2512,7 @@ async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
     if (attemptRes.ok){
       try { await finalizeSetPlayerOnSave(runtimeScene); } catch(e){}
       delete _bgSaves[uid];
-      showToast('Save sincronizado com o servidor (incluindo fila de songs).');
+      showToast('Save sincronizado com o servidor (incluindo fila local de songs).');
       return { ok:true, attempt: attemptIndex+1 };
     }
     if (attemptRes.retryable){
@@ -2710,7 +2557,7 @@ async function startBackgroundSave(runtimeScene, enc, hashHex, playInfo, uid){
   return { ok:false, error: 'max_retries' };
 }
 
-/* ---------- Debounce / coalesce (unchanged) ---------- */
+/* ---------- Debounce / coalesce queue (unchanged) ---------- */
 const _debounceTimers = {};
 const _latestRequest = {};
 const DEBOUNCE_MS = 600;
@@ -2753,15 +2600,12 @@ async function _executeQueuedSave(uid){
   }
 }
 
-/* ---------- Core one-shot save flow (queues songs as strings) ---------- */
+/* ---------- Core one-shot save flow (queues songs locally) ---------- */
 async function _performSaveFlow(runtimeScene, enc, hashHex, playInfo, uid){
   runtimeScene = runtimeScene || window._gd_runtimeScene;
   if (!runtimeScene) throw new Error('runtimeScene required');
   const user = auth.currentUser;
   if (!user || !user.uid) throw new Error('User not authenticated');
-
-  // ensure log UI exists and show
-  try { createLogUI(); if (_logUI && _logUI.container) _logUI.container.style.display = 'flex'; } catch(e){}
 
   let longRunningTimerFired = false;
   const longRunningTimer = setTimeout(async () => {
@@ -2801,8 +2645,9 @@ async function _performSaveFlow(runtimeScene, enc, hashHex, playInfo, uid){
     if (playInfo && playInfo.songName && playInfo.songDifficulty){
       try {
         const compact = compactSongPlayString(playInfo, playInfo.playerName || getUsername());
-        await enqueueSongPlayForUser(user.uid, compact);
+        addSongToLocalQueue(user.uid, compact);
         immediate.songsQueued = true;
+        // try flush immediate (best-effort)
         try {
           const flushRes = await flushSongQueueForUid(user.uid);
           if (flushRes && flushRes.ok) immediate.songsFlushed = true;
@@ -2858,21 +2703,18 @@ window.gdAutoSaveUsers.createAndSaveEncryptedSave = async function(maybeRuntimeS
   const runtimeSceneLocal = maybeRuntimeScene || window._gd_runtimeScene;
   if (!runtimeSceneLocal) throw new Error('runtimeScene required');
 
-  // ensure log UI exists now (user requested UI on call)
-  try { createLogUI(); if (_logUI && _logUI.container) _logUI.container.style.display = 'flex'; } catch(e){}
-
   const user = auth.currentUser;
   if (!user || !user.uid) throw new Error('User not authenticated');
 
+  // Build plaintext & encrypt
   const plain = buildPlaintextSaveJson(runtimeSceneLocal);
   const hashHex = await sha256Hex(plain);
   const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
   const enc = await encryptFilePayload(secret, plain);
 
+  // collect play info (includes sceneScore, customPitch, lastPoints, accuracyNum, side)
   const rawPlay = collectSongPlayInfo(runtimeSceneLocal);
   const playInfo = Object.assign({}, rawPlay, { playerName: (auth.currentUser && auth.currentUser.displayName) ? auth.currentUser.displayName : (auth.currentUser && auth.currentUser.email ? auth.currentUser.email.split('@')[0] : getUsername()) });
-
-  console.log('[gdAutoSave] createAndSaveEncryptedSave called; enqueueing (debounced).');
 
   return new Promise((resolve, reject) => {
     _scheduleSaveForUid(user.uid, { enc, hash: hashHex, playInfo, runtimeScene: runtimeSceneLocal, _resolve: resolve, _reject: reject });
@@ -2884,7 +2726,9 @@ window.gdAutoSaveUsers.retryPendingSaves = async function(maybeRuntimeScene){
   try {
     const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : null;
     if (!uid) return { ok:false, reason:'not-auth' };
+    // flush local song queue
     const flush = await flushSongQueueForUid(uid);
+    // attempt encrypted pending saves
     const keys = getPendingKeysForUid(uid);
     for (const k of keys){
       try {
@@ -2894,21 +2738,22 @@ window.gdAutoSaveUsers.retryPendingSaves = async function(maybeRuntimeScene){
         const plain = await decryptFilePayload(secret, encPayload);
         const parsed = JSON.parse(plain);
         if (!parsed || !parsed.encSave) { removePendingKey(k); continue; }
+        // try write users (compare-before-write)
         try {
           const writeRes = await writeUsersPlayerSaveIfChanged(uid, parsed.encSave, parsed.hash);
           if (writeRes && !writeRes.skipped) {
+            // if songPlay present, add to local queue for flush
             if (parsed.songPlay) {
-              try {
-                const compact = compactSongPlayString(parsed.songPlay, parsed.songPlay.playerName || getUsername());
-                await enqueueSongPlayForUser(uid, compact);
-              } catch(e){}
+              const compact = compactSongPlayString(parsed.songPlay, parsed.songPlay.playerName || getUsername());
+              addSongToLocalQueue(uid, compact);
             }
             removePendingKey(k);
           } else {
+            // remove even if skipped to avoid infinite loop (data already equal)
             removePendingKey(k);
           }
         } catch(e){
-          if (isRateLimitError(e) || isTooRecentError(e)) { /* leave key */ }
+          if (isRateLimitError(e) || isTooRecentError(e)) { /* leave key for later */ }
           else { removePendingKey(k); }
         }
       } catch(e){}
@@ -2918,12 +2763,7 @@ window.gdAutoSaveUsers.retryPendingSaves = async function(maybeRuntimeScene){
     return { ok:false, error: String(e) };
   }
 };
-window.gdAutoSaveUsers.flushSongQueueNow = async function(maybeRuntimeScene){
-  const rs = maybeRuntimeScene || window._gd_runtimeScene;
-  const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : null;
-  if (!uid) throw new Error('not authenticated');
-  return await flushSongQueueForUid(uid);
-};
+
 window.gdAutoSaveUsers.listPendingSaves = function(){
   try {
     const user = auth.currentUser;
@@ -2939,9 +2779,15 @@ window.gdAutoSaveUsers.listPendingSaves = function(){
 window.gdAutoSaveUsers.cancelBackgroundSave = function(uid){
   return cancelBackgroundSaveForUid(uid);
 };
+// Force flush song queue now (public)
+window.gdAutoSaveUsers.flushSongQueueNow = async function(maybeRuntimeScene){
+  const rs = maybeRuntimeScene || window._gd_runtimeScene;
+  const uid = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid : null;
+  if (!uid) throw new Error('not authenticated');
+  return await flushSongQueueForUid(uid);
+};
 
-console.log('gdAutoSaveUsers optimized_songqueue_with_ui v1 loaded (song queue strings + mobile log UI).');
-
+console.log('gdAutoSaveUsers songqueue_local v2 loaded (accuracy NUMBER, local queue, PlayerOnline->Side).');
 `; // end moduleCode
 
   const s = document.createElement('script');
@@ -2950,10 +2796,7 @@ console.log('gdAutoSaveUsers optimized_songqueue_with_ui v1 loaded (song queue s
   document.head.appendChild(s);
 
   window._gd_runtimeScene = runtimeScene;
-
-  // ensure that if logs were generated before UI render, we attempt to create it on first save call:
-  // (module's createAndSaveEncryptedSave will call createLogUI as well)
-})();
+})(runtimeScene);
 
 };
 gdjs.PlayCode.eventsList10 = function(runtimeScene) {
@@ -3019,7 +2862,7 @@ gdjs.copyArray(runtimeScene.getObjects("OppSideLifeBar"), gdjs.PlayCode.GDOppSid
 {
 
 
-gdjs.PlayCode.userFunc0x1a33160(runtimeScene);
+gdjs.PlayCode.userFunc0x18d5cf0(runtimeScene);
 
 }
 
@@ -19079,7 +18922,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1eb2470 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1e92908 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19262,7 +19105,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1eaa4b8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1e92b90 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19273,7 +19116,7 @@ gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x1eb2470(runtimeScene);
+gdjs.PlayCode.userFunc0x1e92908(runtimeScene);
 
 }
 
@@ -19349,7 +19192,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1eaa4b8(runtimeScene);
+gdjs.PlayCode.userFunc0x1e92b90(runtimeScene);
 
 }
 
@@ -19449,7 +19292,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x11a7238 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x17118d8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19632,7 +19475,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1add050 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1c1aa28 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19643,7 +19486,7 @@ gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x11a7238(runtimeScene);
+gdjs.PlayCode.userFunc0x17118d8(runtimeScene);
 
 }
 
@@ -19719,7 +19562,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1add050(runtimeScene);
+gdjs.PlayCode.userFunc0x1c1aa28(runtimeScene);
 
 }
 
@@ -23440,7 +23283,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x1ad5120 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1cc7e30 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -23459,7 +23302,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x1ad51c0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x1cc7ed0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -23724,7 +23567,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x1ad5120(runtimeScene);
+gdjs.PlayCode.userFunc0x1cc7e30(runtimeScene);
 
 }
 
@@ -23732,7 +23575,7 @@ gdjs.PlayCode.userFunc0x1ad5120(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x1ad51c0(runtimeScene);
+gdjs.PlayCode.userFunc0x1cc7ed0(runtimeScene);
 
 }
 
@@ -23854,7 +23697,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x19e7d90 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x18770a8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -24773,7 +24616,7 @@ gdjs.PlayCode.eventsList273 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x19e7d90(runtimeScene);
+gdjs.PlayCode.userFunc0x18770a8(runtimeScene);
 
 }
 
@@ -24853,7 +24696,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x19e99c8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xf398d0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -25797,7 +25640,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x19e99c8(runtimeScene);
+gdjs.PlayCode.userFunc0xf398d0(runtimeScene);
 
 }
 
