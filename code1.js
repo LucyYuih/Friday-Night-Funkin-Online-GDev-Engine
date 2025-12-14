@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x1bb0bf0 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x11a7be0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,7 +848,7 @@ gdjs.InicioCode.userFunc0x1bb0bf0 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.userFunc0x1bb18b0 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1e90f18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   if (window._gd_firebase_users_combined_v1) {
@@ -1539,7 +1539,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x1bb0bf0(runtimeScene);
+gdjs.InicioCode.userFunc0x11a7be0(runtimeScene);
 
 }
 
@@ -1565,7 +1565,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.InicioCode.userFunc0x1bb18b0(runtimeScene);
+gdjs.InicioCode.userFunc0x1e90f18(runtimeScene);
 
 }
 
@@ -1611,7 +1611,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1b92558 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x110baa8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
 (function () {
@@ -2960,12 +2960,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1b92558(runtimeScene);
+gdjs.InicioCode.userFunc0x110baa8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1ea7f00 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x11a8450 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -3582,12 +3582,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1ea7f00(runtimeScene);
+gdjs.InicioCode.userFunc0x11a8450(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xf3a150 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1109b00 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
@@ -3596,12 +3596,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xf3a150(runtimeScene);
+gdjs.InicioCode.userFunc0x1109b00(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1cc7f48 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1a2cea0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 };
@@ -3610,7 +3610,7 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1cc7f48(runtimeScene);
+gdjs.InicioCode.userFunc0x1a2cea0(runtimeScene);
 
 }
 

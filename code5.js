@@ -1819,7 +1819,7 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
 }
 
 
-};gdjs.PlayCode.userFunc0x18d5cf0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1ad58c0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   if (window._gd_auto_save_songqueue_local_v2) {
@@ -2862,7 +2862,7 @@ gdjs.copyArray(runtimeScene.getObjects("OppSideLifeBar"), gdjs.PlayCode.GDOppSid
 {
 
 
-gdjs.PlayCode.userFunc0x18d5cf0(runtimeScene);
+gdjs.PlayCode.userFunc0x1ad58c0(runtimeScene);
 
 }
 
@@ -18922,7 +18922,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1e92908 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1063518 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19105,7 +19105,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1e92b90 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xd63a00 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19116,7 +19116,7 @@ gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x1e92908(runtimeScene);
+gdjs.PlayCode.userFunc0x1063518(runtimeScene);
 
 }
 
@@ -19192,7 +19192,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1e92b90(runtimeScene);
+gdjs.PlayCode.userFunc0xd63a00(runtimeScene);
 
 }
 
@@ -19292,7 +19292,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x17118d8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1b16670 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19475,7 +19475,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1c1aa28 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x18b0db8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19486,7 +19486,7 @@ gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x17118d8(runtimeScene);
+gdjs.PlayCode.userFunc0x1b16670(runtimeScene);
 
 }
 
@@ -19562,7 +19562,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x1c1aa28(runtimeScene);
+gdjs.PlayCode.userFunc0x18b0db8(runtimeScene);
 
 }
 
@@ -23283,7 +23283,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x1cc7e30 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a740a8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -23302,7 +23302,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x1cc7ed0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x1a74e60 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
 (function(runtimeScene){
@@ -23567,7 +23567,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x1cc7e30(runtimeScene);
+gdjs.PlayCode.userFunc0x1a740a8(runtimeScene);
 
 }
 
@@ -23575,7 +23575,7 @@ gdjs.PlayCode.userFunc0x1cc7e30(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x1cc7ed0(runtimeScene);
+gdjs.PlayCode.userFunc0x1a74e60(runtimeScene);
 
 }
 
@@ -23697,7 +23697,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x18770a8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a6b3f8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
 (function(){
@@ -24616,7 +24616,7 @@ gdjs.PlayCode.eventsList273 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x18770a8(runtimeScene);
+gdjs.PlayCode.userFunc0x1a6b3f8(runtimeScene);
 
 }
 
@@ -24696,7 +24696,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0xf398d0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a6a638 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
 // Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
@@ -25640,7 +25640,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0xf398d0(runtimeScene);
+gdjs.PlayCode.userFunc0x1a6a638(runtimeScene);
 
 }
 

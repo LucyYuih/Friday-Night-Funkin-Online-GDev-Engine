@@ -1,0 +1,1194 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Leaderboards GDev Online — Perfil com MatchingPfp</title>
+  <style>
+    :root{
+      --bg:#071028; --card:#0f1724; --muted:#9fb8ff; --accent:#2563eb; --glass: rgba(255,255,255,0.03);
+      --text:#e6eef8; --danger:#ef4444; --accent-2:#10b981;
+    }
+    *{box-sizing:border-box}
+    body{ margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:linear-gradient(180deg,#041126 0%, #071028 100%); color:var(--text); }
+    .app{ max-width:1100px; margin:28px auto; padding:18px; }
+    header{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+    h1{ margin:0; font-size:20px; }
+    .tabs{ display:flex; gap:8px; margin-bottom:12px; }
+    .tab{ padding:8px 12px; background:var(--glass); border-radius:8px; cursor:pointer; color:var(--muted); border:1px solid rgba(255,255,255,0.03); }
+    .tab.active{ background: linear-gradient(90deg, rgba(37,99,235,0.14), rgba(16,185,129,0.06)); color:var(--text); box-shadow:0 6px 18px rgba(2,6,23,0.5); border:1px solid rgba(99,102,241,0.12); }
+    .controls{ display:flex; gap:8px; align-items:center; }
+    .btn{ padding:8px 10px; border-radius:8px; border:none; background:var(--accent); color:white; cursor:pointer; font-weight:600; }
+    .btn.secondary{ background:#0ea5a4; }
+    input.search{ padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:#081222; color:var(--text); min-width:260px; }
+    .layout{ display:grid; grid-template-columns: 320px 1fr; gap:14px; align-items:start; }
+    .card{ background:var(--card); padding:12px; border-radius:12px; box-shadow:0 6px 20px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03); }
+    .list{ max-height:72vh; overflow:auto; padding-right:6px; }
+    .player-row, .song-row{ display:flex; gap:10px; align-items:center; padding:8px; border-radius:8px; cursor:pointer; }
+    .player-row:hover, .song-row:hover{ background: rgba(255,255,255,0.02); }
+    /* MAIN PFP (maior) */
+    .avatar{ width:88px; height:88px; border-radius:12px; object-fit:cover; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); display:block; position:relative; overflow:hidden; }
+    .avatar.small{ width:44px; height:44px; border-radius:8px; }
+    .avatar.fallback{ background: linear-gradient(135deg,#0b1220,#0f1724); display:flex; align-items:center; justify-content:center; color:var(--muted); font-weight:700; }
+    .meta{ display:flex; flex-direction:column; min-width:0; }
+    .muted{ color:var(--muted); font-size:13px; }
+    .right{ margin-left:auto; text-align:right; font-size:13px; color:var(--muted); }
+    .section-title{ font-size:13px; color:var(--muted); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+    table{ width:100%; border-collapse:collapse; font-size:13px; }
+    th, td{ padding:8px 6px; text-align:left; border-bottom:1px dashed rgba(255,255,255,0.03); }
+    th{ color:var(--muted); font-weight:600; font-size:12px; }
+    .folder{ font-weight:700; padding:8px 6px; color:#cbe7ff; display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-radius:6px; }
+    .no-data{ color:var(--muted); padding:14px; text-align:center; }
+    .small{ font-size:12px; color:var(--muted); }
+    .search-row{ display:flex; gap:8px; margin-bottom:10px; align-items:center; }
+    .hidden{ display:none !important; }
+    .row{ display:flex; gap:12px; align-items:center; }
+
+    /* descrição e botão matching */
+    .desc-card{ background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:10px; padding:12px; margin-top:8px; border:1px solid rgba(255,255,255,0.03); }
+    #pd-desc{ margin:0; font-size:14px; color:#dcecff; white-space:pre-wrap; line-height:1.35; cursor:default; }
+    #pd-desc.editable{ cursor:text; border:1px dashed rgba(255,255,255,0.04); padding:6px; background:rgba(255,255,255,0.01); }
+
+    /* small edit button over avatar - stays small */
+    .pfp-wrapper{ position:relative; width:88px; height:88px; }
+    .pfp-edit-btn{
+      position:absolute;
+      top:6px;
+      left:6px;
+      background:rgba(0,0,0,0.35);
+      color:var(--text);
+      border:1px solid rgba(255,255,255,0.06);
+      border-radius:6px;
+      padding:6px;
+      font-size:12px;
+      cursor:pointer;
+      opacity:0.95;
+      backdrop-filter: blur(4px);
+    }
+    .pfp-edit-btn.hidden{ display:none; }
+
+    /* popover */
+    .popover{
+      position:absolute;
+      z-index:1200;
+      min-width:260px;
+      max-width:360px;
+      background:var(--card);
+      border:1px solid rgba(255,255,255,0.05);
+      border-radius:10px;
+      padding:10px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.6);
+    }
+    .popover .row{ align-items:center; gap:8px; }
+    .popover input[type="text"], .popover input[type="file"]{ width:100%; padding:8px; border-radius:6px; background:#081222; color:var(--text); border:1px solid rgba(255,255,255,0.03); }
+    .popover img.preview{ width:72px; height:72px; border-radius:8px; object-fit:cover; border:1px solid rgba(255,255,255,0.04); display:block; margin-bottom:6px; }
+
+    .popover .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
+
+    /* matched small pfp images that appear next to main pfp */
+    .matched-img{
+      position:absolute;
+      width:88px;
+      height:88px;
+      border-radius:10px;
+      object-fit:cover;
+      border:2px solid rgba(255,255,255,0.06);
+      box-shadow:0 6px 18px rgba(0,0,0,0.5);
+      background:#081222;
+      z-index:30;
+    }
+    .matched-left{ left:-105%; top:50%; transform:translateY(-50%); }
+    .matched-right{ left:90%; margin-left:12px; top:50%; transform:translateY(-50%); }
+
+    /* inline matching button (replaces the {..} token) */
+    .matching-pfp-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:32px;
+      min-height:20px;
+      padding:4px 6px;
+      border-radius:6px;
+      background:rgba(0,0,0,0.18);
+      color:var(--text);
+      border:1px solid rgba(255,255,255,0.03);
+      cursor:pointer;
+      margin-left:60px;
+      font-weight:700;
+      font-size:12px;
+    }
+    .matching-pfp-btn.active{ box-shadow:0 4px 12px rgba(37,99,235,0.16); background:linear-gradient(90deg, rgba(37,99,235,0.12), rgba(16,185,129,0.06)); }
+
+    @media(max-width:880px){ .layout{ grid-template-columns: 1fr; } .list{ max-height:40vh; } .controls{ flex-wrap:wrap; } input.search{ min-width:160px; } .avatar{ width:64px; height:64px; } .pfp-wrapper{ width:64px; height:64px; } .matched-img{ width:40px; height:40px; } .matched-left{ left:-48px; } .matched-right{ margin-left:8px; } }
+  </style>
+</head>
+<body>
+  <div class="app card">
+    <header>
+      <div>
+        <h1>Leaderboards GDev Online</h1>
+        <div class="controls" style="margin-top:8px;">
+          <div class="tabs" role="tablist">
+            <div id="tab-players" class="tab active" role="tab">Players</div>
+            <div id="tab-songs" class="tab" role="tab">Songs</div>
+          </div>
+          <input id="global-search" class="search" placeholder="Pesquisar players / músicas..." />
+          <button id="btn-refresh" class="btn">Atualizar</button>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+        <div id="auth-area" style="display:flex; gap:8px; align-items:center;">
+          <div id="signed-in-info" class="hidden" style="display:flex; gap:8px; align-items:center;">
+            <img id="mini-avatar" src="" alt="" class="avatar small" style="width:36px;height:36px;border-radius:8px;display:none;">
+            <div id="mini-name" class="small muted"></div>
+            <button id="btn-logout" class="btn secondary">Sair</button>
+          </div>
+
+          <div id="signed-out-area">
+            <button id="btn-email-toggle" class="btn secondary">Entrar / Registrar (email)</button>
+          </div>
+        </div>
+
+        <div id="email-auth" class="hidden card" style="width:320px; padding:10px;">
+          <div style="font-weight:700; margin-bottom:6px;">Entrar / Registrar</div>
+          <input id="email-input" placeholder="email" type="email" />
+          <input id="password-input" placeholder="senha" type="password" />
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button id="btn-signin" class="btn">Entrar</button>
+            <button id="btn-signup" class="btn secondary">Registrar</button>
+          </div>
+          <div id="email-auth-msg" class="status-msg"></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- left column: list -->
+      <div>
+        <div id="left-card" class="card">
+          <div id="players-controls" class="players-controls">
+            <div class="section-title"><div>Players</div><div class="small" id="players-count">—</div></div>
+            <div class="search-row"><input id="player-search" class="search" placeholder="Buscar players..." /></div>
+            <div class="list" id="players-list"></div>
+          </div>
+
+          <div id="songs-controls" class="hidden">
+            <div class="section-title"><div>Músicas</div><div class="small" id="songs-count">—</div></div>
+            <div class="search-row"><input id="song-search" class="search" placeholder="Buscar músicas..." /></div>
+            <div class="list" id="songs-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- right column: details -->
+      <div>
+        <div id="right-card" class="card">
+          <div id="details-empty" class="no-data">Selecione um player ou música à esquerda para ver detalhes.</div>
+
+          <div id="player-details" class="hidden">
+            <div class="row" style="margin-bottom:10px;">
+              <div id="pd-avatar-wrapper" class="pfp-wrapper"></div>
+
+              <div style="flex:1">
+                <div id="pd-name" style="font-weight:800;font-size:18px;"></div>
+                <div class="muted" id="pd-email"></div>
+
+                <!-- descrição mais aparente (permanece no mesmo lugar) -->
+                <div class="desc-card">
+                  <div id="pd-desc" class=""></div>
+                </div>
+
+              </div>
+              <div class="small muted" id="pd-uid"></div>
+            </div>
+
+            <div class="section-title"><div>Músicas jogadas</div><div class="small">Ordenadas por bestScore (cresc.)</div></div>
+            <div id="player-songs-area"></div>
+          </div>
+
+          <div id="song-details" class="hidden">
+            <div class="row" style="margin-bottom:10px;">
+              <div style="flex:1">
+                <div id="sd-name" style="font-weight:700;font-size:16px;"></div>
+                <div class="muted" id="sd-id"></div>
+              </div>
+              <div class="small muted" id="sd-count"></div>
+            </div>
+
+            <div class="section-title"><div>Scores</div><div class="small">player • difficulty • bestScore</div></div>
+            <div id="song-scores-area"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK (modular) -->
+  <script type="module">
+    // --- imports (no storage used here; we save base64 directly into users/{uid}.avatarURL) ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, doc, getDoc, setDoc, updateDoc, runTransaction } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+    import { getAuth, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+
+    // --- config (use seu config já existente) ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyBeJ5nkLRENkjRlDmC7LhLsG5XBa0BIG_k",
+      authDomain: "fnf-gdev-online.firebaseapp.com",
+      projectId: "fnf-gdev-online",
+      storageBucket: "fnf-gdev-online.firebasestorage.app",
+      messagingSenderId: "595615246122",
+      appId: "1:595615246122:web:4b545361c1f01ea1c7a053",
+      measurementId: "G-MD2E4G1195"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // --- estado local ---
+    let CACHE = { users: [], songs: [] };
+    let currentState = { tab: 'players', selectedPlayer: null, selectedSong: null, selectedSide: null, selectedDifficulty: null };
+    let currentUser = null;
+    let currentUserDoc = null;
+
+    // store per-profile matching state: { [profileId]: { left: username|null, right: username|null } }
+    const profileMatches = {};
+
+    // --- helpers DOM ---
+    const el = id => document.getElementById(id);
+    function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+    function formatDate(val){ if(!val) return '—'; if (val && typeof val.toDate === 'function') return val.toDate().toLocaleString(); try { return new Date(val).toLocaleString(); } catch(e) { return String(val); } }
+    function sanitizeKeyFromDisplay(s){ if(!s) return '__empty__'; return String(s).replace(/\./g,'_').replace(/\$/g,'_').replace(/\//g,'_').replace(/\[|\]|#/g,'_').replace(/\s+/g,'_').slice(0,90); }
+
+    // --- UI refs ---
+    const tabPlayers = el('tab-players'), tabSongs = el('tab-songs');
+    const playersControls = el('players-controls'), songsControls = el('songs-controls');
+    const playersList = el('players-list'), songsList = el('songs-list');
+    const playerSearch = el('player-search'), songSearch = el('song-search'), globalSearch = el('global-search');
+    const btnRefresh = el('btn-refresh');
+    const playersCount = el('players-count'), songsCount = el('songs-count');
+
+    const detailsEmpty = el('details-empty');
+    const playerDetails = el('player-details'), songDetails = el('song-details');
+    const pdAvatarWrapper = el('pd-avatar-wrapper'), pdName = el('pd-name'), pdEmail = el('pd-email'), pdUid = el('pd-uid'), pdDesc = el('pd-desc');
+    const playerSongsArea = el('player-songs-area');
+    const sdName = el('sd-name'), sdId = el('sd-id'), sdCount = el('sd-count'), songScoresArea = el('song-scores-area');
+
+    // auth UI
+    const signedInInfo = el('signed-in-info'), signedOutArea = el('signed-out-area');
+    const btnLogout = el('btn-logout'), btnEmailToggle = el('btn-email-toggle');
+    const emailAuthBox = el('email-auth'), emailInput = el('email-input'), passInput = el('password-input');
+    const btnSignin = el('btn-signin'), btnSignup = el('btn-signup'), emailAuthMsg = el('email-auth-msg');
+    const miniAvatar = el('mini-avatar'), miniName = el('mini-name');
+
+    // tab events
+    function setTab(tab, updateUrl = true){
+      tabPlayers.classList.remove('active'); tabSongs.classList.remove('active');
+      playersControls.classList.add('hidden'); songsControls.classList.add('hidden');
+      if (tab === 'players') { tabPlayers.classList.add('active'); playersControls.classList.remove('hidden'); }
+      else { tabSongs.classList.add('active'); songsControls.classList.remove('hidden'); }
+      currentState.tab = tab;
+      currentState.selectedPlayer = null;
+      currentState.selectedSong = null;
+      currentState.selectedSide = null;
+      currentState.selectedDifficulty = null;
+      if (updateUrl) updateURL();
+      clearDetails();
+    }
+    tabPlayers.addEventListener('click', ()=>setTab('players'));
+    tabSongs.addEventListener('click', ()=>setTab('songs'));
+
+    function updateURL(){
+      const params = new URLSearchParams();
+      params.set('tab', currentState.tab);
+      if (currentState.selectedPlayer) params.set('player', currentState.selectedPlayer);
+      if (currentState.selectedSong) params.set('song', currentState.selectedSong);
+      if (currentState.selectedSide) params.set('side', currentState.selectedSide);
+      if (currentState.selectedDifficulty) params.set('difficulty', currentState.selectedDifficulty);
+      const newURL = `${window.location.pathname}?${params.toString()}`;
+      window.history.pushState({}, '', newURL);
+    }
+
+    function restoreStateFromURL(){
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab'); const playerId = params.get('player'); const songId = params.get('song'); const side = params.get('side'); const difficulty = params.get('difficulty');
+      if (tab) { currentState.tab = tab; setTab(tab, false); }
+      setTimeout(()=>{
+        if (playerId && CACHE.users.length > 0) { const player = CACHE.users.find(u => u.id === playerId); if (player) showPlayerDetails(player, false); }
+        if (songId && CACHE.songs.length > 0) { const song = CACHE.songs.find(s => s.id === songId); if (song) showSongDetails(song, false); }
+        if (side && difficulty && songId) {
+          const song = CACHE.songs.find(s => s.id === songId);
+          if (song) { showSongDetails(song, false); setTimeout(()=>{ const card = document.querySelector(`.card[data-side="${side}"][data-difficulty="${difficulty}"]`); if (card) card.click(); },150); }
+        }
+      }, 500);
+    }
+
+    // -------------------------------
+    // Process @[name]{'MatchingPfpLeft'|'MatchingPfpRight'}
+    // - display: anchor for @name and a small button in place of the {...}
+    // - editing: raw description (unchanged) will be used in editor (no loss)
+    // -------------------------------
+function processUsernameLinks(text) {
+  if (!text || typeof text !== 'string') return text;
+
+  const pattern =
+    /@(\[([^\]]+)\]|([^\s@.,:;!?/()<>]+))\s*\{\s*('?|")?(MatchingPfpLeft|MatchingPfpRight)\4?\s*\}/g;
+
+  let html = '';
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(pattern)) {
+    const full = match[0];
+    const username = match[2] || match[3];
+    const side = match[5]; // MatchingPfpLeft | MatchingPfpRight
+    const start = match.index;
+
+    // texto antes (escapado)
+    html += escapeHtml(text.slice(lastIndex, start));
+
+    // @username clicável
+    html += `<a href="javascript:void(0)" class="username-link" data-username="${escapeHtml(username)}">@${escapeHtml(username)}</a>`;
+
+    // botão de matching
+    html += `
+      <button
+        class="matching-pfp-btn"
+        data-username="${escapeHtml(username)}"
+        data-side="${side.replace('MatchingPfp','')}"
+        title="Show Matching Pfp"
+      >👥</button>
+    `;
+
+    lastIndex = start + full.length;
+  }
+
+  // resto do texto
+  html += escapeHtml(text.slice(lastIndex));
+  return html;
+}
+
+
+    // attach events for username links and matching buttons
+    function attachUsernameLinkEvents() {
+      // username links
+      document.querySelectorAll('.username-link').forEach(link => {
+        if (link._usernameEventAttached) return;
+        link._usernameEventAttached = true;
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          const username = this.getAttribute('data-username');
+          const user = searchUserByName(username);
+          if (user) {
+            setTab('players');
+            showPlayerDetails(user);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            alert(`Usuário "${username}" não encontrado.`);
+          }
+        });
+        link.style.color = 'var(--accent)';
+        link.style.cursor = 'pointer';
+        link.style.textDecoration = 'underline';
+        link.style.fontWeight = '700';
+      });
+
+      // matching buttons
+      document.querySelectorAll('.matching-pfp-btn').forEach(btn => {
+        if (btn._matchingEventAttached) return;
+        btn._matchingEventAttached = true;
+        btn.addEventListener('click', function(e) {
+          e.preventDefault(); e.stopPropagation();
+          const username = this.getAttribute('data-username');
+          const preferredSide = this.getAttribute('data-side'); // 'Left' or 'Right'
+          // toggle matching pfp for the currently shown profile
+          const currentProfileId = currentState.selectedPlayer;
+          if (!currentProfileId) return;
+          toggleProfileMatch(currentProfileId, username, preferredSide);
+          // toggle active class on button to reflect visible state
+          const curState = profileMatches[currentProfileId] || { left: null, right: null };
+          const isActive = (curState.left === username) || (curState.right === username);
+          if (isActive) this.classList.add('active'); else this.classList.remove('active');
+        });
+      });
+    }
+
+    // search helper
+    function searchUserByName(username){
+      if (!username || username.trim() === '') return null;
+      const s = username.toLowerCase().trim();
+      return CACHE.users.find(user => {
+        const displayName = (user.data.displayName || '').toLowerCase();
+        const name = (user.data.name || '').toLowerCase();
+        const email = (user.data.email || '').toLowerCase();
+        const id = user.id.toLowerCase();
+        return displayName === s || name === s || displayName.includes(s) || name.includes(s) || email.includes(s) || id.includes(s);
+      });
+    }
+
+    // toggle match for profileId
+    function toggleProfileMatch(profileId, username, preferredSide) {
+      if (!profileMatches[profileId]) profileMatches[profileId] = { left: null, right: null };
+      const state = profileMatches[profileId];
+      const left = state.left, right = state.right;
+      const side = (preferredSide === 'Left') ? 'right' : 'left';
+      const other = side === 'left' ? 'left' : 'right';
+
+      // if already assigned on either side, toggle off
+      if (state.left === username) { state.left = null; renderProfileMatches(profileId); return; }
+      if (state.right === username) { state.right = null; renderProfileMatches(profileId); return; }
+
+      // try to place on preferred side
+      if (!state[side]) {
+        state[side] = username;
+      } else {
+        // preferred side occupied
+        if (!state[other]) {
+          state[other] = username;
+        } else {
+          // both occupied — replace preferred
+          state[side] = username;
+        }
+      }
+      renderProfileMatches(profileId);
+    }
+
+    // render match images next to main pfp for given profileId
+    function renderProfileMatches(profileId) {
+      // only if this profile is currently open, else skip (we maintain state)
+      if (currentState.selectedPlayer !== profileId) return;
+      const wrapper = pdAvatarWrapper;
+      // remove existing matched imgs
+      wrapper.querySelectorAll('.matched-img').forEach(n=>n.remove());
+      const state = profileMatches[profileId] || { left: null, right: null };
+      // helper to create image element if user found
+      function createMatchedImgFor(username, cls) {
+        if (!username) return;
+        const user = searchUserByName(username);
+        if (!user) return;
+        const img = document.createElement('img');
+        img.className = 'matched-img ' + cls;
+        img.alt = user.data.displayName || user.id;
+        img.src = user.data.avatarURL || user.data.photoURL || '';
+        img.title = user.data.displayName || user.id;
+        wrapper.appendChild(img);
+      }
+      // if both sides are left in original tokens, logic would have placed one on right; our state already stores final placement
+      if (state.left) createMatchedImgFor(state.left, 'matched-left');
+      if (state.right) createMatchedImgFor(state.right, 'matched-right');
+
+      // update matching buttons active state in description area
+      // find all buttons and toggle active depending if username present
+      document.querySelectorAll('.matching-pfp-btn').forEach(b => {
+        const u = b.getAttribute('data-username');
+        if (state.left === u || state.right === u) b.classList.add('active'); else b.classList.remove('active');
+      });
+    }
+
+    // clear details and popovers
+    let activePopover = null;
+    let activePopoverClickHandler = null;
+    function removePopover(){ if (activePopover && activePopover.el){ activePopover.el.remove(); activePopover = null; if (activePopoverClickHandler) document.removeEventListener('click', activePopoverClickHandler); activePopoverClickHandler = null; } }
+
+    function clearDetails(){
+      detailsEmpty.classList.remove('hidden');
+      playerDetails.classList.add('hidden');
+      songDetails.classList.add('hidden');
+      playerSongsArea.innerHTML = '';
+      songScoresArea.innerHTML = '';
+      currentState.selectedPlayer = null; currentState.selectedSong = null; currentState.selectedSide = null; currentState.selectedDifficulty = null;
+      removePopover();
+    }
+
+    // fetchers
+    async function fetchUsers(){
+      const col = collection(db, 'users');
+      const snap = await getDocs(col);
+      const arr = [];
+      snap.forEach(d=> arr.push({ id: d.id, data: d.data() }) );
+      CACHE.users = arr;
+      playersCount.textContent = arr.length + ' players';
+      return arr;
+    }
+    async function fetchSongs(){
+      const col = collection(db, 'songs');
+      const snap = await getDocs(col);
+      const arr = [];
+      snap.forEach(d=> arr.push({ id: d.id, data: d.data() }) );
+      CACHE.songs = arr;
+      songsCount.textContent = arr.length + ' músicas';
+      return arr;
+    }
+    async function refreshAll(){
+      playersList.innerHTML = '<div class="small muted">Carregando players…</div>';
+      songsList.innerHTML = '<div class="small muted">Carregando músicas…</div>';
+      clearDetails();
+      try { await Promise.all([ fetchUsers(), fetchSongs() ]); renderPlayersList(); renderSongsList(); restoreStateFromURL(); } catch(e){ console.error(e); playersList.innerHTML = '<div class="no-data">Erro ao carregar players.</div>'; songsList.innerHTML = '<div class="no-data">Erro ao carregar músicas.</div>'; }
+    }
+
+    // render lists
+    function renderPlayersList(){
+      const q = (playerSearch.value||'').toLowerCase().trim();
+      const filtered = CACHE.users.filter(u=>{ const dn=(u.data.displayName||'').toLowerCase(); const em=(u.data.email||'').toLowerCase(); return (!q) || dn.includes(q) || em.includes(q) || u.id.toLowerCase().includes(q); });
+      playersCount.textContent = filtered.length + ' players';
+      if (!filtered.length) { playersList.innerHTML = '<div class="no-data">Nenhum player encontrado.</div>'; return; }
+      playersList.innerHTML = '';
+      for (const u of filtered){
+        const name = u.data.displayName || u.data.name || u.id;
+        const email = u.data.email || '';
+        const avatar = u.data.avatarURL || u.data.photoURL || '';
+        const div = document.createElement('div'); div.className = 'player-row';
+        let avatarElement;
+        if (avatar) {
+          avatarElement = document.createElement('img'); avatarElement.className = 'avatar small';
+          avatarElement.src = avatar;
+          avatarElement.alt = '';
+        } else {
+          avatarElement = document.createElement('div'); avatarElement.className = 'avatar fallback small'; avatarElement.textContent = (String(name||'').slice(0,1)||'?').toUpperCase();
+        }
+        div.appendChild(avatarElement);
+        const meta = document.createElement('div'); meta.className = 'meta';
+        meta.innerHTML = '<div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(name) + '</div><div class="muted">' + escapeHtml(email) + '</div>';
+        div.appendChild(meta);
+        playersList.appendChild(div);
+        div.addEventListener('click', ()=> showPlayerDetails(u));
+      }
+    }
+
+    function renderSongsList(){
+      const q = (songSearch.value||'').toLowerCase().trim();
+      const songs = CACHE.songs.slice();
+      const filtered = songs.filter(s=> { const name=(s.data.originalName||s.id||'').toLowerCase(); return (!q) || name.includes(q) || s.id.toLowerCase().includes(q); });
+      songsCount.textContent = filtered.length + ' músicas';
+      if (!filtered.length) { songsList.innerHTML = '<div class="no-data">Nenhuma música encontrada.</div>'; return; }
+      const groups = {};
+      for (const s of filtered){
+        const name = (s.data.originalName || s.id || '').trim();
+        const key = (name && name[0]) ? name[0].toUpperCase() : '#';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(s);
+      }
+      const keys = Object.keys(groups).sort();
+      songsList.innerHTML = '';
+      for (const k of keys){
+        const folderEl = document.createElement('div'); folderEl.className = 'folder';
+        folderEl.innerHTML = '<div>' + escapeHtml(k) + '</div><div class="small muted">' + groups[k].length + '</div>';
+        songsList.appendChild(folderEl);
+        const inner = document.createElement('div'); inner.style.margin = '8px 0 12px 6px';
+        groups[k].sort((a,b)=> (String(a.data.originalName||a.id).localeCompare(String(b.data.originalName||b.id))));
+        for (const s of groups[k]){
+          const name = s.data.originalName || s.id;
+          const row = document.createElement('div'); row.className = 'song-row';
+          row.innerHTML = '<div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(name) + '</div><div class="small muted">' + escapeHtml(s.id) + '</div>';
+          inner.appendChild(row);
+          row.addEventListener('click', ()=> showSongDetails(s));
+          row.setAttribute('data-song-id', s.id); row.setAttribute('data-song-name', name);
+        }
+        songsList.appendChild(inner);
+      }
+    }
+
+    // -------------------------------
+    // showPlayerDetails (with matching feature)
+    // -------------------------------
+    function showPlayerDetails(userObj, updateUrl = true){
+      removePopover();
+      detailsEmpty.classList.add('hidden');
+      songDetails.classList.add('hidden');
+      playerDetails.classList.remove('hidden');
+      playerSongsArea.innerHTML = '';
+
+      currentState.selectedPlayer = userObj.id;
+      currentState.selectedSong = null;
+      currentState.selectedSide = null;
+      currentState.selectedDifficulty = null;
+      if (updateUrl) updateURL();
+
+      // ensure profileMatches entry exists
+      if (!profileMatches[userObj.id]) profileMatches[userObj.id] = { left: null, right: null };
+
+      // avatar wrapper: render avatar + small edit button (only if owner)
+      const wrapper = pdAvatarWrapper;
+      wrapper.innerHTML = '';
+      wrapper.style.position = 'relative';
+      const name = userObj.data.displayName || userObj.id;
+      const avatar = userObj.data.avatarURL || userObj.data.photoURL || '';
+      if (avatar) {
+        const img = document.createElement('img'); img.className = 'avatar'; img.src = avatar; img.alt = '';
+        wrapper.appendChild(img);
+      } else {
+        const div = document.createElement('div'); div.className = 'avatar fallback'; div.style.width='88px'; div.style.height='88px'; div.style.borderRadius='12px'; div.textContent = (String(name||'').slice(0,1)||'?').toUpperCase();
+        wrapper.appendChild(div);
+      }
+
+      // edit button (small, top-left) - only show if currentUser is owner
+      const btn = document.createElement('button');
+      btn.className = 'pfp-edit-btn';
+      btn.textContent = '✎';
+      btn.title = 'Editar perfil';
+      if (!currentUser || currentUser.uid !== userObj.id) btn.classList.add('hidden');
+      wrapper.appendChild(btn);
+
+      // make popover for editing (same as before, but not repeated here in detail)
+      const makePopoverContent = () => {
+        const cont = document.createElement('div');
+        const title = document.createElement('div'); title.style.fontWeight='700'; title.style.marginBottom='8px'; title.textContent='Editar nome e avatar';
+        cont.appendChild(title);
+        const previewImg = document.createElement('img'); previewImg.className='preview'; previewImg.alt='preview';
+        previewImg.src = userObj.data.avatarURL || '';
+        cont.appendChild(previewImg);
+        const nameInput = document.createElement('input'); nameInput.type='text'; nameInput.placeholder='Nome único (3-24 chars)'; nameInput.value = userObj.data.displayName || '';
+        cont.appendChild(nameInput);
+        const urlInput = document.createElement('input'); urlInput.type='text'; urlInput.placeholder='Colar URL da imagem (opcional)'; cont.appendChild(urlInput);
+        const fileInput = document.createElement('input'); fileInput.type='file'; fileInput.accept='image/*'; cont.appendChild(fileInput);
+        const status = document.createElement('div'); status.className='small muted'; status.style.marginTop='6px'; status.textContent=''; cont.appendChild(status);
+        const actions = document.createElement('div'); actions.className='actions';
+        const cancelBtn = document.createElement('button'); cancelBtn.className='btn secondary'; cancelBtn.textContent='Cancelar';
+        const saveBtn = document.createElement('button'); saveBtn.className='btn'; saveBtn.textContent='Salvar';
+        actions.appendChild(cancelBtn); actions.appendChild(saveBtn);
+        cont.appendChild(actions);
+
+        fileInput.addEventListener('change', async ()=> {
+          const f = fileInput.files && fileInput.files[0];
+          if (!f){ previewImg.src = userObj.data.avatarURL || ''; return; }
+          try {
+            const dataUrl = await fileToDataURL(f);
+            previewImg.src = dataUrl;
+            status.textContent = 'Preview do arquivo (será salvo em base64).';
+          } catch(e){ status.textContent = 'Erro ao ler arquivo.'; console.error(e); }
+        });
+        urlInput.addEventListener('input', ()=> {
+          if (urlInput.value && urlInput.value.trim() !== '') {
+            previewImg.src = urlInput.value.trim();
+            status.textContent = 'Preview de URL (será salvo como link).';
+          } else {
+            previewImg.src = userObj.data.avatarURL || '';
+            status.textContent = '';
+          }
+        });
+
+        cancelBtn.addEventListener('click', (ev)=> { ev.stopPropagation(); removePopover(); });
+
+        saveBtn.addEventListener('click', async (ev)=>{
+          ev.stopPropagation();
+          if (!currentUser) { status.textContent = 'Você precisa estar logado.'; return; }
+          saveBtn.disabled = true; status.textContent = 'Salvando...';
+          const uid = currentUser.uid;
+          try {
+            let newNameRaw = (nameInput.value||'').trim();
+            if (!newNameRaw || newNameRaw.length < 3 || newNameRaw.length > 24){ status.textContent = 'Nome inválido (3-24 chars).'; saveBtn.disabled=false; return; }
+            const newName = newNameRaw.replace(/[^\w\-]/g,'');
+            if (newName !== newNameRaw){ status.textContent = 'Nome contém caracteres inválidos.'; saveBtn.disabled=false; return; }
+
+            const namesDocRef = doc(db, 'names', 'AllNames');
+            await runTransaction(db, async (tx)=>{
+              const snap = await tx.get(namesDocRef);
+              let arr = [];
+              if (snap.exists()){ const d = snap.data(); arr = Array.isArray(d.names) ? d.names.slice() : []; }
+              else { await tx.set(namesDocRef, { names: [] }); arr = []; }
+              const currentDisplayName = (currentUserDoc && (currentUserDoc.data.displayName||'')) ? String(currentUserDoc.data.displayName) : '';
+              const normalizedArr = arr.map(x => String(x));
+              if (normalizedArr.includes(newName) && newName !== currentDisplayName){ throw new Error('NOME_EM_USO'); }
+              const updated = normalizedArr.filter(x => x !== currentDisplayName);
+              if (!updated.includes(newName)) updated.push(newName);
+              tx.update(namesDocRef, { names: updated });
+            });
+
+            // avatar: file -> base64 priority, else url
+            let avatarToSave = currentUserDoc && currentUserDoc.data.avatarURL ? currentUserDoc.data.avatarURL : '';
+            if (fileInput.files && fileInput.files[0]) {
+              avatarToSave = await fileToDataURL(fileInput.files[0]);
+            } else if (urlInput.value && urlInput.value.trim() !== '') {
+              avatarToSave = urlInput.value.trim();
+            }
+            const userDocRef = doc(db, 'users', uid);
+            const updatePayload = { displayName: newName, avatarURL: avatarToSave, updatedAt: new Date().toISOString() };
+            await updateDoc(userDocRef, updatePayload);
+            currentUserDoc = { id: uid, data: Object.assign({}, currentUserDoc ? currentUserDoc.data : {}, updatePayload) };
+            status.textContent = 'Salvo.';
+            await refreshAll();
+            const updatedUser = CACHE.users.find(u=>u.id === uid);
+            if (updatedUser) showPlayerDetails(updatedUser, true);
+            setTimeout(()=> removePopover(), 700);
+
+          } catch(err){
+            console.error('save popover err', err);
+            if (err && err.message === 'NOME_EM_USO') status.textContent = 'Nome já em uso.';
+            else status.textContent = 'Erro ao salvar: ' + (err.message || String(err));
+          } finally { saveBtn.disabled = false; }
+        });
+
+        return cont;
+      };
+
+      // attach popover toggle to btn
+      btn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        if (activePopover) { removePopover(); return; }
+        const content = makePopoverContent();
+        createPopover(btn, content);
+      });
+
+      // DESCRIPTION display (remove {..} token and put button instead)
+      const rawDesc = (userObj.data && (userObj.data.description || userObj.data.desc || userObj.data.profileDescription)) ? String(userObj.data.description || userObj.data.desc || userObj.data.profileDescription) : '';
+      // processedDesc contains anchor + matching button(s) where applicable
+      const processedDesc = processUsernameLinks(escapeHtml(rawDesc));
+      if (rawDesc && rawDesc.trim()) pdDesc.innerHTML = processedDesc;
+      else pdDesc.innerHTML = '<span class="small muted">Sem descrição.</span>';
+
+      // DESCRIPTION inline edit (owner)
+      if (currentUser && currentUser.uid === userObj.id){
+        pdDesc.classList.add('editable');
+        pdDesc.style.cursor = 'text';
+        pdDesc.onclick = () => {
+          const currentText = (userObj.data && (userObj.data.description || userObj.data.desc || userObj.data.profileDescription)) ? String(userObj.data.description || userObj.data.desc || userObj.data.profileDescription) : '';
+          const ta = document.createElement('textarea'); ta.style.width='100%'; ta.style.minHeight='100px'; ta.value = currentText;
+          const save = document.createElement('button'); save.className='btn'; save.textContent='Salvar';
+          const cancel = document.createElement('button'); cancel.className='btn secondary'; cancel.textContent='Cancelar';
+          const status = document.createElement('div'); status.className='small muted'; status.style.marginTop='6px';
+          const wrapperElm = pdDesc.parentElement;
+          pdDesc.style.display = 'none';
+          const editor = document.createElement('div'); editor.appendChild(ta);
+          const actions = document.createElement('div'); actions.style.marginTop='8px'; actions.style.display='flex'; actions.style.gap='8px'; actions.appendChild(cancel); actions.appendChild(save); editor.appendChild(actions); editor.appendChild(status);
+          wrapperElm.appendChild(editor);
+          cancel.addEventListener('click', ()=> { editor.remove(); pdDesc.style.display = ''; });
+          save.addEventListener('click', async ()=>{
+            save.disabled=true; status.textContent='Salvando...';
+            try{
+              const newDesc = ta.value || '';
+              const uid = currentUser.uid;
+              const userDocRef = doc(db, 'users', uid);
+              await updateDoc(userDocRef, { description: newDesc, updatedAt: new Date().toISOString() });
+              await refreshAll();
+              const updatedUser = CACHE.users.find(u=>u.id===uid);
+              if (updatedUser){ showPlayerDetails(updatedUser, true); }
+              status.textContent='Salvo.'; setTimeout(()=> { editor.remove(); }, 700);
+            }catch(err){ console.error('save desc err', err); status.textContent = 'Erro ao salvar: '+(err.message||String(err)); }
+            finally{ save.disabled=false; }
+          });
+        };
+      } else {
+        pdDesc.classList.remove('editable');
+        pdDesc.onclick = null;
+        pdDesc.style.cursor = 'default';
+      }
+
+      pdName.innerHTML = processUsernameLinks(escapeHtml(name));
+      pdEmail.innerHTML = processUsernameLinks(escapeHtml(userObj.data.email || ''));
+      pdUid.textContent = userObj.id || '';
+
+      // Ensure events attached for username links and matching buttons
+      setTimeout(attachUsernameLinkEvents, 0);
+
+      // render any existing matches for this profile
+      renderProfileMatches(userObj.id);
+
+      // populate plays table (same logic as before)
+      const playerKey = sanitizeKeyFromDisplay(userObj.data.displayName || userObj.data.name || userObj.id);
+      const plays = [];
+      for (const s of CACHE.songs){
+        const doc = s.data;
+        if (!doc || typeof doc !== 'object') continue;
+        for (const sideKey of Object.keys(doc).filter(k=>k !== 'originalName')){
+          const sideObj = doc[sideKey];
+          if (!sideObj || typeof sideObj !== 'object') continue;
+          for (const diffKey of Object.keys(sideObj)){
+            const diffObj = sideObj[diffKey];
+            if (!diffObj || typeof diffObj !== 'object') continue;
+            for (const pk of Object.keys(diffObj)){
+              if (pk === playerKey){
+                const entry = diffObj[pk];
+                plays.push({
+                  songDocId: s.id,
+                  songName: doc.originalName || s.id,
+                  side: sideKey,
+                  difficulty: diffKey,
+                  bestScore: Number(entry.bestScore) || 0,
+                  Points: entry.LastPoints || 0,
+                  accuracy: entry.accuracy + '%' || '',
+                  updatedAt: entry.updatedAt || null
+                });
+              }
+            }
+          }
+        }
+      }
+      plays.sort((a,b)=> (Number(a.bestScore) - Number(b.bestScore)));
+      if (!plays.length) playerSongsArea.innerHTML = '<div class="no-data">Nenhuma música encontrada para este player.</div>';
+      else {
+        const t = document.createElement('table');
+        t.innerHTML = '<thead><tr><th>Música</th><th>Side</th><th>Dificuldade</th><th>Best Score</th><th>Points</th><th>Accuracy</th><th>Updated</th></tr></thead>';
+        const tbody = document.createElement('tbody');
+        for (const p of plays){
+          const tr = document.createElement('tr');
+          const songNameHtml = processUsernameLinks(escapeHtml(p.songName));
+          tr.innerHTML = '<td>' + songNameHtml + '</td><td>' + escapeHtml(p.side) + '</td><td>' + escapeHtml(p.difficulty) + '</td><td>' + p.bestScore + '</td><td>' + p.Points + '</td><td>' + escapeHtml(p.accuracy) + '</td><td>' + formatDate(p.updatedAt) + '</td>';
+          tbody.appendChild(tr);
+        }
+        t.appendChild(tbody);
+        playerSongsArea.appendChild(t);
+      }
+    }
+
+    // -------------------------------
+    // Popover helpers (used by edit button)
+    // -------------------------------
+    function createPopover(anchorEl, contentEl){
+      removePopover();
+      const pop = document.createElement('div'); pop.className = 'popover';
+      pop.appendChild(contentEl);
+      document.body.appendChild(pop);
+      activePopover = { el: pop, anchor: anchorEl };
+      try {
+        const anchorRect = anchorEl.getBoundingClientRect();
+        const left = Math.min(window.innerWidth - 16 - pop.offsetWidth, anchorRect.right + 6);
+        const top = Math.max(8, anchorRect.top + window.scrollY - 8);
+        pop.style.left = (anchorRect.right + 8) + 'px';
+        pop.style.top = (anchorRect.top + window.scrollY - 8) + 'px';
+      } catch(e){
+        pop.style.left = '50px'; pop.style.top = '50px';
+      }
+      activePopoverClickHandler = function(ev){
+        if (!pop.contains(ev.target) && ev.target.closest('.pfp-edit-btn') === null) removePopover();
+      };
+      setTimeout(()=> document.addEventListener('click', activePopoverClickHandler), 0);
+      return pop;
+    }
+
+    // helper to read file as dataURL (base64)
+    function fileToDataURL(file){
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = ()=> resolve(String(r.result));
+        r.onerror = (e)=> reject(e);
+        r.readAsDataURL(file);
+      });
+    }
+
+    // -------------------------------
+    // showSongDetails (unchanged)
+    // -------------------------------
+function showSongDetails(songObj, updateUrl = true){
+  detailsEmpty.classList.add('hidden');
+  playerDetails.classList.add('hidden');
+  songDetails.classList.remove('hidden');
+  
+  currentState.selectedSong = songObj.id;
+  currentState.selectedPlayer = null;
+  currentState.selectedSide = null;
+  currentState.selectedDifficulty = null;
+  
+  if (updateUrl) {
+    updateURL();
+  }
+  
+  sdName.innerHTML = processUsernameLinks(escapeHtml(songObj.data.originalName || songObj.id));
+  sdId.textContent = songObj.id;
+  
+  setTimeout(attachUsernameLinkEvents, 0);
+
+  const entries = [];
+  
+  // NOVA ESTRUTURA: songs/{songId}/sideKey/diffKey/playerKey
+  for (const sideKey of Object.keys(songObj.data).filter(k => k !== 'originalName')) {
+    const sideObj = songObj.data[sideKey] || {};
+    
+    for (const diffKey of Object.keys(sideObj)) {
+      const diffObj = sideObj[diffKey] || {};
+      
+      for (const playerKey of Object.keys(diffObj)) {
+        const e = diffObj[playerKey] || {};
+        entries.push({
+          playerKey,
+          playerName: playerKey,
+          side: sideKey,
+          difficulty: diffKey,
+          bestScore: Number(e.bestScore) || 0,
+          Points: Number(e.Points) || 0,
+          accuracy: e.accuracy + '%' || '',
+          updatedAt: e.updatedAt || null
+        });
+      }
+    }
+  }
+  
+  const userMapBySanitized = {};
+  for (const u of CACHE.users) {
+    const k = sanitizeKeyFromDisplay(u.data.displayName || u.data.name || u.id);
+    userMapBySanitized[k] = u;
+  }
+  
+  for (const en of entries) {
+    if (userMapBySanitized[en.playerKey]) {
+      en.playerName = userMapBySanitized[en.playerKey].data.displayName || 
+                      userMapBySanitized[en.playerKey].data.name || 
+                      userMapBySanitized[en.playerKey].id;
+    }
+  }
+  
+  // Ordena por side, depois por difficulty, depois por bestScore (decrescente)
+  entries.sort((a, b) => {
+    if (a.side !== b.side) return a.side.localeCompare(b.side);
+    if (a.difficulty !== b.difficulty) return a.difficulty.localeCompare(b.difficulty);
+    return (Number(b.bestScore) - Number(a.bestScore));
+  });
+  
+  // Limpa a área e cria os cards
+  songScoresArea.innerHTML = '';
+  const difficultyGroups = {};
+  
+  // Agrupa as entradas por combinação side + difficulty
+  for (const e of entries) {
+    const groupKey = e.side + ' - ' + e.difficulty;
+    if (!difficultyGroups[groupKey]) {
+      difficultyGroups[groupKey] = [];
+    }
+    difficultyGroups[groupKey].push(e);
+  }
+  
+  // Cria o container de cards
+  const cardContainer = document.createElement('div');
+  cardContainer.style.display = 'grid';
+  cardContainer.style.gridTemplateColumns = 'repeat(auto-fill, minmax(220px, 1fr))';
+  cardContainer.style.gap = '12px';
+  cardContainer.classList.add('card-container');
+  
+  // Ordena as chaves dos grupos
+  const sortedGroupKeys = Object.keys(difficultyGroups).sort();
+  
+  // Cria um card para cada combinação side + difficulty
+  for (const groupKey of sortedGroupKeys) {
+    const [sideKey, diffKey] = groupKey.split(' - ');
+    const diffEntries = difficultyGroups[groupKey];
+    
+    // Ordena por bestScore decrescente dentro do grupo
+    diffEntries.sort((a, b) => Number(b.bestScore) - Number(a.bestScore));
+    
+    const bestScoreEntry = diffEntries[0];
+    const maxScore = bestScoreEntry ? bestScoreEntry.bestScore : 0;
+    const playerName = bestScoreEntry ? bestScoreEntry.playerName : 'N/A';
+    const entryCount = diffEntries.length;
+    
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.padding = '12px';
+    card.style.cursor = 'pointer';
+    card.style.transition = 'all 0.2s ease';
+    card.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+    card.setAttribute('data-side', sideKey);
+    card.setAttribute('data-difficulty', diffKey);
+    card.setAttribute('data-song-id', songObj.id);
+    card.setAttribute('data-song-name', songObj.data.originalName || songObj.id);
+    
+    card.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <div style="font-weight: 700; font-size: 15px; color: var(--accent);">${escapeHtml(sideKey)}</div>
+        <div class="small muted" style="font-size: 11px;">${entryCount} score${entryCount !== 1 ? 's' : ''}</div>
+      </div>
+      <div style="font-weight: 600; color: var(--text); margin-bottom: 8px; font-size: 13px;">${escapeHtml(diffKey)}</div>
+      <div class="muted small" style="margin-bottom: 2px;">Melhor Score:</div>
+      <div style="font-weight: 800; color: var(--accent-2); font-size: 22px; margin-bottom: 10px; text-align: center;">${maxScore.toLocaleString()}</div>
+      <div class="muted small" style="margin-top: 8px; border-top: 1px dashed rgba(255,255,255,0.03); padding-top: 6px;">Top Player: ${escapeHtml(playerName)}</div>
+    `;
+    
+    // Adiciona efeito hover
+    card.addEventListener('mouseenter', () => {
+      card.style.transform = 'translateY(-2px)';
+      card.style.boxShadow = '0 8px 24px rgba(2, 6, 23, 0.8)';
+    });
+    
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = 'translateY(0)';
+      card.style.boxShadow = 'none';
+    });
+    
+    // Adiciona evento de clique para mostrar detalhes
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      
+      // Atualiza estado para esta seleção
+      currentState.selectedSide = sideKey;
+      currentState.selectedDifficulty = diffKey;
+      updateURL();
+      
+      // Mostra tabela detalhada para esta combinação
+      showDetailedScoresTable(sideKey, diffKey, diffEntries, cardContainer);
+    });
+    
+    cardContainer.appendChild(card);
+  }
+  
+  songScoresArea.appendChild(cardContainer);
+  
+  // Função para mostrar tabela detalhada
+  function showDetailedScoresTable(sideKey, diffKey, entries, cardsContainer) {
+    // Oculta os cards
+    cardsContainer.classList.add('hidden');
+    
+    // Cria botão de voltar
+    const backButton = document.createElement('button');
+    backButton.className = 'btn secondary';
+    backButton.innerHTML = '← Voltar aos cards';
+    backButton.style.marginBottom = '12px';
+    backButton.style.display = 'block';
+    
+    // Cria título da seção
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'section-title';
+    titleDiv.style.marginTop = '0';
+    titleDiv.innerHTML = `
+      <div>Scores Detalhados - ${escapeHtml(sideKey)} / ${escapeHtml(diffKey)}</div>
+      <div class="small">${entries.length} score${entries.length !== 1 ? 's' : ''}</div>
+    `;
+    
+    // Cria tabela
+    const table = document.createElement('table');
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Best Score</th>
+          <th>Points</th>
+          <th>Accuracy</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+    `;
+    
+    const tbody = document.createElement('tbody');
+    
+    // Ordena por bestScore decrescente
+    entries.sort((a, b) => Number(b.bestScore) - Number(a.bestScore));
+    
+    for (const e of entries) {
+      const tr = document.createElement('tr');
+      
+      // Processa links @[nome] no nome do player
+      const playerNameHtml = processUsernameLinks(escapeHtml(e.playerName));
+      
+      tr.innerHTML = `
+        <td>${playerNameHtml}</td>
+        <td style="font-weight: 700; color: var(--accent-2);">${e.bestScore.toLocaleString()}</td>
+        <td>${e.Points}</td>
+        <td>${escapeHtml(e.accuracy)}</td>
+        <td class="small muted">${formatDate(e.updatedAt)}</td>
+      `;
+      
+      // Adiciona evento de clique no nome do player
+      tr.querySelector('td').style.cursor = 'pointer';
+      tr.querySelector('td').style.color = 'var(--accent)';
+      tr.querySelector('td').addEventListener('click', (event) => {
+        event.stopPropagation();
+        const user = searchUserByName(e.playerName);
+        if (user) {
+          setTab('players');
+          showPlayerDetails(user);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+      
+      tbody.appendChild(tr);
+    }
+    
+    table.appendChild(tbody);
+    
+    // Cria container para a tabela detalhada
+    const detailedContainer = document.createElement('div');
+    detailedContainer.className = 'detailed-scores-container';
+    
+    // Evento do botão voltar
+    backButton.addEventListener('click', () => {
+      detailedContainer.remove();
+      cardsContainer.classList.remove('hidden');
+    });
+    
+    detailedContainer.appendChild(backButton);
+    detailedContainer.appendChild(titleDiv);
+    detailedContainer.appendChild(table);
+    
+    // Adiciona a tabela detalhada à área
+    songScoresArea.appendChild(detailedContainer);
+    
+    // Aplica eventos aos links na tabela
+    setTimeout(attachUsernameLinkEvents, 0);
+  }
+  
+  sdCount.textContent = entries.length + ' scores';
+}
+
+    // -------------------------------
+    // Auth & profile creation on sign-in
+    // -------------------------------
+    btnEmailToggle.addEventListener('click', ()=> { emailAuthBox.classList.toggle('hidden'); });
+    btnSignup.addEventListener('click', async ()=>{
+      const email = emailInput.value.trim(); const pw = passInput.value;
+      if (!email || !pw) { emailAuthMsg.textContent = 'Preencha email e senha.'; return; }
+      try { await createUserWithEmailAndPassword(auth, email, pw); } catch(err){ emailAuthMsg.textContent = 'Erro ao registrar: ' + (err.message || err); console.error(err); }
+    });
+    btnSignin.addEventListener('click', async ()=>{
+      const email = emailInput.value.trim(); const pw = passInput.value;
+      if (!email || !pw) { emailAuthMsg.textContent = 'Preencha email e senha.'; return; }
+      try { await signInWithEmailAndPassword(auth, email, pw); } catch(err){ emailAuthMsg.textContent = 'Erro ao entrar: ' + (err.message || err); console.error(err); }
+    });
+    btnLogout.addEventListener('click', async ()=> { try { await signOut(auth); } catch(err){ console.error(err); } });
+
+    onAuthStateChanged(auth, async (u)=>{
+      currentUser = u;
+      if (u){
+        signedOutArea.classList.add('hidden'); signedInInfo.classList.remove('hidden');
+        miniName.textContent = u.displayName || u.email || u.uid;
+        try {
+          const avatarFromAuth = u.photoURL || '';
+          if (avatarFromAuth) { miniAvatar.src = avatarFromAuth; miniAvatar.style.display = 'block'; }
+          else miniAvatar.style.display = 'none';
+        } catch(e){ miniAvatar.style.display = 'none'; }
+        emailAuthBox.classList.add('hidden');
+
+        // ensure users/{uid} exists
+        const userDocRef = doc(db, 'users', u.uid);
+        const snap = await getDoc(userDocRef);
+        if (!snap.exists()){
+          try {
+            await setDoc(userDocRef, {
+              displayName: u.displayName || '',
+              email: u.email || '',
+              avatarURL: u.photoURL || '',
+              createdAt: new Date().toISOString()
+            }, { merge: true });
+          } catch(err){ console.error('create users doc error', err); }
+        }
+        // refresh and load current user doc
+        await refreshAll();
+        const afterSnap = await getDoc(userDocRef);
+        currentUserDoc = afterSnap.exists() ? { id: afterSnap.id, data: afterSnap.data() } : null;
+
+        // set mini avatar from currentUserDoc if present (handles base64)
+        if (currentUserDoc && currentUserDoc.data && currentUserDoc.data.avatarURL){
+          try { miniAvatar.src = currentUserDoc.data.avatarURL; miniAvatar.style.display = 'block'; } catch(e){ miniAvatar.style.display = 'none'; }
+        }
+      } else {
+        signedOutArea.classList.remove('hidden'); signedInInfo.classList.add('hidden'); miniAvatar.style.display='none'; miniName.textContent=''; currentUserDoc = null; await refreshAll();
+      }
+    });
+
+    // search handlers and refresh
+    playerSearch.addEventListener('input', ()=> renderPlayersList());
+    songSearch.addEventListener('input', ()=> renderSongsList());
+    globalSearch.addEventListener('input', (ev)=>{ const v = ev.target.value.trim(); if (!v) return; playerSearch.value=v; songSearch.value=v; renderPlayersList(); renderSongsList(); });
+    btnRefresh.addEventListener('click', ()=> refreshAll());
+    window.addEventListener('popstate', () => restoreStateFromURL());
+
+    // initial load
+    refreshAll();
+
+    // expose debug helpers
+    window._lb_refresh = refreshAll;
+    window._searchUserByName = searchUserByName;
+    // expose profileMatches for debugging
+    window._profileMatches = profileMatches;
+
+  </script>
+</body>
+</html>

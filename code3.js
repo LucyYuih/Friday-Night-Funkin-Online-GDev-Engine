@@ -77,7 +77,95 @@ gdjs.PRELOADMUSICSCode.GDStatistics2Objects1= [];
 gdjs.PRELOADMUSICSCode.GDStatistics2Objects2= [];
 
 
+gdjs.PRELOADMUSICSCode.userFunc0xd5fb98 = function GDJSInlineCode(runtimeScene) {
+"use strict";
+// Evitar múltiplos overlays
+if (window.__htmlOverlayOpened) return;
+window.__htmlOverlayOpened = true;
+
+// Caminho do arquivo no build HTML
+const jsonPath = "site.json";
+
+// Carrega o arquivo como texto (sem JSON.parse)
+fetch(jsonPath)
+  .then(response => {
+    if (!response.ok) {
+      throw new Error("Falha ao carregar: " + response.status);
+    }
+    return response.text();
+  })
+  .then(fileText => {
+
+    // Usa diretamente o texto do arquivo (que contém HTML)
+    const htmlString = fileText;
+
+    // CRIA OVERLAY
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.left = "0";
+    overlay.style.top = "0";
+    overlay.style.width = "100%";
+    overlay.style.height = "100%";
+    overlay.style.zIndex = "999999";
+    overlay.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+
+    // IFRAME COM O HTML
+    const iframe = document.createElement("iframe");
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.style.border = "none";
+    iframe.srcdoc = htmlString;
+
+    // BOTÃO X COM 35% OPACIDADE
+    const closeBtn = document.createElement("div");
+    closeBtn.innerText = "X";
+    closeBtn.style.position = "fixed";
+    closeBtn.style.right = "20px";
+    closeBtn.style.bottom = "20px";
+    closeBtn.style.width = "48px";
+    closeBtn.style.height = "48px";
+    closeBtn.style.backgroundColor = "rgba(255, 0, 0, 0.35)";
+    closeBtn.style.color = "#fff";
+    closeBtn.style.fontSize = "24px";
+    closeBtn.style.fontWeight = "bold";
+    closeBtn.style.display = "flex";
+    closeBtn.style.alignItems = "center";
+    closeBtn.style.justifyContent = "center";
+    closeBtn.style.borderRadius = "8px";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.style.userSelect = "none";
+    closeBtn.style.boxShadow = "0 0 8px rgba(0,0,0,0.5)";
+
+    closeBtn.onclick = () => {
+      // Remove o overlay
+      overlay.remove();
+      window.__htmlOverlayOpened = false;
+
+      // Define a variável de cena Exit = 1
+      runtimeScene.getVariables().get("Exit").setNumber(1);
+    };
+
+    overlay.appendChild(iframe);
+    overlay.appendChild(closeBtn);
+    document.body.appendChild(overlay);
+
+  })
+  .catch(err => {
+    console.error("Erro ao carregar o arquivo:", err);
+  });
+
+};
 gdjs.PRELOADMUSICSCode.eventsList0 = function(runtimeScene) {
+
+{
+
+
+gdjs.PRELOADMUSICSCode.userFunc0xd5fb98(runtimeScene);
+
+}
+
+
+};gdjs.PRELOADMUSICSCode.eventsList1 = function(runtimeScene) {
 
 {
 
@@ -86,10 +174,9 @@ let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.evtTools.runtimeScene.sceneJustBegins(runtimeScene);
 if (isConditionTrue_0) {
-{gdjs.evtTools.storage.readStringFromJSONFile("Song", "Name", runtimeScene, runtimeScene.getScene().getVariables().getFromIndex(0));
-}
-{gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, runtimeScene.getScene().getVariables().getFromIndex(0).getAsString());
-}
+
+{ //Subevents
+gdjs.PRELOADMUSICSCode.eventsList0(runtimeScene);} //End of subevents
 }
 
 }
@@ -100,24 +187,10 @@ if (isConditionTrue_0) {
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-isConditionTrue_0 = gdjs.evtTools.runtimeScene.areSceneAssetsLoaded(runtimeScene, runtimeScene.getScene().getVariables().getFromIndex(0).getAsString());
+{isConditionTrue_0 = (runtimeScene.getScene().getVariables().getFromIndex(0).getAsNumber() == 1);
+}
 if (isConditionTrue_0) {
-{gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, runtimeScene.getScene().getVariables().getFromIndex(0).getAsString(), false);
-}
-}
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-{
-gdjs.copyArray(runtimeScene.getObjects("NewText"), gdjs.PRELOADMUSICSCode.GDNewTextObjects1);
-{for(var i = 0, len = gdjs.PRELOADMUSICSCode.GDNewTextObjects1.length ;i < len;++i) {
-    gdjs.PRELOADMUSICSCode.GDNewTextObjects1[i].getBehavior("Text").setText(gdjs.evtTools.string.subStr(gdjs.evtTools.common.toString(gdjs.evtTools.runtimeScene.getSceneLoadingProgress(runtimeScene, runtimeScene.getScene().getVariables().getFromIndex(0).getAsString()) * 100), 0, 4) + "%");
-}
+{gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, "Menu", false);
 }
 }
 
@@ -204,7 +277,7 @@ gdjs.PRELOADMUSICSCode.GDLongNoteOppObjects2.length = 0;
 gdjs.PRELOADMUSICSCode.GDStatistics2Objects1.length = 0;
 gdjs.PRELOADMUSICSCode.GDStatistics2Objects2.length = 0;
 
-gdjs.PRELOADMUSICSCode.eventsList0(runtimeScene);
+gdjs.PRELOADMUSICSCode.eventsList1(runtimeScene);
 gdjs.PRELOADMUSICSCode.GDNewTextObjects1.length = 0;
 gdjs.PRELOADMUSICSCode.GDNewTextObjects2.length = 0;
 gdjs.PRELOADMUSICSCode.GDStatisticsObjects1.length = 0;

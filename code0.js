@@ -7438,25 +7438,25 @@ gdjs.MenuCode.eventsList93(runtimeScene);} //End of subevents
 
 {
 
-gdjs.copyArray(runtimeScene.getObjects("maxscore"), gdjs.MenuCode.GDmaxscoreObjects1);
+gdjs.copyArray(runtimeScene.getObjects("leaderboardtext"), gdjs.MenuCode.GDleaderboardtextObjects1);
 
 let isConditionTrue_0 = false;
 isConditionTrue_0 = false;
-for (var i = 0, k = 0, l = gdjs.MenuCode.GDmaxscoreObjects1.length;i<l;++i) {
-    if ( gdjs.MenuCode.GDmaxscoreObjects1[i].getBehavior("MultitouchButton").IsPressed(null) ) {
+for (var i = 0, k = 0, l = gdjs.MenuCode.GDleaderboardtextObjects1.length;i<l;++i) {
+    if ( gdjs.MenuCode.GDleaderboardtextObjects1[i].getBehavior("MultitouchButton").IsJustPressed(null) ) {
         isConditionTrue_0 = true;
-        gdjs.MenuCode.GDmaxscoreObjects1[k] = gdjs.MenuCode.GDmaxscoreObjects1[i];
+        gdjs.MenuCode.GDleaderboardtextObjects1[k] = gdjs.MenuCode.GDleaderboardtextObjects1[i];
         ++k;
     }
 }
-gdjs.MenuCode.GDmaxscoreObjects1.length = k;
+gdjs.MenuCode.GDleaderboardtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
 {isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34769196);
 }
 }
 if (isConditionTrue_0) {
-{gdjs.evtTools.leaderboards.displayLeaderboard(runtimeScene, "9ea1790d-fcf5-483a-8146-63d72ed10d78", true);
+{gdjs.evtTools.runtimeScene.replaceScene(runtimeScene, "PRELOADMUSICS", true);
 }
 }
 
