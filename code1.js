@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0xe86cd0 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x2ac1650 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,11 +848,11 @@ gdjs.InicioCode.userFunc0xe86cd0 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.asyncCallback35111028 = function (runtimeScene, asyncObjectsList) {
+gdjs.InicioCode.asyncCallback35024612 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(35111028, gdjs.InicioCode.asyncCallback35111028);
+gdjs.InicioCode.idToCallbackMap.set(35024612, gdjs.InicioCode.asyncCallback35024612);
 gdjs.InicioCode.eventsList1 = function(runtimeScene) {
 
 {
@@ -862,7 +862,7 @@ gdjs.InicioCode.eventsList1 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(5), (runtimeScene) => (gdjs.InicioCode.asyncCallback35111028(runtimeScene, asyncObjectsList)), 35111028, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(5), (runtimeScene) => (gdjs.InicioCode.asyncCallback35024612(runtimeScene, asyncObjectsList)), 35024612, asyncObjectsList);
 }
 }
 
@@ -898,7 +898,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0xe86cd0(runtimeScene);
+gdjs.InicioCode.userFunc0x2ac1650(runtimeScene);
 
 }
 
@@ -962,7 +962,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x1ddf318 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x2ac1d98 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   if (window._gd_firebase_users_combined_v1) {
@@ -1608,12 +1608,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1ddf318(runtimeScene);
+gdjs.InicioCode.userFunc0x2ac1d98(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xe90e50 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x2ac1fd0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (Manifest: GitHub Raw -> LocalStorage -> Fallbacks) + Cache Cleanup Fix
 (function () {
@@ -3099,20 +3099,59 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
+gdjs.InicioCode.userFunc0x2ac1fd0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xf3c570 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x2ac22a0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
+// skin_downloader.js
 (async function(runtimeScene) {
+  // --- SINGLETON CHECK ---
+  // Se a UI já existe no DOM, apenas mostre-a e encerre a execução duplicada.
+  if (document.querySelector(".skin-modal")) {
+    const existingModal = document.querySelector(".skin-modal");
+    existingModal.style.display = "flex";
+    try { document.documentElement.style.overflow = 'hidden'; } catch(e){}
+    return;
+  }
+
   const MANIFEST_NAME = "manifestskins.json";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
   
   function log(...s){ console.log("[skin-loader]", ...s); }
   function warn(...s){ console.warn("[skin-loader]", ...s); }
+
+  // --- HELPER: PIXI CACHE CLEANER ---
+  // Força a limpeza de texturas da memória do PIXI
+  function clearPixiTextureCache(skinName) {
+    if (!window.PIXI) return;
+    try {
+        let count = 0;
+        // Limpa TextureCache (Cache global de texturas)
+        for (const key in PIXI.utils.TextureCache) {
+            if (key.includes(skinName)) {
+                try {
+                    PIXI.utils.TextureCache[key].destroy(true); // true = destroi baseTexture também
+                    delete PIXI.utils.TextureCache[key];
+                    count++;
+                } catch(e) {}
+            }
+        }
+        // Limpa BaseTextureCache
+        for (const key in PIXI.utils.BaseTextureCache) {
+             if (key.includes(skinName)) {
+                try {
+                    delete PIXI.utils.BaseTextureCache[key];
+                } catch(e) {}
+            }           
+        }
+        log(`Cache PIXI limpo para "${skinName}". Texturas removidas: ${count}`);
+    } catch (e) {
+        warn("Erro ao limpar cache PIXI:", e);
+    }
+  }
 
   function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
   function buildCdnUrl(owner, repo, branch, path){ if (!owner || !repo) return null; const br = branch || "main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
@@ -3121,6 +3160,7 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     const isAbs = typeof pathOrUrl === "string" && (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://"));
     const tries = [];
     if (isAbs) tries.push(pathOrUrl);
+ 
     if (!isAbs && cdnBase && cdnBase.owner && cdnBase.repo) {
       const c = buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, pathOrUrl);
       if (c) tries.push(c);
@@ -3130,13 +3170,14 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     tries.push("./" + pathOrUrl);
     if (typeof pathOrUrl === "string") {
       const enc = pathOrUrl.replace(/ /g,"%20");
-      tries.push(enc); tries.push("resources/" + enc); tries.push("./" + enc);
+      tries.push(enc); tries.push("resources/" + enc);
+      tries.push("./" + enc);
     }
 
     let lastErr = null;
     for (const u of tries) {
       try {
-        log("loader fetch try ->", u);
+        // log("loader fetch try ->", u); // Verbose log removido para performance
         const r = await fetch(u);
         if (!r.ok) throw new Error("Fetch failed " + r.status + " for " + u);
         if (as === "json") return await r.json();
@@ -3145,13 +3186,11 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
         return await r.text();
       } catch (e) {
         lastErr = e;
-        warn("loader fetch failed for", u, "->", e && e.message ? e.message : e);
       }
     }
     throw new Error("All loader fetch attempts failed: " + (lastErr ? lastErr.message : "unknown"));
   }
 
-  // Helper: get skin "name" (compatibility: derive from path if name absent)
   function getSkinName(sk) {
     if (!sk) return "";
     if (sk.name && typeof sk.name === "string" && sk.name.trim() !== "") return sk.name;
@@ -3162,10 +3201,6 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     return "";
   }
 
-  // Helper: build the stored thumb/zip path.
-  // If sk[field] is an absolute URL -> return as-is
-  // If sk[field] contains '/' -> assume it's already a relative path and return it
-  // Else join sk.path + '/' + sk[field]
   function buildFilePathFromSkin(sk, field) {
     if (!sk) return "";
     const v = sk[field] || "";
@@ -3179,13 +3214,13 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     return v;
   }
 
-  // UI / modal creation reused (unchanged)...
   function createLoadingModal() {
     const modal = document.createElement("div");
     modal.id = "skin-download-loading";
     modal.style.cssText = `
       position: fixed; inset: 0; background: rgba(0,0,0,0.85); 
-      display: flex; align-items: center; justify-content: center; 
+      display: flex;
+      align-items: center; justify-content: center; 
       z-index: 100000; color: white; font-family: Arial, sans-serif;
       flex-direction: column; gap: 16px;
     `;
@@ -3193,7 +3228,8 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     const spinner = document.createElement("div");
     spinner.style.cssText = `
       width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3);
-      border-radius: 50%; border-top-color: #1976d2; animation: spin 1s linear infinite;
+      border-radius: 50%; border-top-color: #1976d2;
+      animation: spin 1s linear infinite;
     `;
     
     const text = document.createElement("div");
@@ -3202,7 +3238,6 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     
     modal.appendChild(spinner);
     modal.appendChild(text);
-    
     const style = document.createElement("style");
     style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
     document.head.appendChild(style);
@@ -3213,7 +3248,6 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
   function showLoadingModal() {
     const existing = document.getElementById("skin-download-loading");
     if (existing) return existing;
-    
     const modal = createLoadingModal();
     document.body.appendChild(modal);
     return modal;
@@ -3227,6 +3261,9 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
   }
 
   function createModal(defaultOwner="LucyYuih", defaultRepo="gdev-custom-skins", defaultBranch="main") {
+    // Se já existe, retorna os elementos existentes (simples prevenção extra)
+    if(document.querySelector(".skin-modal")) return;
+
     const css = `
       :root {
         --modal-gap: 12px;
@@ -3235,7 +3272,9 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
         --accent: #1976d2;
         --muted: #999;
       }
-      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; box-sizing: border-box; -webkit-overflow-scrolling: touch; }
+      .skin-modal { position: fixed; inset: 0;
+        background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; box-sizing: border-box; -webkit-overflow-scrolling: touch;
+      }
       .skin-panel {
         width: min(1100px, 98%);
         max-width: 1100px;
@@ -3252,54 +3291,87 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
       }
 
       @media (max-width: 720px) {
-        .skin-panel { grid-template-columns: 1fr; height: calc(100vh - 36px); width: 100%; border-radius: 8px; }
-        .skin-left { order: 0; height: auto; max-height: 160px; overflow:auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.04); padding:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
-        .skin-left .skin-mod { flex: 0 0 auto; padding:6px 8px; font-size:13px; margin:4px; }
-        .skin-right { order: 1; padding:10px; overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+        .skin-panel { grid-template-columns: 1fr;
+          height: calc(100vh - 36px); width: 100%; border-radius: 8px; }
+        .skin-left { order: 0;
+          height: auto; max-height: 160px; overflow:auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.04); padding:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; -webkit-overflow-scrolling: touch;
+          touch-action: pan-x pan-y; }
+        .skin-left .skin-mod { flex: 0 0 auto; padding:6px 8px;
+          font-size:13px; margin:4px; }
+        .skin-right { order: 1; padding:10px; overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+        }
       }
 
-      .skin-left { padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto; min-width: 180px; box-sizing:border-box; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
-      .skin-right { padding:14px; display:flex; flex-direction:column; box-sizing:border-box; min-width: 0; overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+      .skin-left { padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto;
+        min-width: 180px; box-sizing:border-box; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+      .skin-right { padding:14px; display:flex; flex-direction:column; box-sizing:border-box;
+        min-width: 0; overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 
-      .skin-left-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px; }
-      .skin-toggle-btn { background:transparent; border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color: #ddd; cursor:pointer; font-size:13px; }
-      .skin-mod { padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
-      .skin-mod:hover { background: rgba(255,255,255,0.03); }
+      .skin-left-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;
+      }
+      .skin-toggle-btn { background:transparent; border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color: #ddd; cursor:pointer; font-size:13px;
+      }
+      .skin-mod { padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; -webkit-user-select: none;
+        user-select: none; touch-action: manipulation; }
+      .skin-mod:hover { background: rgba(255,255,255,0.03);
+      }
 
       .skin-top { display:flex; flex-direction:column; gap:8px; }
-      .skin-title-row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-      .skin-title { font-weight:700; font-size:1rem; }
-      .skin-controls { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
-      .skin-btn { padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px; }
+      .skin-title-row { display:flex;
+        justify-content:space-between; align-items:center; gap:8px; }
+      .skin-title { font-weight:700; font-size:1rem;
+      }
+      .skin-controls { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;
+      }
+      .skin-btn { padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px;
+      }
       .skin-btn:disabled { opacity:0.45; cursor:default; }
-      .skin-btn.opponent { background: #d32f2f; }
+      .skin-btn.opponent { background: #d32f2f;
+      }
       .skin-btn.bf { background: #1976d2; }
 
-      .cdn-inputs { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
-      .cdn-inputs input { background: #0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px; border-radius:6px; min-width:100px; box-sizing:border-box; font-size:13px; }
+      .cdn-inputs { display:flex; gap:8px;
+        align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+      .cdn-inputs input { background: #0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px;
+        border-radius:6px; min-width:100px; box-sizing:border-box; font-size:13px; }
 
-      .skin-loading { color:var(--muted); font-size:13px; margin:6px 0; }
-      .skin-list { display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+      .skin-loading { color:var(--muted); font-size:13px; margin:6px 0;
+      }
+      .skin-list { display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+      }
       .skin-list::-webkit-scrollbar { height:8px; width:8px; }
-      .skin-left-list { overflow:auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+      .skin-left-list { overflow:auto;
+        -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 
-      .skin-card { width: clamp(110px, 22%, 160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; -webkit-user-select: none; user-select: none; }
-      .skin-card img { width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none; }
-      .skin-card .label { font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-      .skin-card .card-footer { display:flex; gap:6px; justify-content:center; align-items:center; flex-direction: column; }
-      .skin-card button.skin-btn { padding:6px 8px; font-size:12px; border-radius:6px; width: 100%; }
+      .skin-card { width: clamp(110px, 22%, 160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px;
+        padding:8px; text-align:center; cursor:pointer; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; -webkit-user-select: none; user-select: none;
+      }
+      .skin-card img { width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none;
+        transition: opacity 0.3s; opacity: 0; /* Lazy load effect */
+      }
+      .skin-card img.loaded { opacity: 1; }
+      
+      .skin-card .label { font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;
+      }
+      .skin-card .card-footer { display:flex; gap:6px; justify-content:center; align-items:center; flex-direction: column;
+      }
+      .skin-card button.skin-btn { padding:6px 8px; font-size:12px; border-radius:6px; width: 100%;
+      }
 
-      .skin-left::-webkit-scrollbar, .skin-list::-webkit-scrollbar, .skin-right::-webkit-scrollbar { height:8px; width:8px; }
-      .skin-left::-webkit-scrollbar-thumb, .skin-list::-webkit-scrollbar-thumb, .skin-right::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.04); border-radius:8px; }
+      .skin-left::-webkit-scrollbar, .skin-list::-webkit-scrollbar, .skin-right::-webkit-scrollbar { height:8px; width:8px;
+      }
+      .skin-left::-webkit-scrollbar-thumb, .skin-list::-webkit-scrollbar-thumb, .skin-right::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.04); border-radius:8px;
+      }
 
       .note-small { color:#9aa; font-size:12px; }
-      .skin-info-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+      .skin-info-row { display:flex; gap:10px;
+        align-items:center; flex-wrap:wrap; }
     `;
     const style = document.createElement("style");
     style.className = "skin-loader-style";
     style.textContent = css;
     document.head.appendChild(style);
-
+    
     const modal = document.createElement("div"); modal.className = "skin-modal";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
@@ -3307,7 +3379,8 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     const panel = document.createElement("div"); panel.className = "skin-panel";
     const left = document.createElement("div"); left.className = "skin-left";
     const leftList = document.createElement("div"); leftList.className = "skin-left-list";
-    const right = document.createElement("div"); right.className = "skin-right";
+    const right = document.createElement("div");
+    right.className = "skin-right";
 
     const leftHeader = document.createElement("div"); leftHeader.className = "skin-left-header";
     const leftTitle = document.createElement("div"); leftTitle.textContent = "Mods"; leftTitle.style.fontWeight = "700";
@@ -3316,29 +3389,28 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     left.appendChild(leftHeader);
     left.appendChild(leftList);
 
-    const top = document.createElement("div"); top.className = "skin-top";
+    const top = document.createElement("div");
+    top.className = "skin-top";
     const titleRow = document.createElement("div"); titleRow.className = "skin-title-row";
     const title = document.createElement("div"); title.className = "skin-title"; title.textContent = "Skins";
     const controls = document.createElement("div"); controls.className = "skin-controls";
     const closeBtn = document.createElement("button"); closeBtn.className = "skin-btn"; closeBtn.textContent = "Fechar";
     controls.appendChild(closeBtn);
     titleRow.appendChild(title); titleRow.appendChild(controls);
-
     const cdnRow = document.createElement("div"); cdnRow.className = "cdn-inputs";
     const ownerIn = document.createElement("input"); ownerIn.placeholder = "Owner"; ownerIn.value = defaultOwner;
     const repoIn = document.createElement("input"); repoIn.placeholder = "Repo"; repoIn.value = defaultRepo;
     const branchIn = document.createElement("input"); branchIn.placeholder = "Branch"; branchIn.value = defaultBranch;
     const note = document.createElement("div"); note.className = "note-small"; note.textContent = "CDN-first: thumbs/zips serão buscados no jsDelivr.";
     cdnRow.appendChild(ownerIn); cdnRow.appendChild(repoIn); cdnRow.appendChild(branchIn); cdnRow.appendChild(note);
-
     const info = document.createElement("div"); info.className = "skin-loading"; info.textContent = "Selecione um mod à esquerda.";
-    const skinListWrap = document.createElement("div"); skinListWrap.style.flex = "1"; skinListWrap.style.overflow = "auto";
+    const skinListWrap = document.createElement("div");
+    skinListWrap.style.flex = "1"; skinListWrap.style.overflow = "auto";
 
     top.appendChild(titleRow); top.appendChild(cdnRow);
 
     right.appendChild(top); right.appendChild(info); right.appendChild(skinListWrap);
     panel.appendChild(left); panel.appendChild(right); modal.appendChild(panel); document.body.appendChild(modal);
-
     return {
       modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls
     };
@@ -3367,8 +3439,47 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     }
 
     const ui = createModal(baseOwner||"LucyYuih", baseRepo||"gdev-custom-skins", baseBranch||"main");
+    // Se a UI não foi criada (porque já existe), precisamos recuperar as referências do DOM existente
+    let elements = ui;
+    if(!elements) {
+         // Recuperar referências se for reabertura (Singleton fallback)
+         const m = document.querySelector(".skin-modal");
+         // ... (simplificado para o caso de recriação, mas a lógica de singleton no topo impede chegar aqui sem UI)
+         // Para segurança, se chegamos aqui e UI é null, algo deu errado.
+         if(!m) return; 
+         // Se já existe, o topo do script já tratou.
+    }
+    
     const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl, controlsEl } = ui;
     let currentMod = null; let thumbsCache = {}; let downloading = false;
+
+    // INTERSECTION OBSERVER PARA LAZY LOAD
+    let lazyObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const src = img.dataset.src;
+                if (src) {
+                    // Fetch blob para o src
+                    const cdnBase = JSON.parse(img.dataset.cdnBase);
+                    fetchCdnFirst(src, "blob", cdnBase).then(blob => {
+                        const url = URL.createObjectURL(blob);
+                        img.src = url;
+                        img.classList.add("loaded");
+                        // Salvar URL no cache para revogar depois
+                        if(img.dataset.modName && thumbsCache[img.dataset.modName]){
+                             const cacheItem = thumbsCache[img.dataset.modName].find(x => x.imgEl === img);
+                             if(cacheItem) cacheItem.blobUrl = url;
+                        }
+                    }).catch(err => {
+                        warn("Lazy load falhou", src);
+                    });
+                }
+                observer.unobserve(img);
+            }
+        });
+    }, { root: skinListWrap, rootMargin: "100px" });
+
 
     const prevOverflow = document.documentElement.style.overflow;
     try { document.documentElement.style.overflow = 'hidden'; } catch(e){}
@@ -3380,11 +3491,12 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
         el.addEventListener('touchmove', ()=>{}, {passive:true});
       } catch(e){}
     });
-
+    
+    // Botão RESET GLOBAL (Selected)
     const resetSelectedBtn = document.createElement("button");
     resetSelectedBtn.className = "skin-btn";
     resetSelectedBtn.textContent = "Reset Selected";
-    resetSelectedBtn.title = "Remove SelectedSkin do cache/localStorage e rebaixa se possível";
+    resetSelectedBtn.title = "Remove SelectedSkin do cache/localStorage";
     resetSelectedBtn.onclick = async () => {
       if (downloading) return;
       try {
@@ -3396,7 +3508,8 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
         if ((!selStr || selStr.trim()==="") && window.localStorage) selStr = localStorage.getItem("gd_selected_skin");
         if (!selStr) return;
         const parsed = JSON.parse(selStr);
-        if (!parsed || (!parsed.zip && !parsed.zip_cdn)) return;
+        if (!parsed) return;
+        
         await resetAndRedownload(parsed.mod || parsed.modName || "", { name: parsed.name || (parsed.path ? parsed.path.split('/').pop() : ""), zip: parsed.zip || parsed.zip_cdn }, true);
       } catch(e){
         console.error("Reset Selected failed:", e);
@@ -3410,7 +3523,8 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
       leftList.appendChild(no);
     } else {
       for (const m of mods) {
-        const el=document.createElement("div"); el.className="skin-mod"; el.textContent=m;
+        const el=document.createElement("div");
+        el.className="skin-mod"; el.textContent=m;
         el.onclick=()=>selectMod(m);
         el.addEventListener('touchstart', ()=>{}, {passive:true});
         leftList.appendChild(el);
@@ -3428,71 +3542,89 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
     }
     toggleBtn.onclick = ()=> setLeftHidden(!leftHidden);
     window.addEventListener('resize', ()=> { if (window.innerWidth > 720) left.style.display = 'block'; else if (leftHidden) left.style.display='none'; });
-
-    closeBtn.onclick = () => { if (downloading) return; cleanupAndRemove(); };
+    
+    // FECHAR: Apenas esconde, não destroi (Singleton UI)
+    closeBtn.onclick = () => { 
+        if (downloading) return; 
+        modal.style.display = 'none';
+        try { document.documentElement.style.overflow = prevOverflow || ""; } catch(e){}
+    };
 
     function onKeyDown(e){ if (e.key === 'Escape') { closeBtn.click(); } }
     window.addEventListener('keydown', onKeyDown);
 
-    function unloadModThumbs(modName){ const arr = thumbsCache[modName]; if (!arr) return; for (const it of arr) { if (it.blobUrl) try{URL.revokeObjectURL(it.blobUrl)}catch(e){} } delete thumbsCache[modName]; log("Unloaded thumbs for",modName); }
+    function unloadModThumbs(modName){ 
+        const arr = thumbsCache[modName]; if (!arr) return;
+        for (const it of arr) { if (it.blobUrl) try{URL.revokeObjectURL(it.blobUrl)}catch(e){} } 
+        delete thumbsCache[modName]; 
+        // log("Unloaded thumbs for",modName);
+    }
 
     async function selectMod(modName){
       if (downloading) return;
       if (currentMod === modName) return;
       if (currentMod) unloadModThumbs(currentMod);
-      currentMod = modName; skinListWrap.innerHTML=""; info.textContent="Carregando skins...";
+      
+      currentMod = modName; skinListWrap.innerHTML=""; info.textContent="Carregando lista...";
       const skins = manifest[modName] || [];
-      if (!Array.isArray(skins) || skins.length === 0) { info.textContent = "Nenhuma skin encontrada neste mod."; return; }
-      info.textContent=""; const list=document.createElement("div"); list.className="skin-list"; skinListWrap.appendChild(list);
+      if (!Array.isArray(skins) || skins.length === 0) { info.textContent = "Nenhuma skin encontrada neste mod."; return;
+      }
+      info.textContent=""; 
+      const list=document.createElement("div"); list.className="skin-list"; skinListWrap.appendChild(list);
 
       thumbsCache[modName]=[];
       const cdnBase={ owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
+      
+      // OTIMIZAÇÃO: Cria os cards, mas não baixa a imagem imediatamente (Lazy Load)
       for (const sk of skins){
-        const card=document.createElement("div"); card.className="skin-card";
-        const img=document.createElement("img"); img.alt=getSkinName(sk); img.src=""; img.draggable = false;
+        const card=document.createElement("div");
+        card.className="skin-card";
+        
+        const img=document.createElement("img"); 
+        img.alt=getSkinName(sk); 
+        img.draggable = false;
+        
+        // Setup Lazy Load data
+        let thumbPath = buildFilePathFromSkin(sk, "thumb") || "";
+        if(thumbPath) {
+            const candidate = (thumbPath.startsWith("http://")||thumbPath.startsWith("https://")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
+            img.dataset.src = candidate || thumbPath;
+            img.dataset.cdnBase = JSON.stringify(cdnBase);
+            img.dataset.modName = modName;
+            // Observer ativado
+            lazyObserver.observe(img);
+        } else {
+            img.style.background = "#333";
+        }
+
         const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=getSkinName(sk);
         const footer = document.createElement("div"); footer.className="card-footer";
-        
         const applyBtnBF = document.createElement("button"); 
         applyBtnBF.className = "skin-btn bf"; 
         applyBtnBF.textContent = "BF";
         applyBtnBF.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "BF"); };
-
         const applyBtnOpp = document.createElement("button"); 
         applyBtnOpp.className = "skin-btn opponent"; 
         applyBtnOpp.textContent = "Opponent";
         applyBtnOpp.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "Opponent"); };
-
         const resetBtn = document.createElement("button"); 
         resetBtn.className = "skin-btn"; 
         resetBtn.textContent = "Reset";
-        resetBtn.title = "Apaga cache/localStorage relacionado e rebaixa o .zip";
+        resetBtn.title = "Apaga cache/localStorage relacionado e remove textura";
         resetBtn.onclick = (ev)=> { ev.stopPropagation(); resetAndRedownload(modName, sk, false); };
 
         footer.appendChild(applyBtnBF);
         footer.appendChild(applyBtnOpp);
         footer.appendChild(resetBtn);
         card.appendChild(img); card.appendChild(lbl); card.appendChild(footer);
-        
         card.onclick = ()=> downloadAndSaveOnly(modName, sk, false);
         card.addEventListener('touchstart', ()=>{}, {passive:true});
         list.appendChild(card);
-        thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card, applyBtnBF, applyBtnOpp, resetBtn });
-      }
-
-      for (const item of thumbsCache[modName]){
-        const sk = item.skin; 
-        let thumbPath = buildFilePathFromSkin(sk, "thumb") || "";
-        if (!thumbPath) { item.imgEl.style.background="#222"; continue; }
-        try {
-          const candidate = (thumbPath.startsWith("http://")||thumbPath.startsWith("https://")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
-          const blob = await fetchCdnFirst(candidate || thumbPath, "blob", cdnBase);
-          const url = URL.createObjectURL(blob);
-          item.blobUrl = url; item.imgEl.src = url;
-        } catch(e){ warn("Thumb load failed for",getSkinName(sk),e); }
+        thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card });
       }
     }
 
+    // Função auxiliar genérica de download e salvamento
     async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
       if (downloading) return;
       let zipPath = buildFilePathFromSkin(skinObj, "zip") || "";
@@ -3509,7 +3641,6 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
         const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
         
         await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-        
         const selName = getSkinName(skinObj);
         const sel = { mod: modName, name: selName, path: skinObj.path || null, zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || null };
         if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
@@ -3523,7 +3654,7 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
         else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
         try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
         
-        console.log("[skin-loader] Downloaded+Saved " + varName + ":", JSON.stringify(sel));
+        log("Downloaded+Saved " + varName);
       } catch(e){
         console.error("Download/save failed:", e);
       } finally {
@@ -3542,12 +3673,11 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
       if (!zipPath) return;
 
       downloading = true;
-      const loadingModal = showLoadingModal();
+      showLoadingModal();
       try {
         const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
         const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
         const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
         const selName = getSkinName(skinObj);
         const sel = { mod: modName, name: selName, path: skinObj.path || null, zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || null };
         if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
@@ -3556,13 +3686,14 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
         const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
         const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
         
+        // Limpar textura anterior antes de aplicar a nova (boa prática)
+        clearPixiTextureCache(selName);
+
         const gv = runtimeScene.getGame().getVariables();
         if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
         else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
         try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
         
-        console.log("[skin-loader] Saved " + varName + ":", JSON.stringify(sel));
-
         if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
           try {
             const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel" });
@@ -3582,151 +3713,89 @@ gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
       }
     }
 
+    // RESET: Agora limpa PIXI cache e remove a variável
     async function resetAndRedownload(modName, skinObj, auto=false){
       if (downloading) return;
-      // skinObj may be older format or new; try to get zip path
-      let zipPath = "";
-      if (typeof skinObj === "string") {
-        zipPath = skinObj;
-      } else {
-        zipPath = buildFilePathFromSkin(skinObj, "zip") || skinObj.zip || "";
-      }
-      if (!zipPath) {
-        const found = findSkinInManifest(manifest, modName, (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj));
-        if (found) zipPath = buildFilePathFromSkin(found, "zip") || "";
-      }
-      if (!zipPath) return;
+      
+      const skinName = (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj);
+      
+      if(!confirm("Resetar/Remover esta skin? Isso limpará o cache local e forçará o uso da skin padrão.")) return;
 
       downloading = true;
-      const loadingModal = showLoadingModal();
+      showLoadingModal();
       try {
-        const cdnBase = { owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
-        const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-
-        try {
+          // 1. Limpar variáveis de jogo e localStorage
           try {
             const gv = runtimeScene.getGame().getVariables();
             if (gv.has("SelectedSkin")) {
               const cur = gv.get("SelectedSkin").getAsString();
-              if (cur && cur.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) gv.get("SelectedSkin").setString("");
+              if (cur && cur.includes(skinName)) gv.get("SelectedSkin").setString("");
             }
             if (gv.has("SelectedDadSkin")) {
               const cur = gv.get("SelectedDadSkin").getAsString();
-              if (cur && cur.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) gv.get("SelectedDadSkin").setString("");
+              if (cur && cur.includes(skinName)) gv.get("SelectedDadSkin").setString("");
             }
           } catch(e2){}
           
           try {
             const ls1 = localStorage.getItem("gd_selected_skin");
-            if (ls1 && ls1.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) localStorage.removeItem("gd_selected_skin");
+            if (ls1 && ls1.includes(skinName)) localStorage.removeItem("gd_selected_skin");
             const ls2 = localStorage.getItem("gd_selected_dad_skin");
-            if (ls2 && ls2.includes((typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj))) localStorage.removeItem("gd_selected_dad_skin");
+            if (ls2 && ls2.includes(skinName)) localStorage.removeItem("gd_selected_dad_skin");
           } catch(e2){}
 
+          // 2. Limpar cache do Player externo
           if (window.GD_SKIN_PLAYER) {
             try {
-              if (typeof window.GD_SKIN_PLAYER.uninstallPackage === "function") {
-                await window.GD_SKIN_PLAYER.uninstallPackage(modName, (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj));
-                log("Called GD_SKIN_PLAYER.uninstallPackage");
-              } else if (typeof window.GD_SKIN_PLAYER.removePackageByUrl === "function") {
-                await window.GD_SKIN_PLAYER.removePackageByUrl(cdnCandidate);
-                log("Called GD_SKIN_PLAYER.removePackageByUrl");
-              } else if (typeof window.GD_SKIN_PLAYER.clearCache === "function") {
+               if (typeof window.GD_SKIN_PLAYER.clearCache === "function") {
                 await window.GD_SKIN_PLAYER.clearCache();
-                log("Called GD_SKIN_PLAYER.clearCache");
-              }
-            } catch(e3){
-              warn("player cache clear attempt failed", e3);
-            }
+               }
+            } catch(e3){ warn("player cache clear attempt failed", e3); }
           }
-        } catch(eClear){
-          warn("Reset: local cache removal failed", eClear);
-        }
+          
+          // 3. (CRUCIAL) Limpar texturas do PIXI manualmente para garantir que a skin saia
+          clearPixiTextureCache(skinName);
+          
+          log("Reset concluído para: " + skinName);
+          alert("Skin resetada! Recarregue a cena ou o jogo para ver o padrão.");
 
-        const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
-        const selName = (typeof skinObj === "object" ? (skinObj.name || (skinObj.path ? skinObj.path.split('/').pop() : "")) : skinObj);
-        const sel = { mod: modName, name: selName, zip: zipPath || null };
-        if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
-        else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-        
-        try {
-          const gv = runtimeScene.getGame().getVariables();
-          if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
-          else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(sel));
-        } catch(e2){}
-        try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e2){}
-        log("Reset: saved SelectedSkin after redownload", sel);
-
-        if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
-          try {
-            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: "BF" });
-            await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: "BF" });
-          } catch(e){
-            warn("Reset apply via player failed", e);
-          }
-        }
       } catch(e){
-        console.error("resetAndRedownload failed:", e);
+        console.error("Reset failed:", e);
       } finally {
         hideLoadingModal();
         downloading = false;
       }
     }
-
-    try {
-      const gv = runtimeScene.getGame().getVariables();
-      let selStr = null;
-      if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString();
-      if ((!selStr || selStr.trim()==="") && window.localStorage) selStr = localStorage.getItem("gd_selected_skin");
-      if (selStr) {
-        try {
-          const parsed = JSON.parse(selStr);
-          log("Loader: SelectedSkin detected (not auto-applying).", parsed);
-        } catch(e){ warn("Loader read SelectedSkin failed", e); }
-      }
-    } catch(e){ warn("Loader selectedskin check failed", e); }
-
-    function cleanupAndRemove(){
-      try {
-        for (const k in thumbsCache) unloadModThumbs(k);
-        const m = document.querySelector(".skin-modal");
-        if (m) document.body.removeChild(m);
-        try { document.head.removeChild(styleEl); } catch(e){}
-        hideLoadingModal();
-      } catch(e){ console.error("cleanup failed", e); }
-      try { document.documentElement.style.overflow = prevOverflow || ""; } catch(e){}
-      window.removeEventListener('keydown', onKeyDown);
-      try { window.removeEventListener('resize', ()=>{}); } catch(e){}
-    }
-
-    return { close: cleanupAndRemove, unloadModThumbs };
   }
 
   try {
     let manifest = null;
-    try { manifest = await fetchCdnFirst(MANIFEST_NAME, "json", null); } catch(e){ manifest = null; }
-    if (!manifest) { try { manifest = await fetchCdnFirst("resources/" + MANIFEST_NAME, "json", null); } catch(e){ manifest = null; } }
-    if (!manifest) { console.warn("manifestskins.json not found; opening UI empty. Consider generating manifest with _base owner/repo@branch."); manifest = { "": [] }; }
+    try { manifest = await fetchCdnFirst(MANIFEST_NAME, "json", null);
+    } catch(e){ manifest = null; }
+    if (!manifest) { try { manifest = await fetchCdnFirst("resources/" + MANIFEST_NAME, "json", null);
+    } catch(e){ manifest = null; } }
+    if (!manifest) { console.warn("manifestskins.json not found; opening UI empty."); manifest = { "": [] }; }
+    
+    // Marca o UI como "existente" para o Singleton check no início
+    window.GDSkinLoaderUI = true;
     await openSkinSelector(manifest);
   } catch(e){
     console.error("Skin loader startup failed:", e);
   }
 
 })(runtimeScene);
-
 };
 gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0xf3c570(runtimeScene);
+gdjs.InicioCode.userFunc0x2ac22a0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x134b8a8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x2ac25c0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
@@ -3735,12 +3804,12 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x134b8a8(runtimeScene);
+gdjs.InicioCode.userFunc0x2ac25c0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xfbae10 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x2ac2900 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 };
@@ -3749,7 +3818,7 @@ gdjs.InicioCode.eventsList8 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xfbae10(runtimeScene);
+gdjs.InicioCode.userFunc0x2ac2900(runtimeScene);
 
 }
 
@@ -3787,7 +3856,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.asyncCallback35121884 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35035468 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(68), null);
 }
@@ -3801,7 +3870,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(35121884, gdjs.InicioCode.asyncCallback35121884);
+gdjs.InicioCode.idToCallbackMap.set(35035468, gdjs.InicioCode.asyncCallback35035468);
 gdjs.InicioCode.eventsList10 = function(runtimeScene) {
 
 {
@@ -3811,7 +3880,7 @@ gdjs.InicioCode.eventsList10 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback35121884(runtimeScene, asyncObjectsList)), 35121884, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback35035468(runtimeScene, asyncObjectsList)), 35035468, asyncObjectsList);
 }
 }
 
@@ -3976,14 +4045,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback35129676 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35043260 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
 gdjs.InicioCode.eventsList18(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(35129676, gdjs.InicioCode.asyncCallback35129676);
+gdjs.InicioCode.idToCallbackMap.set(35043260, gdjs.InicioCode.asyncCallback35043260);
 gdjs.InicioCode.eventsList19 = function(runtimeScene) {
 
 {
@@ -3993,20 +4062,20 @@ gdjs.InicioCode.eventsList19 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35129676(runtimeScene, asyncObjectsList)), 35129676, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35043260(runtimeScene, asyncObjectsList)), 35043260, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback35139180 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35052764 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(35139180, gdjs.InicioCode.asyncCallback35139180);
+gdjs.InicioCode.idToCallbackMap.set(35052764, gdjs.InicioCode.asyncCallback35052764);
 gdjs.InicioCode.eventsList20 = function(runtimeScene) {
 
 {
@@ -4016,14 +4085,14 @@ gdjs.InicioCode.eventsList20 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback35139180(runtimeScene, asyncObjectsList)), 35139180, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback35052764(runtimeScene, asyncObjectsList)), 35052764, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback35144724 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35058308 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 
@@ -4033,7 +4102,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPoin
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(35144724, gdjs.InicioCode.asyncCallback35144724);
+gdjs.InicioCode.idToCallbackMap.set(35058308, gdjs.InicioCode.asyncCallback35058308);
 gdjs.InicioCode.eventsList21 = function(runtimeScene) {
 
 {
@@ -4044,7 +4113,7 @@ gdjs.InicioCode.eventsList21 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35144724(runtimeScene, asyncObjectsList)), 35144724, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35058308(runtimeScene, asyncObjectsList)), 35058308, asyncObjectsList);
 }
 }
 
@@ -4062,7 +4131,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35142204);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35055788);
 }
 }
 if (isConditionTrue_0) {
@@ -4098,7 +4167,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35144804);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35058388);
 }
 }
 if (isConditionTrue_0) {
@@ -4169,7 +4238,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35111452);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35025036);
 }
 }
 if (isConditionTrue_0) {
@@ -4199,7 +4268,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35115588);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35029172);
 }
 }
 if (isConditionTrue_0) {
@@ -4227,7 +4296,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35116940);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35030524);
 }
 }
 if (isConditionTrue_0) {
@@ -4255,7 +4324,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDExportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDExportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35118268);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35031852);
 }
 }
 if (isConditionTrue_0) {
@@ -4283,7 +4352,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDImportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDImportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35119692);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35033276);
 }
 }
 if (isConditionTrue_0) {
@@ -4304,7 +4373,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35120628);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35034212);
 }
 }
 if (isConditionTrue_0) {
@@ -4378,7 +4447,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35121212);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35034796);
 }
 }
 if (isConditionTrue_0) {
@@ -4686,7 +4755,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35123860);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35037444);
 }
 }
 }
@@ -4748,7 +4817,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35135452);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35049036);
 }
 }
 if (isConditionTrue_0) {
@@ -4819,7 +4888,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35140556);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35054140);
 }
 }
 if (isConditionTrue_0) {
@@ -4896,7 +4965,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35155348);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35068932);
 }
 }
 if (isConditionTrue_0) {
