@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x2ac1650 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1c43458 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -898,7 +898,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x2ac1650(runtimeScene);
+gdjs.InicioCode.userFunc0x1c43458(runtimeScene);
 
 }
 
@@ -962,7 +962,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x2ac1d98 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x19fbff8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   if (window._gd_firebase_users_combined_v1) {
@@ -1608,12 +1608,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2ac1d98(runtimeScene);
+gdjs.InicioCode.userFunc0x19fbff8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x2ac1fd0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xe5ec00 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A — CORRIGIDO (Manifest: GitHub Raw -> LocalStorage -> Fallbacks) + Cache Cleanup Fix
 (function () {
@@ -3099,12 +3099,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2ac1fd0(runtimeScene);
+gdjs.InicioCode.userFunc0xe5ec00(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x2ac22a0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x136d160 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_downloader.js
 (async function(runtimeScene) {
@@ -3790,12 +3790,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2ac22a0(runtimeScene);
+gdjs.InicioCode.userFunc0x136d160(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x2ac25c0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x19ad9c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
@@ -3804,12 +3804,12 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2ac25c0(runtimeScene);
+gdjs.InicioCode.userFunc0x19ad9c8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x2ac2900 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x19fc7d8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 };
@@ -3818,7 +3818,7 @@ gdjs.InicioCode.eventsList8 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x2ac2900(runtimeScene);
+gdjs.InicioCode.userFunc0x19fc7d8(runtimeScene);
 
 }
 

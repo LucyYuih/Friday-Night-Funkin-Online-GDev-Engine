@@ -147,7 +147,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x305efb0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x1be96a8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER (download-only) — adapta repo ativo via localStorage e usa lógica de manifest otimizado do Script A
 (async function(runtimeScene){
@@ -741,7 +741,7 @@ gdjs.PlayonlineCode.userFunc0x305efb0 = function GDJSInlineCode(runtimeScene) {
 })(runtimeScene);
 
 };
-gdjs.PlayonlineCode.userFunc0x305f078 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x28e4fd8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_watcher_online.js
 // Watcher separado: observa SelectedSkin / SelectedDadSkin e aplica apenas quando mudarem.
@@ -1048,7 +1048,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x305efb0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1be96a8(runtimeScene);
 
 }
 
@@ -1056,7 +1056,7 @@ gdjs.PlayonlineCode.userFunc0x305efb0(runtimeScene);
 {
 
 
-gdjs.PlayonlineCode.userFunc0x305f078(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x28e4fd8(runtimeScene);
 
 }
 
@@ -1198,891 +1198,586 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x30612b0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x19fb198 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_player.js (correção do flip do Opponent) - versão modificada (fix multiplayer idle bug)
+// skin player
 (function(){
+  // --- CONFIGURAÇÃO GLOBAL E CACHE ---
+  if (!window.GD_SKIN_CACHE) {
+    window.GD_SKIN_CACHE = {
+        zips: {},     
+        textures: []  
+    };
+  }
+
   const JSZIP_CDN = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
-  const PLAYER_GLOBAL = "__gd_skin_player";
+  const PLAYER_GLOBAL = "__gd_skin_player"; 
 
   function log(...s){ console.log("[gd-skin-player]", ...s); }
   function warn(...s){ console.warn("[gd-skin-player]", ...s); }
 
-  async function ensureJSZip(){
-    if (window.JSZip) return window.JSZip;
-    await new Promise((res, rej) => {
-      const s = document.createElement("script");
-      s.src = JSZIP_CDN;
-      s.onload = res;
-      s.onerror = () => rej(new Error("Failed to load JSZip"));
-      document.head.appendChild(s);
-    });
-    if (!window.JSZip) throw new Error("JSZip not available");
-    return window.JSZip;
-  }
-
-  function safeParseJson(s){ try { return JSON.parse(s); } catch(e){ return null; } }
-  function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
-  function buildCdnUrl(owner, repo, branch, path){ if(!owner||!repo) return null; const br = branch||"main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
-
-  function getObjectSize(obj){
-    try {
-      if (!obj) return {w:0,h:0};
-      if (typeof obj.getWidth === "function" && typeof obj.getHeight === "function") {
-        return { w: obj.getWidth(), h: obj.getHeight() };
-      }
-      const ro = obj.getRendererObject && obj.getRendererObject();
-      if (ro) {
-        if (typeof ro.width === "number" && typeof ro.height === "number") return { w: ro.width, h: ro.height };
-        if (ro.getBounds && typeof ro.getBounds === "function") {
-          const b = ro.getBounds();
-          return { w: b.width || 0, h: b.height || 0 };
-        }
-      }
-      return { w: 0, h: 0 };
-    } catch(e){ return {w:0,h:0}; }
-  }
-  
-  function getTexturePixelSize(tex){
-    try {
-      if (!tex) return {w:0,h:0};
+  // --- SINGLETON DEFINITION ---
+  if (!window.GD_SKIN_PLAYER_DEFINED) {
       
-      if (tex.frame) {
-        const frame = tex.frame;
-        if (frame.width && frame.height) {
-          return { w: frame.width, h: frame.height };
-        }
-        if (frame.realWidth && frame.realHeight) {
-          return { w: frame.realWidth, h: frame.realHeight };
-        }
-      }
-      
-      if (tex.baseTexture) {
-        const bt = tex.baseTexture;
-        if (bt.realWidth && bt.realHeight) {
-          return { w: bt.realWidth, h: bt.realHeight };
-        }
-        if (bt.width && bt.height) {
-          return { w: bt.width, h: bt.height };
-        }
-      }
-      
-      if (typeof tex.width === "number" && typeof tex.height === "number") {
-        return { w: tex.width, h: tex.height };
-      }
-      
-      return {w:0,h:0};
-    } catch(e){ 
-      console.warn("getTexturePixelSize failed:", e);
-      return {w:0,h:0}; 
-    }
-  }
-
-  function findJsonAndBasePath(zip){
-    const entries = Object.keys(zip.files);
-    const candidates = [];
-    for (const name of entries) {
-      if (name.toLowerCase().endsWith(".json")) {
-        const f = zip.files[name];
-        const ts = (f && f.date && f.date instanceof Date) ? f.date.getTime() : 0;
-        candidates.push({ name, ts });
-      }
-    }
-    if (candidates.length === 0) throw new Error("Metadata JSON not found in ZIP");
-
-    const metaMatches = candidates.filter(c => {
-      const n = c.name.toLowerCase();
-      return n.endsWith("/metadata.json") || n.endsWith("metadata.json") || n.includes("metadata");
-    });
-
-    let chosen;
-    if (metaMatches.length) {
-      metaMatches.sort((a,b) => b.ts - a.ts);
-      chosen = metaMatches[0];
-    } else {
-      candidates.sort((a,b) => b.ts - a.ts);
-      chosen = candidates[0];
-    }
-
-    const parts = chosen.name.split("/");
-    const baseFolderPrefix = parts.slice(0, parts.length - 1).join("/");
-    return { jsonEntryName: chosen.name, baseFolderPrefix };
-  }
-
-  function groupImageEntries(entries, baseFolderPrefix, metadata){
-    const groups = {};
-    const animNames = (metadata && Array.isArray(metadata.animations)) ? metadata.animations.map(a=>a.anim) : [];
-    if (animNames.length === 0) groups["idle"] = [];
-    for (const anim of animNames) groups[anim] = [];
-    for (const e of entries){
-      let rel = e;
-      if (baseFolderPrefix && e.startsWith(baseFolderPrefix + "/")) rel = e.slice(baseFolderPrefix.length + 1);
-      for (const anim of animNames){
-        const folderCheck1 = rel.startsWith(anim + "/");
-        const folderCheck2 = metadata && metadata.image && rel.startsWith(metadata.image + "/" + anim + "/");
-        const filename = rel.split("/").pop();
-        const nameCheck = filename.toLowerCase().startsWith(anim.toLowerCase() + "_");
-        if ((folderCheck1 || folderCheck2 || nameCheck) && /\.(png|jpg|jpeg|gif)$/i.test(filename)){
-          groups[anim].push(e);
-        }
-      }
-      if (animNames.length === 0 && /\.(png|jpg|jpeg|gif)$/i.test(e.split("/").pop())){
-        groups["idle"].push(e);
-      }
-    }
-    for (const k of Object.keys(groups)) groups[k].sort((a,b)=>a.localeCompare(b, undefined, { numeric: true }));
-    return groups;
-  }
-
-  async function loadTexturesFromZipEntries(zip, entryNames){
-    const textures = [];
-    for (const n of entryNames){
-      try {
-        const file = zip.file(n);
-        if (!file) continue;
-        const blob = await file.async("blob");
-        const url = URL.createObjectURL(blob);
-        const tex = PIXI.Texture.from(url);
-        
-        await new Promise((resolve, reject) => {
-          if (tex.baseTexture && tex.baseTexture.valid) {
-            return resolve();
-          }
-          
-          const checkValid = () => {
-            if (tex.baseTexture && tex.baseTexture.valid) {
-              resolve();
-            } else {
-              setTimeout(checkValid, 10);
-            }
-          };
-          
-          setTimeout(() => {
-            if (tex.baseTexture && tex.baseTexture.valid) {
-              resolve();
-            } else {
-              reject(new Error("Texture loading timeout"));
-            }
-          }, 2000);
-          
-          checkValid();
+      async function ensureJSZip(){
+        if (window.JSZip) return window.JSZip;
+        if (window.JSZipLoadingPromise) return window.JSZipLoadingPromise;
+        window.JSZipLoadingPromise = new Promise((res, rej) => {
+          const s = document.createElement("script");
+          s.src = JSZIP_CDN;
+          s.onload = () => { window.JSZipLoadingPromise = null; res(window.JSZip); };
+          s.onerror = () => { window.JSZipLoadingPromise = null; rej(new Error("Failed to load JSZip")); };
+          document.head.appendChild(s);
         });
-        
-        textures.push({ tex, blobUrl: url, entryName: n });
-      } catch(e){
-        warn("Failed load entry", n, e);
+        return window.JSZipLoadingPromise;
       }
-    }
-    return textures;
-  }
 
-  async function loadFromArrayBuffer(runtimeScene, arrayBuffer, opts = {}) {
-    await ensureJSZip();
-    const zip = await window.JSZip().loadAsync(arrayBuffer);
+      function safeParseJson(s){ try { return JSON.parse(s); } catch(e){ return null; } }
+      function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
+      function buildCdnUrl(owner, repo, branch, path){ if(!owner||!repo) return null; const br = branch||"main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
 
-    let jsonEntryName, baseFolderPrefix;
-    try { const found = findJsonAndBasePath(zip); jsonEntryName = found.jsonEntryName; baseFolderPrefix = found.baseFolderPrefix; }
-    catch(e){ throw new Error("Metadata JSON not found in zip: " + (e && e.message)); }
-
-    let metadata;
-    try {
-      const txt = await zip.file(jsonEntryName).async("string");
-      metadata = JSON.parse(txt);
-    } catch(e){ throw new Error("Failed reading metadata: " + (e && e.message)); }
-
-    try {
-      if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
-      window.GD_SKIN_PLAYER.lastDownloadedMetadata = metadata;
-      window.GD_SKIN_PLAYER.lastDownloadedJsonEntry = jsonEntryName;
-      window.GD_SKIN_PLAYER.lastDownloadedBaseFolder = baseFolderPrefix;
-      window.GD_SKIN_PLAYER.lastDownloadedAt = (new Date()).toISOString();
-    } catch(e){ }
-
-    const allEntries = Object.keys(zip.files);
-    const groups = groupImageEntries(allEntries, baseFolderPrefix, metadata);
-
-    const animations = {};
-    for (const am of (metadata.animations || [])){
-      animations[am.anim] = { name: am.anim, fps: am.fps||24, frames: [], loaded: false, loop: am.anim === "idle" };
-    }
-    if (Object.keys(animations).length === 0) animations["idle"] = { name:"idle", fps:24, frames:[], loaded:false, loop:true };
-
-    for (const key of Object.keys(animations)){
-      const entryNames = groups[key] || [];
-      if (!entryNames.length) { animations[key].loaded = true; animations[key].frames = []; continue; }
-      const loaded = await loadTexturesFromZipEntries(zip, entryNames);
-      animations[key].frames = loaded.map(o => o.tex);
-      animations[key].loaded = true;
-      animations[key]._blobUrls = loaded.map(o => o.blobUrl);
-    }
-
-    return { 
-      animations, 
-      metadata, 
-      _createdBlobUrls: (function collect(){ 
-        const arr=[]; 
-        for(const k of Object.keys(animations)){ 
-          const a=animations[k]; 
-          if (a._blobUrls) arr.push(...a._blobUrls);
-        } 
-        return arr; 
-      })() 
-    };
-  }
-
-  function computeCenterAndFeetForObject(obj){
-    const size = getObjectSize(obj);
-    const ro = (obj.getRendererObject && obj.getRendererObject()) || null;
-    let anchorX = 0.5, anchorY = 0;
-    try {
-      if (ro) {
-        if (ro.anchor && typeof ro.anchor.x === "number" && typeof ro.anchor.y === "number"){
-          anchorX = ro.anchor.x; anchorY = ro.anchor.y;
-        } else if (ro.pivot && typeof ro.pivot.x === "number" && typeof ro.pivot.y === "number" && typeof ro.width === "number" && typeof ro.height === "number" && ro.width>0 && ro.height>0) {
-          anchorX = ro.pivot.x / (ro.width || 1);
-          anchorY = ro.pivot.y / (ro.height || 1);
-        }
-      }
-    } catch(e){}
-    const gx = (typeof obj.getX === "function") ? obj.getX() : 0;
-    const gy = (typeof obj.getY === "function") ? obj.getY() : 0;
-    
-    const centerX = gx + (0.5 - anchorX) * (size.w || 0);
-    const feetY = gy + (1 - (typeof anchorY === "number" ? anchorY : 0)) * (size.h || 0);
-
-    let pixelToSceneOriginal = 1;
-    try {
-      const tex = ro && (ro.texture || (ro.sprite && ro.sprite.texture));
-      if (tex) {
-        const texPx = getTexturePixelSize(tex);
-        if (texPx && texPx.h > 0 && size.h > 0) {
-          pixelToSceneOriginal = size.h / texPx.h;
-        }
-      }
-    } catch(e){ }
-
-    return { centerX, feetY, anchorX, anchorY, size, originalX: gx, originalY: gy, pixelToSceneOriginal };
-  }
-
-  async function applyPackageToScene(runtimeScene, packageObj, opts = {}) {
-    const TARGET_NAME = (opts && opts.targetName) ? opts.targetName : "BF";
-    const TARGET_ANIM_VAR = (opts && opts.targetAnimVar) ? opts.targetAnimVar : "BFAnim";
-    const invertOffsetY = (typeof opts.invertOffsetY === "boolean") ? opts.invertOffsetY : false;
-    const coordinateMode = (opts.coordinateMode === "raw") ? "raw" : "psych";
-
-    const animations = packageObj.animations || {};
-    const targetObjects = runtimeScene.getObjects(TARGET_NAME);
-    if (!targetObjects || targetObjects.length === 0) {
-      warn(TARGET_NAME + " not found in scene when applying skin. Aborting apply.");
-      return null;
-    }
-
-    // CAPTURAR POSIÇÕES ORIGINAIS
-    const targetInfos = [];
-    for (const obj of targetObjects) {
-      try {
-        const info = computeCenterAndFeetForObject(obj);
-        let originalScaleX = 1;
+      function getObjectSize(obj){
         try {
+          if (!obj) return {w:0,h:0};
+          if (typeof obj.getWidth === "function" && typeof obj.getHeight === "function") return { w: obj.getWidth(), h: obj.getHeight() };
           const ro = obj.getRendererObject && obj.getRendererObject();
           if (ro) {
-            if (ro.scale && typeof ro.scale.x === "number") originalScaleX = ro.scale.x;
-            else if (typeof ro.scaleX === "number") originalScaleX = ro.scaleX;
+            if (typeof ro.width === "number" && typeof ro.height === "number") return { w: ro.width, h: ro.height };
+            if (ro.getBounds && typeof ro.getBounds === "function") { const b = ro.getBounds(); return { w: b.width || 0, h: b.height || 0 }; }
+          }
+          return { w: 0, h: 0 };
+        } catch(e){ return {w:0,h:0}; }
+      }
+      
+      function getTexturePixelSize(tex){
+        try {
+          if (!tex) return {w:0,h:0};
+          if (tex.frame) {
+            if (tex.frame.width && tex.frame.height) return { w: tex.frame.width, h: tex.frame.height };
+            if (tex.frame.realWidth && tex.frame.realHeight) return { w: tex.frame.realWidth, h: tex.frame.realHeight };
+          }
+          if (tex.baseTexture) {
+            if (tex.baseTexture.realWidth && tex.baseTexture.realHeight) return { w: tex.baseTexture.realWidth, h: tex.baseTexture.realHeight };
+            if (tex.baseTexture.width && tex.baseTexture.height) return { w: tex.baseTexture.width, h: tex.baseTexture.height };
+          }
+          if (typeof tex.width === "number" && typeof tex.height === "number") return { w: tex.width, h: tex.height };
+          return {w:0,h:0};
+        } catch(e){ return {w:0,h:0}; }
+      }
+
+      function findJsonAndBasePath(zip){
+        const entries = Object.keys(zip.files);
+        const candidates = [];
+        for (const name of entries) {
+          if (name.toLowerCase().endsWith(".json")) {
+            const f = zip.files[name];
+            const ts = (f && f.date && f.date instanceof Date) ? f.date.getTime() : 0;
+            candidates.push({ name, ts });
+          }
+        }
+        if (candidates.length === 0) throw new Error("Metadata JSON not found in ZIP");
+        const metaMatches = candidates.filter(c => { const n = c.name.toLowerCase(); return n.endsWith("/metadata.json") || n.endsWith("metadata.json") || n.includes("metadata"); });
+        let chosen;
+        if (metaMatches.length) { metaMatches.sort((a,b) => b.ts - a.ts); chosen = metaMatches[0]; } 
+        else { candidates.sort((a,b) => b.ts - a.ts); chosen = candidates[0]; }
+        const parts = chosen.name.split("/");
+        const baseFolderPrefix = parts.slice(0, parts.length - 1).join("/");
+        return { jsonEntryName: chosen.name, baseFolderPrefix };
+      }
+
+      function groupImageEntries(entries, baseFolderPrefix, metadata){
+        const groups = {};
+        const animNames = (metadata && Array.isArray(metadata.animations)) ? metadata.animations.map(a=>a.anim) : [];
+        if (animNames.length === 0) groups["idle"] = [];
+        for (const anim of animNames) groups[anim] = [];
+        for (const e of entries){
+          let rel = e;
+          if (baseFolderPrefix && e.startsWith(baseFolderPrefix + "/")) rel = e.slice(baseFolderPrefix.length + 1);
+          for (const anim of animNames){
+            const folderCheck1 = rel.startsWith(anim + "/");
+            const folderCheck2 = metadata && metadata.image && rel.startsWith(metadata.image + "/" + anim + "/");
+            const filename = rel.split("/").pop();
+            const nameCheck = filename.toLowerCase().startsWith(anim.toLowerCase() + "_");
+            if ((folderCheck1 || folderCheck2 || nameCheck) && /\.(png|jpg|jpeg|gif)$/i.test(filename)){
+              groups[anim].push(e);
+            }
+          }
+          if (animNames.length === 0 && /\.(png|jpg|jpeg|gif)$/i.test(e.split("/").pop())){ groups["idle"].push(e); }
+        }
+        for (const k of Object.keys(groups)) groups[k].sort((a,b)=>a.localeCompare(b, undefined, { numeric: true }));
+        return groups;
+      }
+
+      async function loadTexturesFromZipEntries(zip, entryNames){
+        const textures = [];
+        for (const n of entryNames){
+          try {
+            const file = zip.file(n);
+            if (!file) continue;
+            const blob = await file.async("blob");
+            const url = URL.createObjectURL(blob);
+            const tex = PIXI.Texture.from(url);
+            
+            if(window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.textures) window.GD_SKIN_CACHE.textures.push({ tex, url });
+
+            await new Promise((resolve, reject) => {
+              if (tex.baseTexture && tex.baseTexture.valid) return resolve();
+              const checkValid = () => {
+                if (tex.baseTexture && tex.baseTexture.valid) resolve();
+                else setTimeout(checkValid, 10);
+              };
+              setTimeout(() => { if (tex.baseTexture && tex.baseTexture.valid) resolve(); else reject(new Error("Timeout texture")); }, 3000);
+              checkValid();
+            });
+            textures.push({ tex, blobUrl: url, entryName: n });
+          } catch(e){ warn("Failed load entry", n, e); }
+        }
+        return textures;
+      }
+
+      async function loadFromArrayBuffer(runtimeScene, arrayBuffer, opts = {}) {
+        await ensureJSZip();
+        const zip = await window.JSZip().loadAsync(arrayBuffer);
+        let jsonEntryName, baseFolderPrefix;
+        try { 
+            const found = findJsonAndBasePath(zip); 
+            jsonEntryName = found.jsonEntryName; baseFolderPrefix = found.baseFolderPrefix;
+        } catch(e){ throw new Error("Metadata JSON not found: " + (e && e.message)); }
+
+        let metadata;
+        try { metadata = JSON.parse(await zip.file(jsonEntryName).async("string")); } 
+        catch(e){ throw new Error("Failed reading metadata: " + (e && e.message)); }
+
+        if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
+        window.GD_SKIN_PLAYER.lastDownloadedMetadata = metadata;
+
+        const allEntries = Object.keys(zip.files);
+        const groups = groupImageEntries(allEntries, baseFolderPrefix, metadata);
+        const animations = {};
+        
+        for (const am of (metadata.animations || [])){
+          animations[am.anim] = { name: am.anim, fps: am.fps||24, frames: [], loaded: false, loop: am.anim === "idle" };
+        }
+        if (Object.keys(animations).length === 0) animations["idle"] = { name:"idle", fps:24, frames:[], loaded:false, loop:true };
+        
+        // --- PRE-WARM ---
+        for (const key of Object.keys(animations)){
+          const entryNames = groups[key] || [];
+          if (!entryNames.length) { animations[key].loaded = true; animations[key].frames = []; continue; }
+          
+          const loaded = await loadTexturesFromZipEntries(zip, entryNames);
+          animations[key].frames = loaded.map(o => o.tex);
+          animations[key].loaded = true;
+          animations[key]._blobUrls = loaded.map(o => o.blobUrl);
+          
+          loaded.forEach(obj => {
+             if(obj.tex && obj.tex.baseTexture) {
+                 obj.tex.baseTexture.update(); 
+             }
+          });
+        }
+        log("Todas as animações foram pré-carregadas.");
+        return { 
+          animations, metadata, 
+          _createdBlobUrls: (function collect(){ const arr=[]; for(const k of Object.keys(animations)){ const a=animations[k]; if (a._blobUrls) arr.push(...a._blobUrls); } return arr; })() 
+        };
+      }
+
+      function computeCenterAndFeetForObject(obj){
+        const size = getObjectSize(obj);
+        const ro = (obj.getRendererObject && obj.getRendererObject()) || null;
+        let anchorX = 0.5, anchorY = 0;
+        try {
+          if (ro) {
+            if (ro.anchor && typeof ro.anchor.x === "number") { anchorX = ro.anchor.x; anchorY = ro.anchor.y; }
+            else if (ro.pivot && typeof ro.pivot.x === "number" && typeof ro.width === "number") { anchorX = ro.pivot.x / (ro.width || 1); anchorY = ro.pivot.y / (ro.height || 1); }
           }
         } catch(e){}
-        
-        // use absolute value as baseline to avoid inheriting an unwanted flip
-        const originalAbsScaleX = Math.abs(typeof originalScaleX === "number" && isFinite(originalScaleX) ? originalScaleX : 1) || 1;
-
-        targetInfos.push({ 
-          obj, 
-          centerX: info.centerX, 
-          feetY: info.feetY, 
-          anchorX: info.anchorX, 
-          anchorY: info.anchorY, 
-          size: info.size, 
-          originalScaleX,
-          originalAbsScaleX,
-          originalX: info.originalX,
-          originalY: info.originalY,
-          pixelToSceneOriginal: (typeof info.pixelToSceneOriginal === "number" && isFinite(info.pixelToSceneOriginal)) ? info.pixelToSceneOriginal : 1
-        });
-        
-        log(`Original ${TARGET_NAME} pos - X:${info.originalX} Y:${info.originalY} centerX:${info.centerX} feetY:${info.feetY} size:${info.size.w}x${info.size.h} anchor:(${info.anchorX},${info.anchorY}) pxToScene:${info.pixelToSceneOriginal}`);
-      } catch(e){
-        const fallbackSize = getObjectSize(obj);
         const gx = (typeof obj.getX === "function") ? obj.getX() : 0;
         const gy = (typeof obj.getY === "function") ? obj.getY() : 0;
-        targetInfos.push({ 
-          obj, 
-          centerX: gx, 
-          feetY: gy + (fallbackSize.h || 0),
-          anchorX: 0.5, 
-          anchorY: 0, 
-          size: fallbackSize, 
-          originalScaleX: 1,
-          originalAbsScaleX: 1,
-          originalX: gx,
-          originalY: gy,
-          pixelToSceneOriginal: 1
-        });
-      }
-    }
-
-    const state = {
-      current: "idle", 
-      frameIndex: 0, 
-      elapsed: 0, 
-      lastAnimValue: "", 
-      lastTick: performance.now(),
-      _idleBeatTimeout: null, 
-      _returnToIdleTimeout: null, 
-      _createdBlobUrls: packageObj._createdBlobUrls || [], 
-      _isPlayingSingAnimation: false,
-      _idleTimerRunning: false,
-      _watchdogCounter: 0
-    };
-
-    const meta = packageObj.metadata || {};
-    
-    // CORREÇÃO CRÍTICA: Lógica do flip para Opponent
-    let invertSideGlobal = false;
-
-    // normalizar meta.OPPSide para boolean robusto (aceita "true"/"false"/1/0)
-    const parseBoolean = (v) => {
-      if (typeof v === "boolean") return v;
-      if (typeof v === "number") return v !== 0;
-      if (typeof v === "string") {
-        const s = v.trim().toLowerCase();
-        if (s === "true" || s === "1" || s === "yes") return true;
-        if (s === "false" || s === "0" || s === "no") return false;
-      }
-      return Boolean(v);
-    };
-    const oppSideBool = parseBoolean(meta.OPPSide);
-
-    if (TARGET_NAME === "BFPixel") {
-      // OPPSide = true -> SEM flip (normal), OPPSide = false -> COM flip
-      invertSideGlobal = !oppSideBool;
-      log(`Opponent flip logic: OPPSide=${meta.OPPSide} (parsed=${oppSideBool}), invertSideGlobal=${invertSideGlobal}`);
-    } else {
-      // BF: OPPSide = true -> COM flip, OPPSide = false -> SEM flip  
-      invertSideGlobal = oppSideBool;
-      log(`BF flip logic: OPPSide=${meta.OPPSide} (parsed=${oppSideBool}), invertSideGlobal=${invertSideGlobal}`);
-    }
-
-    function mapAnimToKey(rawAnim, invertSide){
-      if (!rawAnim) return "";
-      const v = rawAnim.toLowerCase();
-      if (invertSide) {
-        if (v.includes("left")) return "singRIGHT";
-        if (v.includes("right")) return "singLEFT";
-      } else {
-        if (v.includes("left")) return "singLEFT";
-        if (v.includes("right")) return "singRIGHT";
-      }
-      if (v.includes("down")) return "singDOWN";
-      if (v.includes("up")) return "singUP";
-      return rawAnim;
-    }
-
-    function applyFrameToAllObjects(tex){
-      if (!targetInfos || targetInfos.length === 0) return;
-      const texPixel = getTexturePixelSize(tex);
-      const texPxW = texPixel.w || 0;
-      const texPxH = texPixel.h || 0;
-
-      for (const info of targetInfos) {
-        const obj = info.obj;
+        const centerX = gx + (0.5 - anchorX) * (size.w || 0);
+        const feetY = gy + (1 - (typeof anchorY === "number" ? anchorY : 0)) * (size.h || 0);
+        let pixelToSceneOriginal = 1;
         try {
-          // Aplicar textura
-          const ro = obj.getRendererObject && obj.getRendererObject();
-          if (ro && ro.texture !== undefined) {
-            ro.texture = tex;
-          } else {
-            try { obj.getRendererObject().texture = tex; } catch(e){}
-          }
-
-          const ox_scene = 0;
-          const oy_scene = 0;
-
-          let pixelToScene = 1;
-          if (coordinateMode === "psych") {
-            pixelToScene = (typeof info.pixelToSceneOriginal === "number" && info.pixelToSceneOriginal > 0) ? info.pixelToSceneOriginal : 1;
-          } else {
-            pixelToScene = 1;
-          }
-
-          const oyAdjusted = invertOffsetY ? -oy_scene : oy_scene;
-
-          // USAR DIMENSÕES EXATAS DA TEXTURA
-          const scaledTexWidth = texPxW * pixelToScene;
-          const scaledTexHeight = texPxH * pixelToScene;
-
-          const targetFeetY = info.feetY + oyAdjusted;
-          const targetCenterX = info.centerX + ox_scene;
-
-          const anchorX = (typeof info.anchorX === "number") ? info.anchorX : 0.5;
-          const anchorY = (typeof info.anchorY === "number") ? info.anchorY : 0;
-
-          const currentWidth = scaledTexWidth;
-          const currentHeight = scaledTexHeight;
-
-          const targetObjX = targetCenterX - (0.5 - anchorX) * currentWidth;
-          const targetObjY = targetFeetY - (1 - anchorY) * currentHeight;
-
-          if (typeof obj.setX === "function") obj.setX(targetObjX);
-          if (typeof obj.setY === "function") obj.setY(targetObjY);
-
-          // CORREÇÃO APLICADA: Lógica de flip corrigida usando originalAbsScaleX
-          try {
-            if (ro) {
-              // baseline absoluto (garante que não herdamos um flip indesejado do original)
-              const baseScale = (typeof info.originalAbsScaleX === "number" && info.originalAbsScaleX > 0) ? info.originalAbsScaleX : (Math.abs(info.originalScaleX) || 1);
-              const wantScaleX = invertSideGlobal ? -baseScale : baseScale;
-
-              if (ro.scale && typeof ro.scale.x === "number") {
-                ro.scale.x = wantScaleX;
-              } else if (typeof ro.scaleX === "number") {
-                ro.scaleX = wantScaleX;
-              } else {
-                ro.scale = ro.scale || {};
-                if (typeof ro.scale.x === "number") ro.scale.x = wantScaleX;
-              }
-              
-              log(`Applied scale to ${TARGET_NAME}: ${wantScaleX} (invertSideGlobal: ${invertSideGlobal})`);
-            }
-          } catch(e){
-            warn("Error applying scale:", e);
-          }
-
-          const newFeetY = targetObjY + (1 - anchorY) * currentHeight;
-          const newCenterX = targetObjX + (0.5 - anchorX) * currentWidth;
-          log(`Applied frame to ${TARGET_NAME} - Texture:${texPxW}x${texPxH} Scaled:${scaledTexWidth}x${scaledTexHeight} ActualFeetY:${newFeetY} ActualCenterX:${newCenterX}`);
-        } catch(e){
-          console.error("Error applying frame to object:", e);
-        }
+          const tex = ro && (ro.texture || (ro.sprite && ro.sprite.texture));
+          if (tex) { const texPx = getTexturePixelSize(tex); if (texPx && texPx.h > 0 && size.h > 0) pixelToSceneOriginal = size.h / texPx.h; }
+        } catch(e){ }
+        return { centerX, feetY, anchorX, anchorY, size, originalX: gx, originalY: gy, pixelToSceneOriginal };
       }
-    }
 
-    // Aplicar frame inicial (idle)
-    if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
-      applyFrameToAllObjects(animations.idle.frames[0]);
-    }
+      async function applyPackageToScene(runtimeScene, packageObj, opts = {}) {
+        const TARGET_NAME = (opts && opts.targetName) ? opts.targetName : "BF";
+        
+        // Anti-Flicker: Mata player anterior
+        if (window[PLAYER_GLOBAL] && window[PLAYER_GLOBAL][TARGET_NAME]) {
+            try { window[PLAYER_GLOBAL][TARGET_NAME].cleanup(); } catch(e){}
+            window[PLAYER_GLOBAL][TARGET_NAME] = null;
+        }
 
-    let rafHandle = null;
-    function clearAllTimeouts(){ 
-      if (state._idleBeatTimeout){ clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout=null; } 
-      if (state._returnToIdleTimeout){ clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout=null; } 
-      state._idleTimerRunning = false;
-    }
-    
-    // Helper robusto para decidir se um valor de animação é "vazio" (deve voltar para idle)
-    function animValueIsEmpty(s){
-      if (s === null || s === undefined) return true;
-      try {
-        const st = String(s).trim().toLowerCase();
-        return st === "" || st === "idle";
-      } catch(e){ return true; }
-    }
+        const TARGET_ANIM_VAR = (opts && opts.targetAnimVar) ? opts.targetAnimVar : "BFAnim";
+        const invertOffsetY = (typeof opts.invertOffsetY === "boolean") ? opts.invertOffsetY : false;
+        const coordinateMode = (opts.coordinateMode === "raw") ? "raw" : "psych";
 
-    // Retorna ao idle com segurança
-    function scheduleReturnToIdle(delayMs = 150){
-      // sempre cancela timers anteriores para evitar múltiplos timers concorrentes
-      if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
-      state._idleTimerRunning = true;
-      state._returnToIdleTimeout = setTimeout(()=>{
-        state._returnToIdleTimeout = null;
-        state._idleTimerRunning = false;
-        state.current = "idle";
-        state.frameIndex = 0;
-        state.elapsed = 0;
-        state._isPlayingSingAnimation = false;
+        const animations = packageObj.animations || {};
+        const targetObjects = runtimeScene.getObjects(TARGET_NAME);
+        if (!targetObjects || targetObjects.length === 0) { warn(TARGET_NAME + " not found."); return null; }
+
+        const targetInfos = [];
+        for (const obj of targetObjects) {
+          try {
+            const info = computeCenterAndFeetForObject(obj);
+            let originalScaleX = 1;
+            try {
+              const ro = obj.getRendererObject && obj.getRendererObject();
+              if (ro) {
+                if (ro.scale && typeof ro.scale.x === "number") originalScaleX = ro.scale.x;
+                else if (typeof ro.scaleX === "number") originalScaleX = ro.scaleX;
+              }
+            } catch(e){}
+            const originalAbsScaleX = Math.abs(typeof originalScaleX === "number" && isFinite(originalScaleX) ? originalScaleX : 1) || 1;
+            targetInfos.push({ 
+              obj, centerX: info.centerX, feetY: info.feetY, anchorX: info.anchorX, anchorY: info.anchorY, 
+              originalScaleX, originalAbsScaleX, pixelToSceneOriginal: (typeof info.pixelToSceneOriginal === "number" && isFinite(info.pixelToSceneOriginal)) ? info.pixelToSceneOriginal : 1
+            });
+          } catch(e){ }
+        }
+
+        const state = {
+          current: "idle", frameIndex: 0, elapsed: 0, lastAnimValue: "", lastTick: performance.now(),
+          _idleBeatTimeout: null, _returnToIdleTimeout: null, _createdBlobUrls: packageObj._createdBlobUrls || [], 
+          _isPlayingSingAnimation: false, _idleTimerRunning: false, _watchdogCounter: 0
+        };
+        const meta = packageObj.metadata || {};
+        
+        let invertSideGlobal = false;
+        const parseBoolean = (v) => {
+          if (typeof v === "boolean") return v;
+          if (typeof v === "number") return v !== 0;
+          if (typeof v === "string") {
+             const s = v.trim().toLowerCase();
+             return (s === "true" || s === "1" || s === "yes");
+          }
+          return Boolean(v);
+        };
+        const oppSideBool = parseBoolean(meta.OPPSide);
+        invertSideGlobal = (TARGET_NAME === "BFPixel") ? !oppSideBool : oppSideBool;
+
+        function mapAnimToKey(rawAnim, invertSide){
+          if (!rawAnim) return "";
+          const v = rawAnim.toLowerCase();
+          if (invertSide) {
+            if (v.includes("left")) return "singRIGHT";
+            if (v.includes("right")) return "singLEFT";
+          } else {
+            if (v.includes("left")) return "singLEFT";
+            if (v.includes("right")) return "singRIGHT";
+          }
+          if (v.includes("down")) return "singDOWN";
+          if (v.includes("up")) return "singUP";
+          return rawAnim;
+        }
+
+        function applyFrameToAllObjects(tex){
+          if (!targetInfos || targetInfos.length === 0) return;
+          const texPixel = getTexturePixelSize(tex);
+          for (const info of targetInfos) {
+            const obj = info.obj;
+            try {
+              const ro = obj.getRendererObject && obj.getRendererObject();
+              if (ro && ro.texture !== undefined) ro.texture = tex;
+              else { try { obj.getRendererObject().texture = tex; } catch(e){} }
+
+              const pixelToScene = (coordinateMode === "psych") ? ((typeof info.pixelToSceneOriginal === "number" && info.pixelToSceneOriginal > 0) ? info.pixelToSceneOriginal : 1) : 1;
+              const scaledTexWidth = (texPixel.w || 0) * pixelToScene;
+              const scaledTexHeight = (texPixel.h || 0) * pixelToScene;
+              const targetFeetY = info.feetY;
+              const targetCenterX = info.centerX;
+              const anchorX = (typeof info.anchorX === "number") ? info.anchorX : 0.5;
+              const anchorY = (typeof info.anchorY === "number") ? info.anchorY : 0;
+              
+              const targetObjX = targetCenterX - (0.5 - anchorX) * scaledTexWidth;
+              const targetObjY = targetFeetY - (1 - anchorY) * scaledTexHeight;
+              
+              if (typeof obj.setX === "function") obj.setX(targetObjX);
+              if (typeof obj.setY === "function") obj.setY(targetObjY);
+
+              if (ro) {
+                  const baseScale = (typeof info.originalAbsScaleX === "number" && info.originalAbsScaleX > 0) ? info.originalAbsScaleX : 1;
+                  const wantScaleX = invertSideGlobal ? -baseScale : baseScale;
+                  if (ro.scale && typeof ro.scale.x === "number") ro.scale.x = wantScaleX;
+                  else if (typeof ro.scaleX === "number") ro.scaleX = wantScaleX;
+              }
+            } catch(e){ console.error("Error applying frame:", e); }
+          }
+        }
+
         if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
           applyFrameToAllObjects(animations.idle.frames[0]);
         }
-        log("Returned to idle after scheduled timeout (multiplayer-safe)");
-      }, delayMs);
-    }
 
-    // Watchdog para evitar ficar preso em animação sem avanço
-    let watchdogLastFrameIndex = null;
-    let watchdogCounter = 0;
-    const WATCHDOG_MAX_TICKS = 40; // se por ~40 ticks (com dt limitado) não avançar ou variável estiver inconsistente, volta ao idle
-
-    function tick(now){
-      const dt = Math.min(100, now - (state.lastTick || now)); 
-      state.lastTick = now;
-      
-      let currentAnim = "";
-      try {
-        const sv = runtimeScene.getVariables();
-        const gv = runtimeScene.getGame().getVariables();
-        // Tentar ler da variável de cena -> se não existir, ler game variable
-        if (sv && sv.has && sv.has(TARGET_ANIM_VAR)) {
-          currentAnim = sv.get(TARGET_ANIM_VAR).getAsString();
-        } else if (gv && gv.has && gv.has(TARGET_ANIM_VAR)) {
-          currentAnim = gv.get(TARGET_ANIM_VAR).getAsString();
-        } else {
-          currentAnim = "";
-        }
-      } catch(e){
-        currentAnim = "";
-      }
-      
-      // Início de nova animação: detectar mudanças claras (inclui caso em que variável vinha vazia)
-      if (!animValueIsEmpty(currentAnim) && currentAnim !== state.lastAnimValue){
-        // nova animação -> cancelar timers de retorno e iniciar
-        clearAllTimeouts();
-        const key = mapAnimToKey(currentAnim, invertSideGlobal);
-        if (animations[key] && animations[key].frames && animations[key].frames.length > 0){
-          state.current = key; 
-          state.frameIndex = 0; 
-          state.elapsed = 0; 
-          state._isPlayingSingAnimation = true;
+        let rafHandle = null;
+        function clearAllTimeouts(){ 
+          if (state._idleBeatTimeout){ clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout=null; } 
+          if (state._returnToIdleTimeout){ clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout=null; } 
           state._idleTimerRunning = false;
-          watchdogLastFrameIndex = 0;
-          watchdogCounter = 0;
-          const anim = animations[key]; 
-          applyFrameToAllObjects(anim.frames[0]); 
-          log("Started animation (multiplayer-safe):", key, "from animVar:", currentAnim);
-        } else {
-          // se não existe animação correspondente, schedule quick return to idle
-          scheduleReturnToIdle(120);
         }
-      }
+        
+        function animValueIsEmpty(s){
+          if (s === null || s === undefined) return true;
+          try { const st = String(s).trim().toLowerCase(); return st === "" || st === "idle"; } catch(e){ return true; }
+        }
 
-      // Se variável está vazia/idle, iniciar retorno ao idle (mas com debounce curto)
-      if (animValueIsEmpty(currentAnim) && state.current !== "idle" && !state._idleTimerRunning){
-        // sempre (re)agendar; se durante o delay a variável voltar a ter valor, será cancelado abaixo
-        scheduleReturnToIdle(150);
-      }
+        function scheduleReturnToIdle(delayMs = 150){
+          if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
+          state._idleTimerRunning = true;
+          state._returnToIdleTimeout = setTimeout(()=>{
+            state._returnToIdleTimeout = null;
+            state._idleTimerRunning = false;
+            state.current = "idle";
+            state.frameIndex = 0;
+            state.elapsed = 0;
+            state._isPlayingSingAnimation = false;
+            if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
+              applyFrameToAllObjects(animations.idle.frames[0]);
+            }
+          }, delayMs);
+        }
 
-      // Se timer está correndo e a variável voltou a ter valor, cancelar retorno
-      if (state._idleTimerRunning && !animValueIsEmpty(currentAnim)){
-        clearAllTimeouts();
-      }
-      
-      state.lastAnimValue = currentAnim;
+        let watchdogLastFrameIndex = null;
+        let watchdogCounter = 0;
+        const WATCHDOG_MAX_TICKS = 40;
 
-      // Animação atual -- avançar frames
-      const anim = animations[state.current];
-      if (anim && anim.frames && anim.frames.length > 0){
-        const msPerFrame = 1000 / (anim.fps || 24);
-        state.elapsed += dt;
-        let frameChanged = false;
-        while (state.elapsed >= msPerFrame && !frameChanged){
-          state.elapsed -= msPerFrame; 
-          state.frameIndex++; 
-          frameChanged = true;
-          if (state.frameIndex >= anim.frames.length){
-            if (anim.loop){
-              if (anim.name === "idle" || state.current === "idle"){
-                // manter último quadro até beat timeout — preserve o comportamento original, mas garante reinício
-                state.frameIndex = anim.frames.length - 1;
-                if (!state._idleBeatTimeout){
-                  state._idleBeatTimeout = setTimeout(()=>{
-                    state._idleBeatTimeout = null;
-                    state.current = "idle";
-                    state.frameIndex = 0;
-                    state.elapsed = 0;
-                    if (animations.idle && animations.idle.frames && animations.idle.frames[0]){
-                      applyFrameToAllObjects(animations.idle.frames[0]);
-                    }
-                    log("Idle loop restarted after 1s delay (multiplayer-safe)");
-                  }, 1000);
+        function tick(now){
+          const dt = Math.min(60, now - (state.lastTick || now));
+          state.lastTick = now;
+          let currentAnim = "";
+          try {
+            const sv = runtimeScene.getVariables();
+            const gv = runtimeScene.getGame().getVariables();
+            if (sv && sv.has && sv.has(TARGET_ANIM_VAR)) currentAnim = sv.get(TARGET_ANIM_VAR).getAsString();
+            else if (gv && gv.has && gv.has(TARGET_ANIM_VAR)) currentAnim = gv.get(TARGET_ANIM_VAR).getAsString();
+          } catch(e){ currentAnim = ""; }
+          
+          if (!animValueIsEmpty(currentAnim) && currentAnim !== state.lastAnimValue){
+            clearAllTimeouts();
+            const key = mapAnimToKey(currentAnim, invertSideGlobal);
+            if (animations[key] && animations[key].frames && animations[key].frames.length > 0){
+              state.current = key; state.frameIndex = 0; state.elapsed = 0; 
+              state._isPlayingSingAnimation = true; state._idleTimerRunning = false;
+              watchdogLastFrameIndex = 0; watchdogCounter = 0;
+              applyFrameToAllObjects(animations[key].frames[0]); 
+            } else { scheduleReturnToIdle(120); }
+          } else if (animValueIsEmpty(currentAnim) && state.current !== "idle" && !state._idleTimerRunning){
+            scheduleReturnToIdle(150);
+          }
+          
+          if (state._idleTimerRunning && !animValueIsEmpty(currentAnim)){ clearAllTimeouts(); }
+          
+          state.lastAnimValue = currentAnim;
+          
+          const anim = animations[state.current];
+          if (anim && anim.frames && anim.frames.length > 0){
+            const msPerFrame = 1000 / (anim.fps || 24);
+            state.elapsed += dt;
+            let frameChanged = false;
+            while (state.elapsed >= msPerFrame && !frameChanged){
+              state.elapsed -= msPerFrame;
+              state.frameIndex++; 
+              frameChanged = true;
+              if (state.frameIndex >= anim.frames.length){
+                if (anim.loop){
+                   // --- CORREÇÃO DO LOOP IMEDIATO ---
+                   // Mantém o último frame e espera um tempo (simulando beat) antes de reiniciar
+                   state.frameIndex = anim.frames.length - 1; 
+                   if (!state._idleBeatTimeout) {
+                       const beatDelay = 650; // Ajuste este valor para mais rápido/lento (ms)
+                       state._idleBeatTimeout = setTimeout(() => {
+                           state._idleBeatTimeout = null;
+                           state.current = "idle";
+                           state.frameIndex = 0;
+                           state.elapsed = 0;
+                           if (animations.idle) applyFrameToAllObjects(animations.idle.frames[0]);
+                       }, beatDelay);
+                   }
+                } else {
+                  state.frameIndex = anim.frames.length - 1; 
+                  if (state._isPlayingSingAnimation){ state._isPlayingSingAnimation = false; }
                 }
-              } else {
-                state.frameIndex = 0;
-              }
-            } else {
-              state.frameIndex = anim.frames.length - 1;
-              if (state._isPlayingSingAnimation){
-                state._isPlayingSingAnimation = false;
               }
             }
-          }
-        }
-        if (frameChanged){
-          const tex = anim.frames[state.frameIndex]; 
-          if (tex) {
-            applyFrameToAllObjects(tex);
-          }
-          // watchdog: se anim é sing (não idle) e não avançou por muitos ticks, forçar idle
-          if (state.current !== "idle"){
-            if (watchdogLastFrameIndex === state.frameIndex) {
-              watchdogCounter++;
-            } else {
-              watchdogCounter = 0;
-            }
-            watchdogLastFrameIndex = state.frameIndex;
-            if (watchdogCounter > WATCHDOG_MAX_TICKS){
-              // forçar retorno ao idle como fallback
-              log("Watchdog triggered: forcing return to idle due to stalled animation (multiplayer)");
-              clearAllTimeouts();
-              state.current = "idle";
-              state.frameIndex = 0;
-              state.elapsed = 0;
-              state._isPlayingSingAnimation = false;
-              if (animations.idle && animations.idle.frames && animations.idle.frames[0]) applyFrameToAllObjects(animations.idle.frames[0]);
+            if (frameChanged){
+              const tex = anim.frames[state.frameIndex];
+              if (tex) applyFrameToAllObjects(tex);
+              
+              if (state.current !== "idle"){
+                if (watchdogLastFrameIndex === state.frameIndex) watchdogCounter++;
+                else watchdogCounter = 0;
+                watchdogLastFrameIndex = state.frameIndex;
+                if (watchdogCounter > WATCHDOG_MAX_TICKS){
+                  clearAllTimeouts(); state.current = "idle"; state.frameIndex = 0; state.elapsed = 0;
+                  if (animations.idle) applyFrameToAllObjects(animations.idle.frames[0]);
+                }
+              } else { watchdogCounter = 0; }
             }
           } else {
-            watchdogCounter = 0;
-            watchdogLastFrameIndex = null;
+            if (state.current !== "idle") scheduleReturnToIdle(120);
           }
+          rafHandle = requestAnimationFrame(tick);
         }
-      } else {
-        // sem frames para animação atual -> garantir retorno ao idle
-        if (state.current !== "idle"){
-          scheduleReturnToIdle(120);
+        rafHandle = requestAnimationFrame(tick);
+
+        function cleanup(){
+          if (rafHandle) cancelAnimationFrame(rafHandle);
+          clearAllTimeouts();
+          try { for (const b of state._createdBlobUrls){ try{ URL.revokeObjectURL(b); }catch(e){} } } catch(e){}
         }
+
+        const instance = { animations, state, cleanup, target: TARGET_NAME };
+        if (!window[PLAYER_GLOBAL]) window[PLAYER_GLOBAL] = {};
+        window[PLAYER_GLOBAL][TARGET_NAME] = instance; 
+        
+        return instance;
       }
 
-      rafHandle = requestAnimationFrame(tick);
-    }
-    rafHandle = requestAnimationFrame(tick);
-
-    function cleanup(){
-      if (rafHandle) cancelAnimationFrame(rafHandle);
-      clearAllTimeouts();
-      try { 
-        for (const b of state._createdBlobUrls){ 
-          try{ URL.revokeObjectURL(b); }catch(e){} 
-        } 
-      } catch(e){}
-      log("Player cleaned for " + TARGET_NAME);
-    }
-
-    const instance = { animations, state, cleanup, target: TARGET_NAME };
-    window[PLAYER_GLOBAL] = instance;
-    log("Player applied to " + TARGET_NAME + ". Anims:", Object.keys(animations).map(k=>`${k}(${animations[k].frames.length})`).join(", "));
-    return instance;
-  }
-
-  async function autoApplySelectedSkin(runtimeScene, opts = {}) {
-    const defaults = (opts && opts.extraDefaults) ? opts.extraDefaults : { owner: "LucyYuih", repo: "gdev-custom-skins", branch: "main" };
-    let selStr = null;
-    try {
-      const gv = runtimeScene.getGame().getVariables();
-      if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString();
-    } catch(e){}
-    if ((!selStr || selStr.trim() === "") && window.localStorage) {
-      try { selStr = localStorage.getItem("gd_selected_skin"); } catch(e){}
-    }
-    if (!selStr) { log("autoApply: no SelectedSkin present."); return null; }
-    const parsed = safeParseJson(selStr);
-    if (!parsed) { warn("autoApply: SelectedSkin invalid JSON:", selStr); return null; }
-    log("autoApplySelectedSkin found:", parsed);
-
-    const candidates = [];
-    if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
-    if (parsed.zip) {
-      candidates.push(parsed.zip);
-      candidates.push("resources/" + parsed.zip);
-      candidates.push("./" + parsed.zip);
-      candidates.push(parsed.zip.replace(/ /g,"%20"));
-      candidates.push("resources/" + parsed.zip.replace(/ /g,"%20"));
-    }
-
-    try {
-      let manifest = null;
-      try { const r = await fetch("resources/manifestskins.json"); if (r.ok) manifest = await r.json(); } catch(e){}
-      if (!manifest) {
-        const cdnTry = buildCdnUrl(defaults.owner, defaults.repo, defaults.branch, "manifestskins.json");
-        try { const r2 = await fetch(cdnTry); if (r2.ok) manifest = await r2.json(); } catch(e){}
+      function clearCache(){
+          if(window.GD_SKIN_CACHE){
+              window.GD_SKIN_CACHE.textures.forEach(item => {
+                  try { if(item.tex) item.tex.destroy(true); if(item.url) URL.revokeObjectURL(item.url); } catch(e){}
+              });
+              window.GD_SKIN_CACHE.textures = [];
+              window.GD_SKIN_CACHE.zips = {};
+          }
+          if(window[PLAYER_GLOBAL]){
+             Object.keys(window[PLAYER_GLOBAL]).forEach(key => {
+                 try{ if(window[PLAYER_GLOBAL][key]) window[PLAYER_GLOBAL][key].cleanup(); }catch(e){}
+             });
+          }
       }
-      if (manifest && manifest._base) {
-        const [ownerRepo, branch] = manifest._base.split("@");
-        const [owner, repo] = ownerRepo.split("/");
-        if (parsed.zip) {
-          const cdnBuilt = buildCdnUrl(owner, repo, branch || "main", parsed.zip);
-          if (cdnBuilt) candidates.unshift(cdnBuilt);
-        }
-      }
-    } catch(e){ warn("manifest detection failed", e); }
 
-    let lastErr = null;
-    for (const c of candidates) {
-      try {
-        log("player fetch try ->", c);
-        const r = await fetch(c);
+      async function fetchAndCacheZip(url){
+        if (window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.zips[url]) return window.GD_SKIN_CACHE.zips[url];
+        const r = await fetch(url);
         if (!r.ok) throw new Error("Fetch failed " + r.status);
         const arr = await r.arrayBuffer();
-        log("player fetch ok ->", c);
-        const pkg = await loadFromArrayBuffer(runtimeScene, arr);
-        const inst = await applyPackageToScene(runtimeScene, pkg, opts);
-
-        try {
-          if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
-          window.GD_SKIN_PLAYER.lastAppliedZipSource = c;
-          window.GD_SKIN_PLAYER.lastAppliedPackage = pkg;
-        } catch(e){}
-
-        try {
-          const selToSave = Object.assign({}, parsed, { zip_cdn: c });
-          const gv2 = runtimeScene.getGame().getVariables();
-          if (gv2.has("SelectedSkin")) gv2.get("SelectedSkin").setString(JSON.stringify(selToSave));
-          else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(selToSave));
-          try { localStorage.setItem("gd_selected_skin", JSON.stringify(selToSave)); } catch(e){}
-          log("Updated SelectedSkin.zip_cdn ->", c);
-        } catch(e){ warn("failed saving zip_cdn", e); }
-        return inst;
-      } catch(err){
-        lastErr = err;
-        warn("player fetch failed for candidate ->", c, err && err.message ? err.message : err);
+        if (window.GD_SKIN_CACHE) window.GD_SKIN_CACHE.zips[url] = arr;
+        return arr;
       }
-    }
-    warn("autoApplySelectedSkin: all candidates failed.", lastErr);
-    return null;
-  }
 
-  async function autoApplySelectedDadSkin(runtimeScene, opts = {}) {
-    const defaults = (opts && opts.extraDefaults) ? opts.extraDefaults : { owner: "LucyYuih", repo: "gdev-custom-skins", branch: "main" };
-    let selStr = null;
-    try {
-      const gv = runtimeScene.getGame().getVariables();
-      if (gv.has("SelectedDadSkin")) selStr = gv.get("SelectedDadSkin").getAsString();
-    } catch(e){}
-    if ((!selStr || selStr.trim() === "") && window.localStorage) {
-      try { selStr = localStorage.getItem("gd_selected_dad_skin"); } catch(e){}
-    }
-    if (!selStr) { log("autoApply: no SelectedDadSkin present."); return null; }
-    const parsed = safeParseJson(selStr);
-    if (!parsed) { warn("autoApply: SelectedDadSkin invalid JSON:", selStr); return null; }
-    log("autoApplySelectedDadSkin found:", parsed);
+      async function autoApplySelectedSkin(runtimeScene, opts = {}) {
+        let selStr = null;
+        try { const gv = runtimeScene.getGame().getVariables(); if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString(); } catch(e){}
+        if ((!selStr || selStr.trim() === "") && window.localStorage) try { selStr = localStorage.getItem("gd_selected_skin"); } catch(e){}
+        if (!selStr) return null;
+        const parsed = safeParseJson(selStr); if (!parsed) return null;
 
-    const candidates = [];
-    if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
-    if (parsed.zip) {
-      candidates.push(parsed.zip);
-      candidates.push("resources/" + parsed.zip);
-      candidates.push("./" + parsed.zip);
-      candidates.push(parsed.zip.replace(/ /g,"%20"));
-      candidates.push("resources/" + parsed.zip.replace(/ /g,"%20"));
-    }
-
-    try {
-      let manifest = null;
-      try { const r = await fetch("resources/manifestskins.json"); if (r.ok) manifest = await r.json(); } catch(e){}
-      if (!manifest) {
-        const cdnTry = buildCdnUrl(defaults.owner, defaults.repo, defaults.branch, "manifestskins.json");
-        try { const r2 = await fetch(cdnTry); if (r2.ok) manifest = await r2.json(); } catch(e){}
-      }
-      if (manifest && manifest._base) {
-        const [ownerRepo, branch] = manifest._base.split("@");
-        const [owner, repo] = ownerRepo.split("/");
-        if (parsed.zip) {
-          const cdnBuilt = buildCdnUrl(owner, repo, branch || "main", parsed.zip);
-          if (cdnBuilt) candidates.unshift(cdnBuilt);
+        const candidates = [];
+        if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
+        if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); }
+        
+        for (const c of candidates) {
+          try {
+            const arr = await fetchAndCacheZip(c);
+            const pkg = await loadFromArrayBuffer(runtimeScene, arr);
+            return await applyPackageToScene(runtimeScene, pkg, opts);
+          } catch(err){}
         }
+        return null;
       }
-    } catch(e){ warn("manifest detection failed", e); }
 
-    let lastErr = null;
-    for (const c of candidates) {
-      try {
-        log("player fetch try (Dad) ->", c);
-        const r = await fetch(c);
-        if (!r.ok) throw new Error("Fetch failed " + r.status);
-        const arr = await r.arrayBuffer();
-        log("player fetch ok (Dad) ->", c);
-        const pkg = await loadFromArrayBuffer(runtimeScene, arr);
-        const inst = await applyPackageToScene(runtimeScene, pkg, { 
-          ...opts, 
-          targetName: "BFPixel",
-          targetAnimVar: "OPPAnim"
-        });
+      async function autoApplySelectedDadSkin(runtimeScene, opts = {}) {
+        let selStr = null;
+        try { const gv = runtimeScene.getGame().getVariables(); if (gv.has("SelectedDadSkin")) selStr = gv.get("SelectedDadSkin").getAsString(); } catch(e){}
+        if ((!selStr || selStr.trim() === "") && window.localStorage) try { selStr = localStorage.getItem("gd_selected_dad_skin"); } catch(e){}
+        if (!selStr) return null;
+        const parsed = safeParseJson(selStr); if (!parsed) return null;
 
-        try {
-          if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
-          window.GD_SKIN_PLAYER.lastAppliedDadZipSource = c;
-          window.GD_SKIN_PLAYER.lastAppliedDadPackage = pkg;
-        } catch(e){}
-
-        try {
-          const selToSave = Object.assign({}, parsed, { zip_cdn: c });
-          const gv2 = runtimeScene.getGame().getVariables();
-          if (gv2.has("SelectedDadSkin")) gv2.get("SelectedDadSkin").setString(JSON.stringify(selToSave));
-          else runtimeScene.getGame().getVariables().pushNew("SelectedDadSkin").setString(JSON.stringify(selToSave));
-          try { localStorage.setItem("gd_selected_dad_skin", JSON.stringify(selToSave)); } catch(e){}
-          log("Updated SelectedDadSkin.zip_cdn ->", c);
-        } catch(e){ warn("failed saving dad zip_cdn", e); }
-        return inst;
-      } catch(err){
-        lastErr = err;
-        warn("player fetch failed for dad candidate ->", c, err && err.message ? err.message : err);
+        const candidates = [];
+        if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
+        if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); }
+        
+        for (const c of candidates) {
+          try {
+            const arr = await fetchAndCacheZip(c);
+            const pkg = await loadFromArrayBuffer(runtimeScene, arr);
+            return await applyPackageToScene(runtimeScene, pkg, { ...opts, targetName: "BFPixel", targetAnimVar: "OPPAnim" });
+          } catch(err){}
+        }
+        return null;
       }
-    }
-    warn("autoApplySelectedDadSkin: all candidates failed.", lastErr);
-    return null;
+
+      window.GD_SKIN_PLAYER = Object.assign(window.GD_SKIN_PLAYER || {}, { 
+        autoApplySelectedSkin, autoApplySelectedDadSkin, loadFromArrayBuffer, applyPackageToScene, clearCache, cleanup: clearCache 
+      });
+      window.GD_SKIN_PLAYER_DEFINED = true;
   }
 
-  function cleanupGlobal(){ 
-    try { 
-      if (window[PLAYER_GLOBAL] && typeof window[PLAYER_GLOBAL].cleanup === "function") 
-        window[PLAYER_GLOBAL].cleanup(); 
-    } catch(e){} 
-    window[PLAYER_GLOBAL] = null; 
-  }
-
-  window.GD_SKIN_PLAYER = Object.assign(window.GD_SKIN_PLAYER || {}, { 
-    autoApplySelectedSkin, 
-    autoApplySelectedDadSkin,
-    loadFromArrayBuffer, 
-    applyPackageToScene, 
-    cleanup: cleanupGlobal, 
-    lastDownloadedMetadata: window.GD_SKIN_PLAYER ? window.GD_SKIN_PLAYER.lastDownloadedMetadata : null 
-  });
-
-  log("GD_SKIN_PLAYER ready. (Opponent flip FIXED, multiplayer idle robustness)");
-
+  // --- AUTO EXECUÇÃO ---
   (async ()=>{
     try {
       let rs = null;
       try { if (typeof runtimeScene !== "undefined") rs = runtimeScene; } catch(e){}
       if (!rs && window.__gd_runtimeScene_for_skin) rs = window.__gd_runtimeScene_for_skin;
-      if (!rs) { log("player: no runtimeScene on load; waiting for manual call."); return; }
-      
-      try { 
-        await window.GD_SKIN_PLAYER.autoApplySelectedSkin(rs, { 
-          extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } 
-        }); 
-      } catch(e){ warn("initial autoApply BF failed", e); }
-      
-      try { 
-        await window.GD_SKIN_PLAYER.autoApplySelectedDadSkin(rs, { 
-          extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } 
-        }); 
-      } catch(e){ warn("initial autoApply Dad failed", e); }
+      if (!rs) return;
+
+      await window.GD_SKIN_PLAYER.autoApplySelectedSkin(rs, { extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } });
+      await window.GD_SKIN_PLAYER.autoApplySelectedDadSkin(rs, { extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } });
     } catch(e){}
   })();
-
 })();
-
 };
 gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0x30612b0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x19fb198(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x3061598 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x1c43458 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_loader_online_preserve_original_vars.js
-// Versão online — preserva exatamente o comportamento original ao salvar variáveis (SelectedSkin / SelectedDadSkin).
+// skin loader
 (async function(runtimeScene) {
+  // --- CONSTANTES E UTILITÁRIOS ---
   const MANIFEST_NAME = "manifestskins.json";
   const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
-  
-  function log(...s){ console.log("[skin-loader]", ...s); }
-  function warn(...s){ console.warn("[skin-loader]", ...s); }
+  // URLs para fallback do manifesto
+  const GITHUB_RAW_URL = `https://raw.githubusercontent.com/LucyYuih/gdev-custom-skins/main/${MANIFEST_NAME}`;
+  const LOCAL_STORAGE_KEY = "skin_loader_manifest";
 
-  // encodePath corrigido
+  function log(...s){ console.log("[skin-loader-multi]", ...s); }
+  function warn(...s){ console.warn("[skin-loader-multi]", ...s); }
+
+  // --- 1. FUNÇÕES DE LIMPEZA E CACHE (OTIMIZAÇÃO) ---
+  function clearPixiTextureCache(skinName) {
+    if (!window.PIXI) return;
+    try {
+        let count = 0;
+        // Limpa TextureCache
+        for (const key in PIXI.utils.TextureCache) {
+            if (key.includes(skinName)) {
+                try {
+                    PIXI.utils.TextureCache[key].destroy(true);
+                    delete PIXI.utils.TextureCache[key];
+                    count++;
+                } catch(e) {}
+            }
+        }
+        // Limpa BaseTextureCache
+        for (const key in PIXI.utils.BaseTextureCache) {
+             if (key.includes(skinName)) {
+                try { delete PIXI.utils.BaseTextureCache[key]; } catch(e) {}
+            }           
+        }
+        log(`Cache PIXI limpo para "${skinName}". Texturas removidas: ${count}`);
+    } catch (e) {
+        warn("Erro ao limpar cache PIXI:", e);
+    }
+  }
+
+  // --- 2. NETWORK HELPERS ---
   function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
   function buildCdnUrl(owner, repo, branch, path){ if (!owner || !repo) return null; const br = branch || "main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
 
@@ -2099,28 +1794,23 @@ gdjs.PlayonlineCode.userFunc0x30612b0(runtimeScene);
     tries.push("./" + pathOrUrl);
     if (typeof pathOrUrl === "string") {
       const enc = pathOrUrl.replace(/ /g,"%20");
-      tries.push(enc); tries.push("resources/" + enc); tries.push("./" + enc);
+      tries.push(enc); tries.push("resources/" + enc);
     }
 
     let lastErr = null;
     for (const u of tries) {
       try {
-        log("loader fetch try ->", u);
         const r = await fetch(u);
         if (!r.ok) throw new Error("Fetch failed " + r.status + " for " + u);
         if (as === "json") return await r.json();
         if (as === "arraybuffer") return await r.arrayBuffer();
         if (as === "blob") return await r.blob();
         return await r.text();
-      } catch (e) {
-        lastErr = e;
-        warn("loader fetch failed for", u, "->", e && e.message ? e.message : e);
-      }
+      } catch (e) { lastErr = e; }
     }
-    throw new Error("All loader fetch attempts failed: " + (lastErr ? lastErr.message : "unknown"));
+    throw new Error("All loader fetch attempts failed");
   }
 
-  // Helper: get skin "name" (compatibilidade: derive from path if name absent)
   function getSkinName(sk) {
     if (!sk) return "";
     if (sk.name && typeof sk.name === "string" && sk.name.trim() !== "") return sk.name;
@@ -2131,10 +1821,6 @@ gdjs.PlayonlineCode.userFunc0x30612b0(runtimeScene);
     return "";
   }
 
-  // Helper: build the stored thumb/zip path.
-  // If sk[field] is an absolute URL -> return as-is
-  // If sk[field] contains '/' -> assume it's already a relative path and return it
-  // Else join sk.path + '/' + sk[field]
   function buildFilePathFromSkin(sk, field) {
     if (!sk) return "";
     const v = sk[field] || "";
@@ -2148,27 +1834,16 @@ gdjs.PlayonlineCode.userFunc0x30612b0(runtimeScene);
     return v;
   }
 
+  // --- 3. UI LOADING HELPERS ---
   function createLoadingModal() {
     const modal = document.createElement("div");
     modal.id = "skin-download-loading";
-    modal.style.cssText = `
-      position: fixed; inset: 0; background: rgba(0,0,0,0.85); 
-      display: flex; align-items: center; justify-content: center; 
-      z-index: 100000; color: white; font-family: Arial, sans-serif;
-      flex-direction: column; gap: 16px;
-    `;
+    modal.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100000; color: white; font-family: Arial, sans-serif; flex-direction: column; gap: 16px;`;
     const spinner = document.createElement("div");
-    spinner.style.cssText = `
-      width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3);
-      border-radius: 50%; border-top-color: #1976d2; animation: spin 1s linear infinite;
-    `;
-    const text = document.createElement("div");
-    text.textContent = "Baixando skin...";
-    text.style.fontSize = "16px";
-    modal.appendChild(spinner);
-    modal.appendChild(text);
-    const style = document.createElement("style");
-    style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
+    spinner.style.cssText = `width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #1976d2; animation: spin 1s linear infinite;`;
+    const text = document.createElement("div"); text.textContent = "Baixando skin..."; text.style.fontSize = "16px";
+    modal.appendChild(spinner); modal.appendChild(text);
+    const style = document.createElement("style"); style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
     document.head.appendChild(style);
     return modal;
   }
@@ -2184,105 +1859,29 @@ gdjs.PlayonlineCode.userFunc0x30612b0(runtimeScene);
     if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
   }
 
-  function createModal(defaultOwner="LucyYuih", defaultRepo="gdev-custom-skins", defaultBranch="main") {
-    const css = `
-      :root { --modal-gap:12px; --panel-bg:#0f0f11; --panel-radius:12px; --accent:#1976d2; --muted:#999; }
-      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; box-sizing: border-box; }
-      .skin-panel { width: min(1100px,98%); max-width:1100px; height: min(86vh,820px); background:var(--panel-bg); color:#eee; border-radius:var(--panel-radius); display:grid; grid-template-columns:300px 1fr; gap:var(--modal-gap); overflow:hidden; font-family:Arial, sans-serif; box-shadow: 0 12px 32px rgba(0,0,0,0.6); }
-      @media (max-width:720px){ .skin-panel{ grid-template-columns:1fr; height:calc(100vh-36px); width:100%; border-radius:8px;} .skin-left{ order:0; max-height:160px; overflow:auto; } .skin-right{ order:1; } }
-      .skin-left{ padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto; min-width:180px; box-sizing:border-box;}
-      .skin-right{ padding:14px; display:flex; flex-direction:column; overflow:auto; box-sizing:border-box; }
-      .skin-left-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;}
-      .skin-toggle-btn{ background:transparent; border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color:#ddd; cursor:pointer; font-size:13px;}
-      .skin-mod{ padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; user-select:none;}
-      .skin-top{ display:flex; flex-direction:column; gap:8px;}
-      .skin-title-row{ display:flex; justify-content:space-between; align-items:center; gap:8px;}
-      .skin-title{ font-weight:700; font-size:1rem; }
-      .skin-controls{ display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
-      .skin-btn{ padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px;}
-      .skin-btn.opponent{ background:#d32f2f; } .skin-btn.bf{ background:#1976d2; }
-      .cdn-inputs{ display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;}
-      .cdn-inputs input{ background:#0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px; border-radius:6px; min-width:100px; }
-      .skin-loading{ color:var(--muted); font-size:13px; margin:6px 0; }
-      .skin-list{ display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start; }
-      .skin-card{ width: clamp(110px,22%,160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; user-select:none; }
-      .skin-card img{ width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none; }
-      .skin-card .label{ font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-      .skin-card .card-footer{ display:flex; gap:6px; justify-content:center; align-items:center; flex-direction: column; }
-      .skin-card button.skin-btn{ padding:6px 8px; font-size:12px; border-radius:6px; width:100%; }
-    `;
-    const style = document.createElement("style");
-    style.className = "skin-loader-style";
-    style.textContent = css;
-    document.head.appendChild(style);
-
-    const modal = document.createElement("div"); modal.className = "skin-modal"; modal.setAttribute("role","dialog"); modal.setAttribute("aria-modal","true");
-    const panel = document.createElement("div"); panel.className = "skin-panel";
-    const left = document.createElement("div"); left.className = "skin-left";
-    const leftList = document.createElement("div"); leftList.className = "skin-left-list";
-    const right = document.createElement("div"); right.className = "skin-right";
-
-    const leftHeader = document.createElement("div"); leftHeader.className = "skin-left-header";
-    const leftTitle = document.createElement("div"); leftTitle.textContent = "Mods"; leftTitle.style.fontWeight = "700";
-    const toggleBtn = document.createElement("button"); toggleBtn.className = "skin-toggle-btn"; toggleBtn.textContent = "Toggle";
-    leftHeader.appendChild(leftTitle); leftHeader.appendChild(toggleBtn);
-    left.appendChild(leftHeader); left.appendChild(leftList);
-
-    const top = document.createElement("div"); top.className = "skin-top";
-    const titleRow = document.createElement("div"); titleRow.className = "skin-title-row";
-    const title = document.createElement("div"); title.className = "skin-title"; title.textContent = "Skins";
-    const controls = document.createElement("div"); controls.className = "skin-controls";
-    const closeBtn = document.createElement("button"); closeBtn.className = "skin-btn"; closeBtn.textContent = "Fechar";
-    controls.appendChild(closeBtn);
-    titleRow.appendChild(title); titleRow.appendChild(controls);
-
-    const cdnRow = document.createElement("div"); cdnRow.className = "cdn-inputs";
-    const ownerIn = document.createElement("input"); ownerIn.placeholder = "Owner"; ownerIn.value = defaultOwner || "LucyYuih";
-    const repoIn = document.createElement("input"); repoIn.placeholder = "Repo"; repoIn.value = defaultRepo || "gdev-custom-skins";
-    const branchIn = document.createElement("input"); branchIn.placeholder = "Branch"; branchIn.value = defaultBranch || "main";
-    const note = document.createElement("div"); note.className = "note-small"; note.textContent = "CDN-first: thumbs/zips serão buscados no jsDelivr.";
-    cdnRow.appendChild(ownerIn); cdnRow.appendChild(repoIn); cdnRow.appendChild(branchIn); cdnRow.appendChild(note);
-
-    const info = document.createElement("div"); info.className = "skin-loading"; info.textContent = "Selecione um mod à esquerda.";
-    const skinListWrap = document.createElement("div"); skinListWrap.style.flex = "1"; skinListWrap.style.overflow = "auto";
-
-    top.appendChild(titleRow); top.appendChild(cdnRow);
-    right.appendChild(top); right.appendChild(info); right.appendChild(skinListWrap);
-    panel.appendChild(left); panel.appendChild(right); modal.appendChild(panel); document.body.appendChild(modal);
-
-    return { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls };
+  // --- 4. MULTIPLAYER HELPERS ---
+  function getPlayerOnlineValue(runtimeScene){
+    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("PlayerOnline")) return gv.get("PlayerOnline").getAsNumber(); } catch(e){}
+    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("PlayerOnline")) return sv.get("PlayerOnline").getAsNumber(); } catch(e){}
+    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.getCurrentPlayerNumber === 'function'){ const pn = gdjs.multiplayer.getCurrentPlayerNumber(); if (typeof pn === 'number') return pn === 1 ? 1 : 2; } } catch(e){}
+    return 0; // 0 = Offline/Testing (Exibe ambos os botões)
   }
 
-  // Updated to use getSkinName for compatibility with new manifest format
+  // --- 5. LOGICA DE DOWNLOAD E APLICAÇÃO ---
+  let modalOwner = null, modalRepo = null, modalBranch = null;
+  let globalManifest = null;
+
   function findSkinInManifest(manifest, modName, skinName){
     if (!manifest || !modName || !skinName) return null;
     const arr = manifest[modName] || [];
-    if (!Array.isArray(arr)) return null;
     for (const s of arr) if (getSkinName(s).toString() === skinName.toString()) return s;
     return null;
   }
-
-  // small helper to get PlayerOnline (tries game vars, scene vars, gdjs.multiplayer fallback)
-  function getPlayerOnlineValue(runtimeScene){
-    try { const gv = runtimeScene.getGame().getVariables(); if (gv && gv.has("PlayerOnline")) { const n = gv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n)) return n; } } catch(e){}
-    try { const sv = runtimeScene.getVariables(); if (sv && sv.has("PlayerOnline")) { const n = sv.get("PlayerOnline").getAsNumber(); if (typeof n === 'number' && !isNaN(n)) return n; } } catch(e){}
-    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer && typeof gdjs.multiplayer.getCurrentPlayerNumber === 'function'){ const pn = gdjs.multiplayer.getCurrentPlayerNumber(); if (typeof pn === 'number') return pn === 1 ? 1 : 2; } } catch(e){}
-    return 0;
-  }
-
-  // UI logic: create buttons but show/hide according to PlayerOnline WITHOUT changing what those buttons do
-  let globalManifest = null;
-  let modalOwner = null, modalRepo = null, modalBranch = null;
-
-  // Keep the exact original variable behavior on download/apply/reset functions:
-  // When target === "BF" -> set SelectedSkin & gd_selected_skin
-  // When target === "Opponent" -> set SelectedDadSkin & gd_selected_dad_skin
 
   async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
     if (downloadAndSaveOnly._busy) return;
     downloadAndSaveOnly._busy = true;
 
-    // try to build zipPath properly (supports filename-only in manifest)
     let zipPath = buildFilePathFromSkin(skinObj, "zip") || (skinObj.zip || "");
     if (!zipPath) {
       const found = findSkinInManifest(globalManifest, modName, getSkinName(skinObj));
@@ -2294,25 +1893,26 @@ gdjs.PlayonlineCode.userFunc0x30612b0(runtimeScene);
     try {
       const cdnBase = { owner: modalOwner||"LucyYuih", repo: modalRepo||"gdev-custom-skins", branch: modalBranch||"main" };
       const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-
-      // just check availability (like original did)
+      
+      // Verifica e baixa (cache)
       await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
-      // Build selection object exactly like original
+      
       const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || (skinObj.thumb || null) };
       if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
       else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-
-      // Preserve original behavior: set SelectedSkin or SelectedDadSkin and localStorage keys
+      
+      // Define variáveis corretas para Multiplayer
       const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
       const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
+      
       const gv = runtimeScene.getGame().getVariables();
       if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
       else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
       try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
-      log("[skin-loader] Downloaded+Saved " + varName + ":", JSON.stringify(sel));
+      
+      log("Saved " + varName);
     } catch(e){
-      console.error("Download/save failed:", e);
+      console.error("Download failed:", e);
     } finally {
       hideLoadingModal();
       downloadAndSaveOnly._busy = false;
@@ -2322,7 +1922,7 @@ gdjs.PlayonlineCode.userFunc0x30612b0(runtimeScene);
   async function applyNow(modName, skinObj, target){
     if (applyNow._busy) return;
     applyNow._busy = true;
-
+    
     let zipPath = buildFilePathFromSkin(skinObj, "zip") || (skinObj.zip || "");
     if (!zipPath) {
       const found = findSkinInManifest(globalManifest, modName, getSkinName(skinObj));
@@ -2334,32 +1934,30 @@ gdjs.PlayonlineCode.userFunc0x30612b0(runtimeScene);
     try {
       const cdnBase = { owner: modalOwner||"LucyYuih", repo: modalRepo||"gdev-custom-skins", branch: modalBranch||"main" };
       const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+      
       const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
+      
       const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || (skinObj.thumb || null) };
       if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
       else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-      
-      // ORIGINAL behavior: write SelectedSkin or SelectedDadSkin and storage keys
+
+      // Limpa cache PIXI antes de aplicar
+      clearPixiTextureCache(getSkinName(skinObj));
+
       const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
       const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
+      
       const gv = runtimeScene.getGame().getVariables();
       if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
       else runtimeScene.getGame().getVariables().pushNew(varName).setString(JSON.stringify(sel));
       try { localStorage.setItem(storageKey, JSON.stringify(sel)); } catch(e){}
-      log("[skin-loader] Saved " + varName + ":", JSON.stringify(sel));
 
-      // apply via GD_SKIN_PLAYER (same as original)
-      if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
-        try {
+      if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function") {
           const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel" });
           await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { 
             targetName: target === "BF" ? "BF" : "BFPixel",
             targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim"
           });
-        } catch(e){
-          warn("apply via player failed", e);
-        }
       }
     } catch(e){
       console.error("applyNow failed:", e);
@@ -2373,434 +1971,379 @@ gdjs.PlayonlineCode.userFunc0x30612b0(runtimeScene);
     if (resetAndRedownload._busy) return;
     resetAndRedownload._busy = true;
 
-    let zipPath = buildFilePathFromSkin(skinObj, "zip") || (skinObj.zip || "");
-    if (!zipPath) {
-      const found = findSkinInManifest(globalManifest, modName, getSkinName(skinObj));
-      if (found) zipPath = buildFilePathFromSkin(found, "zip") || (found.zip || "");
-    }
-    if (!zipPath) { resetAndRedownload._busy = false; return; }
+    if(!auto && !confirm("Resetar esta skin? Isso limpará o cache local.")) { resetAndRedownload._busy = false; return; }
+
+    const skinName = typeof skinObj === "object" ? getSkinName(skinObj) : skinObj;
 
     const loadingModal = showLoadingModal();
     try {
-      const cdnBase = { owner: modalOwner||"LucyYuih", repo: modalRepo||"gdev-custom-skins", branch: modalBranch||"main" };
-      const cdnCandidate = (zipPath.startsWith("http://")||zipPath.startsWith("https://")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-
-      try {
-        // Clear SelectedSkin/SelectedDadSkin if they reference this skin (preserve original logic)
+        // 1. Limpa variáveis
         try {
           const gv = runtimeScene.getGame().getVariables();
-          if (gv.has("SelectedSkin")) {
-            const cur = gv.get("SelectedSkin").getAsString();
-            if (cur && cur.includes(getSkinName(skinObj))) gv.get("SelectedSkin").setString("");
-          }
-          if (gv.has("SelectedDadSkin")) {
-            const cur = gv.get("SelectedDadSkin").getAsString();
-            if (cur && cur.includes(getSkinName(skinObj))) gv.get("SelectedDadSkin").setString("");
-          }
+          if (gv.has("SelectedSkin")) { const cur = gv.get("SelectedSkin").getAsString(); if (cur.includes(skinName)) gv.get("SelectedSkin").setString(""); }
+          if (gv.has("SelectedDadSkin")) { const cur = gv.get("SelectedDadSkin").getAsString(); if (cur.includes(skinName)) gv.get("SelectedDadSkin").setString(""); }
         } catch(e2){}
+        try {
+          const ls1 = localStorage.getItem("gd_selected_skin"); if (ls1 && ls1.includes(skinName)) localStorage.removeItem("gd_selected_skin");
+          const ls2 = localStorage.getItem("gd_selected_dad_skin"); if (ls2 && ls2.includes(skinName)) localStorage.removeItem("gd_selected_dad_skin");
+        } catch(e2){}
+
+        // 2. Limpa Cache Player
+        if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.clearCache === "function") {
+           await window.GD_SKIN_PLAYER.clearCache();
+        }
         
-        try {
-          const ls1 = localStorage.getItem("gd_selected_skin");
-          if (ls1 && ls1.includes(getSkinName(skinObj))) localStorage.removeItem("gd_selected_skin");
-          const ls2 = localStorage.getItem("gd_selected_dad_skin");
-          if (ls2 && ls2.includes(getSkinName(skinObj))) localStorage.removeItem("gd_selected_dad_skin");
-        } catch(e2){}
+        // 3. Limpa Cache PIXI (CRÍTICO)
+        clearPixiTextureCache(skinName);
+        
+        log("Reset concluído para " + skinName);
+        if(!auto) alert("Skin resetada. Recarregue a cena.");
 
-        if (window.GD_SKIN_PLAYER) {
-          try {
-            if (typeof window.GD_SKIN_PLAYER.uninstallPackage === "function") {
-              await window.GD_SKIN_PLAYER.uninstallPackage(modName, getSkinName(skinObj));
-              log("Called GD_SKIN_PLAYER.uninstallPackage");
-            } else if (typeof window.GD_SKIN_PLAYER.removePackageByUrl === "function") {
-              await window.GD_SKIN_PLAYER.removePackageByUrl(cdnCandidate);
-              log("Called GD_SKIN_PLAYER.removePackageByUrl");
-            } else if (typeof window.GD_SKIN_PLAYER.clearCache === "function") {
-              await window.GD_SKIN_PLAYER.clearCache();
-              log("Called GD_SKIN_PLAYER.clearCache");
-            }
-          } catch(e3){
-            warn("player cache clear attempt failed", e3);
-          }
-        }
-      } catch(eClear){
-        warn("Reset: local cache removal failed", eClear);
-      }
-
-      const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-
-      const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath || null, thumb: buildFilePathFromSkin(skinObj, "thumb") || (skinObj.thumb || null) };
-      if (typeof cdnCandidate === "string" && cdnCandidate.trim() !== "") sel.zip_cdn = cdnCandidate;
-      else sel.zip_cdn = (zipPath && (zipPath.startsWith("http://")||zipPath.startsWith("https://"))) ? zipPath : null;
-      
-      // Save to SelectedSkin (original behavior) — choose BF variable for reset (original script did this)
-      try {
-        const gv = runtimeScene.getGame().getVariables();
-        if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString(JSON.stringify(sel));
-        else runtimeScene.getGame().getVariables().pushNew("SelectedSkin").setString(JSON.stringify(sel));
-      } catch(e2){}
-      try { localStorage.setItem("gd_selected_skin", JSON.stringify(sel)); } catch(e2){}
-      log("Reset: saved SelectedSkin after redownload", sel);
-
-      if (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" && typeof window.GD_SKIN_PLAYER.applyPackageToScene === "function") {
-        try {
-          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: "BF" });
-          await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: "BF" });
-        } catch(e){
-          warn("Reset apply via player failed", e);
-        }
-      }
     } catch(e){
-      console.error("resetAndRedownload failed:", e);
+      console.error("Reset failed:", e);
     } finally {
       hideLoadingModal();
       resetAndRedownload._busy = false;
     }
   }
 
-  // UI logic: create the modal, populate the mod list, handle skin selection
-  let styleEl = null;
-  let prevOverflow = null;
-  let thumbsCache = {};
-  let currentModName = null;
+  // --- 6. UI CREATION (HTML/CSS) ---
+  function createModal(defaultOwner, defaultRepo, defaultBranch) {
+    const css = `
+      :root { --modal-gap:12px; --panel-bg:#0f0f11; --panel-radius:12px; --accent:#1976d2; --muted:#999; }
+      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; box-sizing: border-box; }
+      .skin-panel { width: min(1100px,98%); max-width:1100px; height: min(86vh,820px); background:var(--panel-bg); color:#eee; border-radius:var(--panel-radius); display:grid; grid-template-columns:300px 1fr; gap:var(--modal-gap); overflow:hidden; font-family:Arial, sans-serif; box-shadow: 0 12px 32px rgba(0,0,0,0.6); }
+      @media (max-width:720px){ .skin-panel{ grid-template-columns:1fr; height:calc(100vh-36px); width:100%; } .skin-left{ order:0; max-height:160px; overflow:auto; } .skin-right{ order:1; } }
+      .skin-left{ padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto; min-width:180px; box-sizing:border-box;}
+      .skin-right{ padding:14px; display:flex; flex-direction:column; overflow:auto; box-sizing:border-box; }
+      .skin-left-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;}
+      .skin-toggle-btn{ background:transparent; border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color:#ddd; cursor:pointer; font-size:13px;}
+      .skin-mod{ padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; user-select:none;}
+      .skin-mod:hover { background: rgba(255,255,255,0.03); }
+      .skin-top{ display:flex; flex-direction:column; gap:8px;}
+      .skin-title-row{ display:flex; justify-content:space-between; align-items:center; gap:8px;}
+      .skin-title{ font-weight:700; font-size:1rem; }
+      .skin-controls{ display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
+      .skin-btn{ padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px;}
+      .skin-btn.opponent{ background:#d32f2f; } .skin-btn.bf{ background:#1976d2; }
+      .cdn-inputs{ display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;}
+      .cdn-inputs input{ background:#0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px; border-radius:6px; min-width:100px; }
+      .skin-loading{ color:var(--muted); font-size:13px; margin:6px 0; }
+      .skin-list{ display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start; }
+      .skin-card{ width: clamp(110px,22%,160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; box-sizing:border-box; display:flex; flex-direction:column; gap:8px; user-select:none; }
+      .skin-card img{ width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none; transition: opacity 0.3s; opacity: 0; }
+      .skin-card img.loaded { opacity: 1; }
+      .skin-card .label{ font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+      .skin-card .card-footer{ display:flex; gap:6px; justify-content:center; align-items:center; flex-direction: column; }
+      .skin-card button.skin-btn{ padding:6px 8px; font-size:12px; border-radius:6px; width:100%; }
+    `;
+    const style = document.createElement("style"); style.className = "skin-loader-style"; style.textContent = css; document.head.appendChild(style);
 
+    const modal = document.createElement("div"); modal.className = "skin-modal";
+    const panel = document.createElement("div"); panel.className = "skin-panel";
+    const left = document.createElement("div"); left.className = "skin-left";
+    const leftList = document.createElement("div"); leftList.className = "skin-left-list";
+    const right = document.createElement("div"); right.className = "skin-right";
+
+    const leftHeader = document.createElement("div"); leftHeader.className = "skin-left-header";
+    const leftTitle = document.createElement("div"); leftTitle.textContent = "Mods"; leftTitle.style.fontWeight = "700";
+    const toggleBtn = document.createElement("button"); toggleBtn.className = "skin-toggle-btn"; toggleBtn.textContent = "Toggle";
+    leftHeader.appendChild(leftTitle); leftHeader.appendChild(toggleBtn);
+    left.appendChild(leftList); left.insertBefore(leftHeader, leftList);
+
+    const top = document.createElement("div"); top.className = "skin-top";
+    const titleRow = document.createElement("div"); titleRow.className = "skin-title-row";
+    const title = document.createElement("div"); title.className = "skin-title"; title.textContent = "Skins";
+    const controls = document.createElement("div"); controls.className = "skin-controls";
+    const closeBtn = document.createElement("button"); closeBtn.className = "skin-btn"; closeBtn.textContent = "Fechar";
+    controls.appendChild(closeBtn);
+    titleRow.appendChild(title); titleRow.appendChild(controls);
+
+    const cdnRow = document.createElement("div"); cdnRow.className = "cdn-inputs";
+    const ownerIn = document.createElement("input"); ownerIn.placeholder = "Owner"; ownerIn.value = defaultOwner;
+    const repoIn = document.createElement("input"); repoIn.placeholder = "Repo"; repoIn.value = defaultRepo;
+    const branchIn = document.createElement("input"); branchIn.placeholder = "Branch"; branchIn.value = defaultBranch;
+    cdnRow.appendChild(ownerIn); cdnRow.appendChild(repoIn); cdnRow.appendChild(branchIn);
+    
+    const info = document.createElement("div"); info.className = "skin-loading"; info.textContent = "Selecione um mod à esquerda.";
+    const skinListWrap = document.createElement("div"); skinListWrap.style.flex = "1"; skinListWrap.style.overflow = "auto";
+
+    top.appendChild(titleRow); top.appendChild(cdnRow);
+    right.appendChild(top); right.appendChild(info); right.appendChild(skinListWrap);
+    panel.appendChild(left); panel.appendChild(right); modal.appendChild(panel); document.body.appendChild(modal);
+
+    return { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls };
+  }
+
+  // --- 7. MAIN LOGIC (SINGLETON & UI) ---
+  let thumbsCache = {};
+  
   async function openSkinSelector(manifest){
+    // SINGLETON CHECK (Otimização)
+    if (document.querySelector(".skin-modal")) {
+        const m = document.querySelector(".skin-modal");
+        m.style.display = "flex";
+        try { document.documentElement.style.overflow = 'hidden'; } catch(e){}
+        return;
+    }
+
     globalManifest = manifest || { "": [] };
     let baseOwner=null, baseRepo=null, baseBranch=null;
-    if (manifest && typeof manifest._base === "string" && manifest._base.includes("/")) {
-      try { const base = manifest._base.trim(); const [ownerRepo, branch] = base.split("@"); const [owner, repo] = ownerRepo.split("/"); baseOwner = owner; baseRepo = repo; baseBranch = branch || "main"; } catch(e){}
+    if (manifest && typeof manifest._base === "string") {
+      try { const [ownerRepo, branch] = manifest._base.trim().split("@"); const [owner, repo] = ownerRepo.split("/"); baseOwner = owner; baseRepo = repo; baseBranch = branch || "main"; } catch(e){}
     }
 
     const ui = createModal(baseOwner||"LucyYuih", baseRepo||"gdev-custom-skins", baseBranch||"main");
-    const { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: s, controlsEl } = ui;
-    let currentMod = null; let downloading = false;
+    const { modal, left, leftList, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, controlsEl } = ui;
     
-    // Variáveis globais atualizadas
-    styleEl = s;
-    modalOwner = ownerIn.value || baseOwner; modalRepo = repoIn.value || baseRepo; modalBranch = branchIn.value || baseBranch || "main";
+    modalOwner = ownerIn.value; modalRepo = repoIn.value; modalBranch = branchIn.value;
+    let currentMod = null;
 
-    prevOverflow = document.documentElement.style.overflow;
-    try { document.documentElement.style.overflow = 'hidden'; } catch(e){}
+    // LAZY LOAD OBSERVER
+    const lazyObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const src = img.dataset.src;
+                if (src) {
+                    const cdnBase = JSON.parse(img.dataset.cdnBase);
+                    fetchCdnFirst(src, "blob", cdnBase).then(blob => {
+                        const url = URL.createObjectURL(blob);
+                        img.src = url;
+                        img.classList.add("loaded");
+                        if(img.dataset.modName && thumbsCache[img.dataset.modName]){
+                             const cacheItem = thumbsCache[img.dataset.modName].find(x => x.imgEl === img);
+                             if(cacheItem) cacheItem.blobUrl = url;
+                        }
+                    }).catch(e => warn("Thumb lazy fail", src));
+                }
+                observer.unobserve(img);
+            }
+        });
+    }, { root: skinListWrap, rootMargin: "100px" });
 
-    [leftList, skinListWrap, right, left].forEach(el => { try { if (!el) return; el.addEventListener('touchstart', ()=>{}, {passive:true}); el.addEventListener('touchmove', ()=>{}, {passive:true}); } catch(e){} });
-
+    // RESET GLOBAL BUTTON
     const resetSelectedBtn = document.createElement("button");
     resetSelectedBtn.className = "skin-btn";
     resetSelectedBtn.textContent = "Reset Selected";
-    resetSelectedBtn.title = "Remove SelectedSkin do cache/localStorage e rebaixa se possível";
     resetSelectedBtn.onclick = async () => {
-      if (downloading) return;
       try {
         let selStr = null;
-        try {
-          const gv = runtimeScene.getGame().getVariables();
-          if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString();
-        } catch(e){}
-        if ((!selStr || selStr.trim()==="") && window.localStorage) selStr = localStorage.getItem("gd_selected_skin");
+        try { const gv = runtimeScene.getGame().getVariables(); if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString(); } catch(e){}
+        if (!selStr && window.localStorage) selStr = localStorage.getItem("gd_selected_skin");
         if (!selStr) return;
         const parsed = JSON.parse(selStr);
-        if (!parsed || (!parsed.zip && !parsed.zip_cdn)) return;
-        await resetAndRedownload(parsed.mod || parsed.modName || "", { name: parsed.name || "", zip: parsed.zip || parsed.zip_cdn }, true);
-      } catch(e){
-        console.error("Reset Selected failed:", e);
-      }
+        await resetAndRedownload(parsed.mod||"", { name: parsed.name||"", zip: parsed.zip||parsed.zip_cdn }, true);
+      } catch(e){}
     };
     controlsEl.insertBefore(resetSelectedBtn, controlsEl.firstChild);
 
+    // Populate Mods
     const mods = manifest[""] || [];
-    if (!Array.isArray(mods) || mods.length === 0) {
-      const no = Object.assign(document.createElement("div"), { textContent: "No mods found", style: "color:#aaa; padding:8px;" });
-      leftList.appendChild(no);
-    } else {
+    if (!Array.isArray(mods) || mods.length === 0) leftList.textContent = "No mods found";
+    else {
       for (const m of mods) {
         const el=document.createElement("div"); el.className="skin-mod"; el.textContent=m;
         el.onclick=()=>selectMod(m);
-        el.addEventListener('touchstart', ()=>{}, {passive:true});
         leftList.appendChild(el);
       }
     }
 
+    // Toggles & Close
     let leftHidden = false;
-    function setLeftHidden(hide){
-      leftHidden = !!hide;
-      if (window.innerWidth <= 720) left.style.display = hide ? 'none' : 'flex';
-      else left.style.display = 'block';
-    }
-    toggleBtn.onclick = ()=> setLeftHidden(!leftHidden);
-    window.addEventListener('resize', ()=> { if (window.innerWidth > 720) left.style.display = 'block'; else if (leftHidden) left.style.display='none'; });
-
-    const cleanupAndRemove = () => {
-      try {
-        for (const k in thumbsCache) unloadModThumbs(k);
-        if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
-        try { document.head.removeChild(styleEl); } catch(e){}
-        hideLoadingModal();
-      } catch(e){ console.error("cleanup failed", e); }
-      try { document.documentElement.style.overflow = prevOverflow || ""; } catch(e){}
-      window.removeEventListener('keydown', onKeyDown);
-      try { window.removeEventListener('resize', ()=>{}); } catch(e){}
-    };
-
-    closeBtn.onclick = () => { if (downloading) return; cleanupAndRemove(); };
-    function onKeyDown(e){ if (e.key === 'Escape') { closeBtn.click(); } }
-    window.addEventListener('keydown', onKeyDown);
-
-    function unloadModThumbs(modName){ const arr = thumbsCache[modName]; if (!arr) return; for (const it of arr) { if (it.blobUrl) try{URL.revokeObjectURL(it.blobUrl)}catch(e){} } delete thumbsCache[modName]; log("Unloaded thumbs for",modName); }
-
-    function createApplyButtonsForItem(){
-      const playerOnline = getPlayerOnlineValue(runtimeScene);
-      // playerOnline 1 => only BF; 2 => only Opponent; 0 => both
-      const showBF = (playerOnline === 0 || playerOnline === 1);
-      const showOpp = (playerOnline === 0 || playerOnline === 2);
-      return { showBF, showOpp, playerOnline };
-    }
+    toggleBtn.onclick = ()=> { leftHidden = !leftHidden; left.style.display = leftHidden ? 'none' : 'block'; };
+    closeBtn.onclick = () => { modal.style.display = 'none'; try { document.documentElement.style.overflow = ''; } catch(e){} };
 
     async function selectMod(modName){
-      if (downloading) return;
       if (currentMod === modName) return;
-      if (currentMod) unloadModThumbs(currentMod);
-      currentMod = modName; skinListWrap.innerHTML=""; info.textContent="Carregando skins...";
-      const skins = manifest[modName] || [];
-      if (!Array.isArray(skins) || skins.length === 0) { info.textContent = "Nenhuma skin encontrada neste mod."; return; }
-      info.textContent=""; const list=document.createElement("div"); list.className="skin-list"; skinListWrap.appendChild(list);
+      // Limpa blobs anteriores para liberar memoria
+      if (currentMod && thumbsCache[currentMod]) {
+         thumbsCache[currentMod].forEach(x => { if(x.blobUrl) URL.revokeObjectURL(x.blobUrl); });
+         delete thumbsCache[currentMod];
+      }
 
+      currentMod = modName; skinListWrap.innerHTML=""; info.textContent="Carregando...";
+      const skins = manifest[modName] || [];
+      if (!skins.length) { info.textContent = "Nenhuma skin aqui."; return; }
+      
+      info.textContent=""; 
+      const list=document.createElement("div"); list.className="skin-list"; skinListWrap.appendChild(list);
       thumbsCache[modName]=[];
-      const cdnBase={ owner: ownerIn.value||baseOwner, repo: repoIn.value||baseRepo, branch: branchIn.value||baseBranch||"main" };
+      const cdnBase={ owner: ownerIn.value, repo: repoIn.value, branch: branchIn.value };
+      
+      const playerOnline = getPlayerOnlineValue(runtimeScene);
+      // 0: Offline/Host (Mostra tudo), 1: Player 1 (Mostra BF), 2: Player 2 (Mostra Opponent)
+      const showBF = (playerOnline === 0 || playerOnline === 1);
+      const showOpp = (playerOnline === 0 || playerOnline === 2);
 
       for (const sk of skins){
         const card=document.createElement("div"); card.className="skin-card";
-        const img=document.createElement("img"); img.alt=getSkinName(sk); img.src=""; img.draggable = false;
+        const img=document.createElement("img"); img.alt=getSkinName(sk); img.draggable = false;
+        
+        // Lazy Load setup
+        let thumbPath = buildFilePathFromSkin(sk, "thumb");
+        if(thumbPath) {
+            const candidate = (thumbPath.startsWith("http")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
+            img.dataset.src = candidate || thumbPath;
+            img.dataset.cdnBase = JSON.stringify(cdnBase);
+            img.dataset.modName = modName;
+            lazyObserver.observe(img);
+        } else { img.style.background = "#333"; }
+
         const lbl=document.createElement("div"); lbl.className="label"; lbl.textContent=getSkinName(sk);
         const footer = document.createElement("div"); footer.className="card-footer";
-        
-        const { showBF, showOpp } = createApplyButtonsForItem();
 
-        const applyBtnBF = document.createElement("button"); 
-        applyBtnBF.className = "skin-btn bf"; 
-        applyBtnBF.textContent = "BF";
-        applyBtnBF.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "BF"); };
-        if (!showBF) applyBtnBF.style.display = "none";
+        if(showBF){
+            const btn = document.createElement("button"); btn.className = "skin-btn bf"; btn.textContent = "BF";
+            btn.onclick = (e)=>{ e.stopPropagation(); applyNow(modName, sk, "BF"); };
+            footer.appendChild(btn);
+        }
+        if(showOpp){
+            const btn = document.createElement("button"); btn.className = "skin-btn opponent"; btn.textContent = "Opp";
+            btn.onclick = (e)=>{ e.stopPropagation(); applyNow(modName, sk, "Opponent"); };
+            footer.appendChild(btn);
+        }
+        const rst = document.createElement("button"); rst.className = "skin-btn"; rst.textContent = "Rst";
+        rst.onclick = (e)=>{ e.stopPropagation(); resetAndRedownload(modName, sk, false); };
+        footer.appendChild(rst);
 
-        const applyBtnOpp = document.createElement("button"); 
-        applyBtnOpp.className = "skin-btn opponent"; 
-        applyBtnOpp.textContent = "Opponent";
-        applyBtnOpp.onclick = (ev)=> { ev.stopPropagation(); applyNow(modName, sk, "Opponent"); };
-        if (!showOpp) applyBtnOpp.style.display = "none";
-
-        const resetBtn = document.createElement("button"); 
-        resetBtn.className = "skin-btn"; 
-        resetBtn.textContent = "Reset";
-        resetBtn.title = "Apaga cache/localStorage relacionado e rebaixa o .zip";
-        resetBtn.onclick = (ev)=> { ev.stopPropagation(); resetAndRedownload(modName, sk, false); };
-
-        footer.appendChild(applyBtnBF);
-        footer.appendChild(applyBtnOpp);
-        footer.appendChild(resetBtn);
         card.appendChild(img); card.appendChild(lbl); card.appendChild(footer);
+        // Clique no card aplica automático pro seu slot
+        card.onclick = () => downloadAndSaveOnly(modName, sk, false, (playerOnline === 2 ? "Opponent" : "BF"));
         
-        // default click on card -> download+save for the slot this player controls (preserve original default logic)
-        card.onclick = ()=> downloadAndSaveOnly(modName, sk, false, (getPlayerOnlineValue(runtimeScene) === 2 ? "Opponent" : "BF"));
-        card.addEventListener('touchstart', ()=>{}, {passive:true});
         list.appendChild(card);
-        thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null, cardEl: card, applyBtnBF, applyBtnOpp, resetBtn });
-      }
-
-      for (const item of thumbsCache[modName]){
-        const sk = item.skin; 
-        // build thumb path using helper (supports filename-only)
-        let thumbPath = buildFilePathFromSkin(sk, "thumb") || (sk.thumb || "");
-        if (!thumbPath) { item.imgEl.style.background="#222"; continue; }
-        try {
-          let candidate = (thumbPath.startsWith("http://")||thumbPath.startsWith("https://")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
-          const blob = await fetchCdnFirst(candidate || thumbPath, "blob", cdnBase);
-          const url = URL.createObjectURL(blob);
-          item.blobUrl = url; item.imgEl.src = url;
-        } catch(e){ warn("Thumb load failed for",getSkinName(sk),e); }
+        thumbsCache[modName].push({ skin: sk, imgEl: img, blobUrl: null });
       }
     }
-
-    // A função cleanupAndRemove original foi movida para dentro de openSkinSelector
-    // para ter acesso às variáveis locais.
-
-    return { close: cleanupAndRemove, unloadModThumbs };
   }
 
-  // ---------- watcher (observes other player's var changes and applies pack locally) ----------
+  // --- 8. WATCHER (SYNC MULTIPLAYER) ---
   let _skinWatcherInterval = null;
   let _skinWatcherLast = { SelectedSkin: null, SelectedDadSkin: null };
 
   async function applySelectionString(runtimeScene, selStr, opts = {}){ 
     if (!selStr || !selStr.trim()) return null;
-    let parsed = null;
-    try { parsed = JSON.parse(selStr); } catch(e){ return null; }
-    const candidates = [];
-    if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
-    if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); candidates.push(parsed.zip.replace(/ /g,"%20")); candidates.push("resources/" + parsed.zip.replace(/ /g,"%20")); }
-    for (const c of candidates){
-      try {
-        log("watcher fetch try ->", c);
-        const r = await fetch(c);
-        if (!r.ok) throw new Error("Fetch failed " + r.status);
-        const arr = await r.arrayBuffer();
-        const pkg = await (window.GD_SKIN_PLAYER && typeof window.GD_SKIN_PLAYER.loadFromArrayBuffer === "function" ? window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arr) : Promise.reject(new Error("GD_SKIN_PLAYER missing")));
-        if (pkg) return window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, opts);
-      } catch(e){ warn("watcher apply candidate failed", e); }
-    }
-    return null;
+    let parsed = null; try { parsed = JSON.parse(selStr); } catch(e){ return null; }
+    
+    // Tenta baixar usando o fetchCdnFirst otimizado
+    const zipUrl = parsed.zip_cdn || parsed.zip;
+    if(!zipUrl) return;
+
+    try {
+        // Tenta usar o cache do GD_SKIN_PLAYER (ram) se disponível
+        let arr = null;
+        if(window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.zips[zipUrl]) {
+             arr = window.GD_SKIN_CACHE.zips[zipUrl];
+        } else {
+             const r = await fetch(zipUrl); // Fetch simples se não for cdn complexa, ou melhorar aqui se necessário
+             if(r.ok) arr = await r.arrayBuffer();
+        }
+
+        if(arr && window.GD_SKIN_PLAYER){
+            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arr);
+            return window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, opts);
+        }
+    } catch(e){ warn("Watcher apply error", e); }
   }
 
   async function skinWatcherTick(runtimeScene){
     try{
-      const gv = runtimeScene.getGame().getVariables(); if (!gv) return;
+      const gv = runtimeScene.getGame().getVariables();
+      if (!gv) return;
       if (!gv.has('SelectedSkin')) gv.pushNew('SelectedSkin').setString('');
       if (!gv.has('SelectedDadSkin')) gv.pushNew('SelectedDadSkin').setString('');
 
       const cur = { SelectedSkin: gv.get('SelectedSkin').getAsString(), SelectedDadSkin: gv.get('SelectedDadSkin').getAsString() };
       const playerOnline = getPlayerOnlineValue(runtimeScene);
 
-      // If SelectedSkin changed and this client is NOT player 1, download+apply host's BF skin locally
+      // Se eu NÃO sou Player 1, aplico as mudanças do BF (SelectedSkin)
       if ((cur.SelectedSkin || '') !== (_skinWatcherLast.SelectedSkin || '')){
         if (playerOnline !== 1){
-          const sel = cur.SelectedSkin || '';
-          if (sel && sel.trim() !== ''){
-            log("Watcher: SelectedSkin changed by host -> applying host's BF skin locally");
-            try { await applySelectionString(runtimeScene, sel, { targetName: "BF", targetAnimVar: "BFAnim" }); } catch(e){ warn("Watcher apply host BF failed", e); }
-          }
+           if (cur.SelectedSkin && cur.SelectedSkin.trim() !== ''){
+             log("Watcher: Host mudou BF skin -> aplicando localmente");
+             await applySelectionString(runtimeScene, cur.SelectedSkin, { targetName: "BF", targetAnimVar: "BFAnim" });
+           }
         }
       }
 
-      // If SelectedDadSkin changed and this client is NOT player 2, download+apply opponent skin locally
+      // Se eu NÃO sou Player 2, aplico as mudanças do Dad (SelectedDadSkin)
       if ((cur.SelectedDadSkin || '') !== (_skinWatcherLast.SelectedDadSkin || '')){
         if (playerOnline !== 2){
-          const sel = cur.SelectedDadSkin || '';
-          if (sel && sel.trim() !== ''){
-            log("Watcher: SelectedDadSkin changed by player2 -> applying opponent skin locally");
-            try { await applySelectionString(runtimeScene, sel, { targetName: "BFPixel", targetAnimVar: "OPPAnim" }); } catch(e){ warn("Watcher apply opponent failed", e); }
-          }
+           if (cur.SelectedDadSkin && cur.SelectedDadSkin.trim() !== ''){
+             log("Watcher: P2 mudou Dad skin -> aplicando localmente");
+             await applySelectionString(runtimeScene, cur.SelectedDadSkin, { targetName: "BFPixel", targetAnimVar: "OPPAnim" });
+           }
         }
       }
 
       _skinWatcherLast.SelectedSkin = cur.SelectedSkin;
       _skinWatcherLast.SelectedDadSkin = cur.SelectedDadSkin;
-    } catch(e){ warn("skinWatcherTick error:", e); }
+    } catch(e){ }
   }
 
   function startSkinWatcher(runtimeScene){
     if (_skinWatcherInterval) return;
-    _skinWatcherInterval = setInterval(()=> skinWatcherTick(runtimeScene).catch(e=>warn("skinWatcherTick outer:",e)), 700);
-    skinWatcherTick(runtimeScene).catch(e=>warn("skinWatcherTick initial:",e));
+    _skinWatcherInterval = setInterval(()=> skinWatcherTick(runtimeScene), 700);
     log("Skin watcher started.");
   }
-  function stopSkinWatcher(){ if (_skinWatcherInterval){ clearInterval(_skinWatcherInterval); _skinWatcherInterval = null; log("Skin watcher stopped."); } }
 
-  // ---------- NOVO: Função para carregar o manifest com fallback para localStorage ----------
-  // O repositório e branch padrão são 'LucyYuih/gdev-custom-skins' e 'main', inferidos do código original.
-  const GITHUB_RAW_URL = `https://raw.githubusercontent.com/LucyYuih/gdev-custom-skins/main/${MANIFEST_NAME}`;
-  const LOCAL_STORAGE_KEY = "skin_loader_manifest";
-
+  // --- 9. BOOTSTRAP ---
   async function loadManifestWithFallback(){
     let manifest = null;
-
-    // 1. Tenta ler do GitHub API (usando o link raw)
     try {
-      log("Tentando carregar manifest do GitHub:", GITHUB_RAW_URL);
-      const response = await fetch(GITHUB_RAW_URL);
-      
-      if (!response.ok) {
-        // Se falhar (incluindo rate limit, 404, etc.), lança erro para ir para o catch
-        throw new Error(`Falha ao carregar do GitHub. Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      // 2. Sucesso: Salva no localStorage e usa o manifest
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-        log("Manifest carregado do GitHub e salvo no localStorage.");
-      } catch(e) {
-        warn("Falha ao salvar manifest no localStorage:", e);
-      }
-      manifest = data;
-
+      // 1. GitHub
+      const r = await fetch(GITHUB_RAW_URL);
+      if(r.ok) {
+         manifest = await r.json();
+         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(manifest));
+      } else throw new Error("GH Fail");
     } catch(e) {
-      warn("Falha ao carregar manifest do GitHub:", e.message);
-      
-      // 3. Falha: Tenta ler do localStorage
-      try {
-        const storedManifest = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (storedManifest) {
-          manifest = JSON.parse(storedManifest);
-          log("Manifest carregado com sucesso do localStorage como fallback.");
-        } else {
-          throw new Error("localStorage vazio.");
-        }
-      } catch(e) {
-        warn("Falha ao carregar manifest do localStorage:", e.message);
-        
-        // 4. Falha no localStorage: Tenta o fallback original (CDN/Local)
-        log("Tentando fallback original (CDN/Local)...");
-        try { 
-          manifest = await fetchCdnFirst(MANIFEST_NAME, "json", null); 
-        } catch(e){ 
-          manifest = null; 
-        }
-        if (!manifest) { 
-          try { 
-            manifest = await fetchCdnFirst("resources/" + MANIFEST_NAME, "json", null); 
-          } catch(e){ 
-            manifest = null; 
-          } 
-        }
+      // 2. LocalStorage
+      try { manifest = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)); } catch(e2){}
+      // 3. Fallback Local
+      if(!manifest) {
+          try { manifest = await fetchCdnFirst(MANIFEST_NAME, "json"); } catch(e3){}
       }
     }
-
-    if (!manifest) { 
-      console.warn("manifestskins.json não encontrado em nenhuma fonte; abrindo UI vazia."); 
-      manifest = { "": [] }; 
-    }
-    
-    return manifest;
+    return manifest || { "": [] };
   }
-  // ---------- FIM NOVO ----------
 
-  // ---------- bootstrap: load manifest, open UI, start watcher ----------
   try {
-    // O código original de carregamento foi substituído pela nova função
     const manifest = await loadManifestWithFallback();
-    
     await openSkinSelector(manifest);
     startSkinWatcher(runtimeScene);
   } catch(e){
     console.error("Skin loader startup failed:", e);
   }
 
-  // small debug hooks
-  window.__skin_loader_online = window.__skin_loader_online || {};
-  window.__skin_loader_online.stopWatcher = () => stopSkinWatcher();
-  window.__skin_loader_online.startWatcher = (rs) => startSkinWatcher(rs || runtimeScene);
-
 })(runtimeScene);
-
 };
 gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x1c43458(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x3061aa0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x28a95e8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
+// SCRIPT A — CORRIGIDO (Manifest: GitHub Raw -> LocalStorage -> Fallbacks) + Multiplayer Watcher Support
 (function () {
-  if (document.getElementById("gdjs-mod-list-ui-final")) return;
+  // SINGLETON CHECK: Impede execução duplicada
+  if (document.getElementById("gdjs-mod-list-ui-final")) {
+      const existing = document.getElementById("gdjs-mod-list-ui-final");
+      existing.style.display = "flex";
+      return;
+  }
 
   // --- REPO STORAGE / HELPERS ---
   const REPO_STORAGE_KEY = "gdjs_repo_list_v1";
   const ACTIVE_REPO_KEY = "gdjs_active_repo_id_v1";
   const FAVORITES_STORAGE_KEY = "gdjs_fav_songs_v1";
+  const MANIFEST_CACHE_PREFIX = "gdjs_manifest_cache_"; // Prefixo para salvar manifests no localStorage [cite: 53]
 
   function defaultRepoEntry() {
     return { id: "official", name: "oficial (LucyYuih/gdev-custom-charts)", owner: "LucyYuih", repo: "gdev-custom-charts", branch: "main", enabled: true };
@@ -2809,7 +2352,9 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
   function loadRepoList() {
     try {
       const raw = localStorage.getItem(REPO_STORAGE_KEY);
-      if (!raw) { const list = [defaultRepoEntry()]; localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list)); return list; }
+      if (!raw) { 
+        const list = [defaultRepoEntry()]; localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list)); return list; 
+      }
       return JSON.parse(raw);
     } catch (e) { const list = [defaultRepoEntry()]; localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list)); return list; }
   }
@@ -2854,11 +2399,23 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     return null;
   }
 
+  // Novo Helper: URL Raw do GitHub (evita cache de CDN)
+  function buildManifestRawUrl(entry) {
+    if (!entry) return null;
+    if (entry.manifestUrl) return entry.manifestUrl; // Se for URL direta customizada, usa ela
+    if (entry.owner && entry.repo) {
+        // Usa raw.githubusercontent.com para pegar a versão mais fresca
+        return `https://raw.githubusercontent.com/${entry.owner}/${entry.repo}/${entry.branch || "main"}/manifest.json`;
+    }
+    return null;
+  }
+
   // --- small util helpers ---
   function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
   function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
   function isJsonFile(name){ return /\.json$/i.test(name); }
-  function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
+  function basenameNoExt(p){ if(!p) return "";
+    const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
 
   // --- FUNÇÕES PARA MANIFEST OTIMIZADO COM ÁUDIOS ---
   function getBaseUrl(manifest) {
@@ -2885,10 +2442,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     return baseUrl + filePath;
   }
 
-  // parseManifestEntry agora recebe também folderPath (chave do manifest) para montar URLs corretamente
   function parseManifestEntry(entry, baseUrl = "", folderPath = "") {
     if (!entry) return null;
-
     // Se for array de strings (diretórios ou arquivos)
     if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "string") {
       const firstItem = entry[0];
@@ -2983,7 +2538,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     try {
       const tries = ["manifest.json","resources/manifest.json","res/manifest.json","./manifest.json"];
       for (const p of tries) {
-        try { const r = await fetch(p, {cache:"no-cache"}); if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
+        try { const r = await fetch(p, {cache:"no-cache"});
+        if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
       }
     } catch(e){}
     return null;
@@ -2995,6 +2551,18 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       if (!url) return null;
       const r = await fetch(url, {cache:"no-cache"});
       if (r.ok) return await r.json();
+    } catch(e){}
+    return null;
+  }
+
+  // NOVA FUNÇÃO: Tenta pegar o manifest raw (Network)
+  async function tryManifestFromRawNetwork(entry) {
+    try {
+        const url = buildManifestRawUrl(entry);
+        if(!url) return null;
+        // Adicionando timestamp para evitar qualquer cache residual
+        const r = await fetch(url + "?t=" + Date.now()); 
+        if(r.ok) return await r.json();
     } catch(e){}
     return null;
   }
@@ -3013,13 +2581,55 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
 
   const _manifest_cache_by_repo = {};
 
+  // --- LÓGICA DE CARREGAMENTO DO MANIFEST MODIFICADA ---
   async function loadManifestPreferLocalFor(entry, runtimeScene) {
     const repoId = (entry && entry.id) ? entry.id : "__default__";
-    if (typeof _manifest_cache_by_repo[repoId] !== "undefined") return _manifest_cache_by_repo[repoId];
+    
+    // Se já estiver em memória RAM nesta sessão, retorna direto
+    if (typeof _manifest_cache_by_repo[repoId] !== "undefined" && _manifest_cache_by_repo[repoId] !== null) {
+        return _manifest_cache_by_repo[repoId];
+    }
 
-    const a = await tryManifestFromGameVar(runtimeScene); if (a) { _manifest_cache_by_repo[repoId] = a; return a; }
-    const b = await tryManifestFromProjectResource(); if (b) { _manifest_cache_by_repo[repoId] = b; return b; }
-    const c = await tryManifestFromCdnOf(entry); if (c) { _manifest_cache_by_repo[repoId] = c; return c; }
+    const storageKey = MANIFEST_CACHE_PREFIX + repoId;
+
+    // 1. TENTATIVA: Network (GitHub Raw / API fake via raw file)
+    // Objetivo: Sempre tentar pegar o mais atual
+    const fromNetwork = await tryManifestFromRawNetwork(entry);
+    if (fromNetwork) {
+        // Se deu certo baixar, salva no localStorage e retorna
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(fromNetwork));
+        } catch(e) {
+            console.warn("Falha ao salvar manifest no localStorage (quota excedida?)", e);
+        }
+        _manifest_cache_by_repo[repoId] = fromNetwork;
+        return fromNetwork;
+    }
+
+    // 2. TENTATIVA: LocalStorage (Offline ou Falha de Rede)
+    try {
+        const localRaw = localStorage.getItem(storageKey);
+        if (localRaw) {
+            const parsed = JSON.parse(localRaw);
+            if (parsed) {
+                _manifest_cache_by_repo[repoId] = parsed;
+                return parsed;
+            }
+        }
+    } catch(e) {}
+
+    // 3. TENTATIVA: Variáveis de Jogo (GameVar)
+    const fromVar = await tryManifestFromGameVar(runtimeScene);
+    if (fromVar) { _manifest_cache_by_repo[repoId] = fromVar; return fromVar; }
+
+    // 4. TENTATIVA: Recursos do Projeto
+    const fromRes = await tryManifestFromProjectResource();
+    if (fromRes) { _manifest_cache_by_repo[repoId] = fromRes; return fromRes; }
+
+    // 5. TENTATIVA: Fallback para CDN JsDelivr (se o Raw falhou, talvez o CDN funcione, embora improvável se for erro de rede)
+    const fromCdn = await tryManifestFromCdnOf(entry);
+    if (fromCdn) { _manifest_cache_by_repo[repoId] = fromCdn; return fromCdn; }
+
     _manifest_cache_by_repo[repoId] = null;
     return null;
   }
@@ -3040,7 +2650,6 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     overflow: "hidden", display: "flex", flexDirection: "column",
     background: "linear-gradient(180deg, rgba(12,12,12,0.98), rgba(8,8,8,0.95))"
   });
-
   // Header
   const header = document.createElement("div");
   Object.assign(header.style, { padding: "10px", display: "flex", gap: "8px", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)", flex: "0 0 auto" });
@@ -3055,14 +2664,11 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     <input id="gdjs-final-search" placeholder="Pesquisar mods / músicas..." style="margin-left:8px;flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#0b0b0b;color:#eee" />
     <button id="gdjs-final-close" style="margin-left:8px;padding:6px;border-radius:6px">Fechar</button>
   `;
-
   // Main split
   const main = document.createElement("div");
   Object.assign(main.style, { display: "flex", gap: "10px", padding: "10px", flex: "1 1 auto", minHeight: 0, overflow: "hidden" });
-
   const leftPane = document.createElement("div");
   Object.assign(leftPane.style, { width: "38%", minWidth: "260px", maxWidth: "640px", overflowY: "auto", borderRight: "1px solid rgba(255,255,255,0.03)", paddingRight: "8px" });
-
   const rightPane = document.createElement("div");
   Object.assign(rightPane.style, { flex: "1 1 auto", overflowY: "auto", paddingLeft: "8px" });
 
@@ -3094,7 +2700,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
   let songsList = [];
   let modElementMap = {};
   let songElementMap = {};
-  let favorites = loadFavorites(); // array of { path, name, repoId }
+  let favorites = loadFavorites();
+  // array of { path, name, repoId }
 
   // --- Favorites helpers ---
   function loadFavorites() {
@@ -3156,7 +2763,6 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
   }
 
   function showRepoManagerModal() {
-    // [código idêntico ao anterior...]
     const overlay = document.createElement("div");
     Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 10000000, display: "flex", alignItems: "center", justifyContent: "center" });
     const box = document.createElement("div");
@@ -3186,7 +2792,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
         setActiveBtn.onclick = () => { setActiveRepoById(r.id); renderRepoSelect(); loadFolder(""); overlay.remove(); };
         const del = document.createElement("button"); del.textContent = "Excluir"; del.style.padding = "6px"; del.style.borderRadius = "6px";
         del.onclick = () => { const idx = lst.findIndex(x=>x.id===r.id); if (idx>=0) { lst.splice(idx,1); saveRepoList(lst); renderListArea(); renderRepoSelect(); } };
-        controls.appendChild(toggle); controls.appendChild(setActiveBtn); controls.appendChild(del);
+        controls.appendChild(toggle); controls.appendChild(setActiveBtn);
+        controls.appendChild(del);
         row.appendChild(label); row.appendChild(controls); listArea.appendChild(row);
       }
       if ((lst||[]).length === 0) listArea.innerHTML = "<div style='opacity:0.8'>Nenhum repositório adicionado.</div>";
@@ -3232,9 +2839,23 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
         Object.assign(row.style, { display: "flex", gap: "8px", alignItems: "center", padding: "8px", borderRadius: "6px", marginBottom: "6px", background: "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))" });
         const label = document.createElement("div"); label.style.flex = "1"; label.innerHTML = `<div style="font-weight:600">${k}</div><div style="font-size:12px;opacity:0.8">${Object.keys((window.gdjsCustomAudio[k] && window.gdjsCustomAudio[k].audios) || {}).length} audios • ${Object.keys((window.gdjsCustomAudio[k] && window.gdjsCustomAudio[k].rawFiles) || {}).length} jsons</div>`;
         const btns = document.createElement("div"); btns.style.display = "flex"; btns.style.gap = "6px";
-        const del = document.createElement("button"); del.textContent = "Deletar"; del.style.padding = "6px"; del.style.borderRadius = "6px";
-        del.onclick = () => { delete window.gdjsCustomAudio[k]; try { /* revoke blobs if any */ } catch(e){} renderCache(); };
-        const openBtn = document.createElement("button"); openBtn.textContent = "Abrir pasta"; openBtn.style.padding = "6px"; openBtn.style.borderRadius = "6px";
+        const del = document.createElement("button"); del.textContent = "Deletar"; del.style.padding = "6px";
+        del.style.borderRadius = "6px";
+        del.onclick = () => { 
+            // CORREÇÃO DE CLEANUP: Revogar blob URLs antes de deletar a referência
+            try { 
+                const data = window.gdjsCustomAudio[k];
+                if (data && data.audios) {
+                    Object.values(data.audios).forEach(a => {
+                        if (a.blobUrl) URL.revokeObjectURL(a.blobUrl);
+                    });
+                }
+            } catch(e){} 
+            delete window.gdjsCustomAudio[k];
+            renderCache(); 
+        };
+        const openBtn = document.createElement("button"); openBtn.textContent = "Abrir pasta";
+        openBtn.style.padding = "6px"; openBtn.style.borderRadius = "6px";
         openBtn.onclick = () => { showCacheDetails(k); };
         btns.appendChild(openBtn); btns.appendChild(del);
         row.appendChild(label); row.appendChild(btns); listArea.appendChild(row);
@@ -3253,24 +2874,48 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       const raws = (data && data.rawFiles) ? Object.keys(data.rawFiles) : [];
       if (audios.length === 0 && raws.length === 0) listEl.innerHTML = "<div style='opacity:0.8'>Vazio</div>";
       for (const a of audios) {
-        const row = document.createElement("div"); row.style.display = "flex"; row.style.justifyContent = "space-between"; row.style.alignItems = "center";
+        const row = document.createElement("div"); row.style.display = "flex";
+        row.style.justifyContent = "space-between"; row.style.alignItems = "center";
         row.innerHTML = `<div>${a}</div>`;
-        const btn = document.createElement("button"); btn.textContent = "Deletar"; btn.style.padding = "6px"; btn.style.borderRadius = "6px";
-        btn.onclick = () => { try { delete data.audios[a]; } catch(e){} row.remove(); };
+        const btn = document.createElement("button"); btn.textContent = "Deletar"; btn.style.padding = "6px";
+        btn.style.borderRadius = "6px";
+        btn.onclick = () => { 
+            try { 
+                // Revoke single blob
+                if(data.audios[a] && data.audios[a].blobUrl) URL.revokeObjectURL(data.audios[a].blobUrl);
+                delete data.audios[a]; 
+            } catch(e){} 
+            row.remove(); 
+        };
         row.appendChild(btn); listEl.appendChild(row);
       }
       for (const r of raws) {
-        const row = document.createElement("div"); row.style.display = "flex"; row.style.justifyContent = "space-between"; row.style.alignItems = "center";
+        const row = document.createElement("div");
+        row.style.display = "flex"; row.style.justifyContent = "space-between"; row.style.alignItems = "center";
         row.innerHTML = `<div>${r}</div>`;
-        const btn = document.createElement("button"); btn.textContent = "Deletar"; btn.style.padding = "6px"; btn.style.borderRadius = "6px";
+        const btn = document.createElement("button"); btn.textContent = "Deletar";
+        btn.style.padding = "6px"; btn.style.borderRadius = "6px";
         btn.onclick = () => { try { delete data.rawFiles[r]; } catch(e){} row.remove(); };
-        row.appendChild(btn); listEl.appendChild(row);
+        row.appendChild(btn);
+        listEl.appendChild(row);
       }
       b.querySelector("#gdjs-cache-detail-close").onclick = () => modal.remove();
     }
 
     box.querySelector("#gdjs-cache-clear").onclick = () => {
       if (!confirm("Deletar todo o cache de músicas?")) return;
+      // Revogar tudo antes de zerar
+      try {
+          if (window.gdjsCustomAudio) {
+              Object.values(window.gdjsCustomAudio).forEach(folder => {
+                  if(folder.audios) {
+                      Object.values(folder.audios).forEach(a => {
+                          if(a.blobUrl) URL.revokeObjectURL(a.blobUrl);
+                      });
+                  }
+              });
+          }
+      } catch(e){}
       try { window.gdjsCustomAudio = {}; } catch(e){}
       renderCache();
     };
@@ -3303,8 +2948,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     favRow.onclick = ()=> openMod("__favorites__");
     leftPane.appendChild(favRow);
     modElementMap["__favorites__"] = { element: favRow, data: { name: "Favorites", path: "__favorites__" } };
-
-    if (!items || items.length === 0) { const e = document.createElement("div"); e.textContent = "Nenhum mod encontrado."; e.style.opacity = "0.8"; leftPane.appendChild(e); return; }
+    if (!items || items.length === 0) { const e = document.createElement("div"); e.textContent = "Nenhum mod encontrado."; e.style.opacity = "0.8"; leftPane.appendChild(e);
+    return; }
     for (const item of items) {
       const row = document.createElement("div");
       Object.assign(row.style, {
@@ -3335,7 +2980,6 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
           row.style.background = "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))";
         } catch(e){}
       });
-
       const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div>`;
       row.appendChild(left);
 
@@ -3349,13 +2993,17 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
   function renderSongsList(items) {
     rightPane.innerHTML = "";
     songElementMap = {};
-    if (!items || items.length === 0) { const e = document.createElement("div"); e.textContent = "Selecione um mod à esquerda."; e.style.opacity = "0.8"; rightPane.appendChild(e); return; }
+    if (!items || items.length === 0) { const e = document.createElement("div");
+      e.textContent = "Selecione um mod à esquerda."; e.style.opacity = "0.8"; rightPane.appendChild(e); return;
+    }
     for (const item of items) {
       const row = document.createElement("div");
       Object.assign(row.style, { padding: "10px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", marginBottom: "8px", background: "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))" });
       // left column: name only (removed path below name)
-      const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div>`;
-      const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px"; right.style.alignItems = "center";
+      const left = document.createElement("div");
+      left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div>`;
+      const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px";
+      right.style.alignItems = "center";
       // star favorite icon
       const favIcon = document.createElement("div");
       favIcon.textContent = isFavorite(item.path) ? "★" : "☆";
@@ -3363,7 +3011,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       Object.assign(favIcon.style, { cursor: "pointer", fontSize: "18px", userSelect: "none" });
       favIcon.onclick = (ev) => { ev.stopPropagation(); toggleFavorite(item.path, item.name); };
       // action buttons container
-      const checkBtn = document.createElement("button"); checkBtn.textContent = "Checando..."; checkBtn.disabled = true; checkBtn.style.padding="6px"; checkBtn.style.borderRadius="6px";
+      const checkBtn = document.createElement("button"); checkBtn.textContent = "Checando..."; checkBtn.disabled = true; checkBtn.style.padding="6px";
+      checkBtn.style.borderRadius="6px";
       right.appendChild(favIcon);
       right.appendChild(checkBtn);
       row.appendChild(left); row.appendChild(right); rightPane.appendChild(row);
@@ -3377,19 +3026,20 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
   const hasSubCache = {};
 
   function startBackgroundCheckOnSongs(items) {
-    if (bgController && typeof bgController.abort === "function") try { bgController.abort(); } catch(e){}
+    if (bgController && typeof bgController.abort === "function") try { bgController.abort();
+    } catch(e){}
     bgController = { aborted:false, abort(){ this.aborted=true; } };
     const list = items || [];
     const concurrency = 3;
     let idx = 0;
     const activeRepo = getActiveRepo();
-
     async function worker() {
       while(!bgController.aborted) {
         if (idx >= list.length) break;
         const p = list[idx++].path;
         try {
-          if (typeof hasSubCache[p] !== "undefined") { updateButtonsForDecisionFromCache(p, hasSubCache[p]); await sleep(0); continue; }
+          if (typeof hasSubCache[p] !== "undefined") { updateButtonsForDecisionFromCache(p, hasSubCache[p]);
+          await sleep(0); continue; }
           const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
           let hasSubdirs = false;
           
@@ -3424,7 +3074,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
   function updateButtonsForDecisionFromCache(path, hasSubdirs) {
     const el = songElementMap[path];
     if (!el) return;
-    const right = el.rightContainer; right.innerHTML = "";
+    const right = el.rightContainer;
+    right.innerHTML = "";
     const itemName = el.name || path.split("/").pop();
 
     // favorite icon (recreate to keep consistent)
@@ -3433,7 +3084,6 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     favIcon.title = isFavorite(path) ? "Remover dos favoritos" : "Adicionar aos favoritos";
     Object.assign(favIcon.style, { cursor: "pointer", fontSize: "18px", userSelect: "none" });
     favIcon.onclick = (ev) => { ev.stopPropagation(); toggleFavorite(path, itemName); };
-
     if (hasSubdirs) {
       const pickBtn = document.createElement("button"); pickBtn.textContent = "Selecionar difficulty"; pickBtn.style.padding="6px"; pickBtn.style.borderRadius="6px";
       pickBtn.onclick = async ()=>{ 
@@ -3441,15 +3091,18 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
           setStatus("Carregando difficulties de " + itemName + "...");
           const activeRepo = getActiveRepo();
           const subdirs = await fetchSubdirsUsingEntry(activeRepo, path);
-          if (!subdirs || subdirs.length === 0) { setStatus("Nenhuma difficulty encontrada."); return; }
+          if (!subdirs || subdirs.length === 0) { setStatus("Nenhuma difficulty encontrada.");
+          return; }
           showDifficultyChooser(path, subdirs);
           setStatus("");
-        } catch(e){ setStatus("Erro listando difficulties."); }
+        } catch(e){ setStatus("Erro listando difficulties.");
+        }
       };
       right.appendChild(favIcon);
       right.appendChild(pickBtn);
     } else {
-      const dlBtn = document.createElement("button"); dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px";
+      const dlBtn = document.createElement("button");
+      dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px";
       dlBtn.onclick = ()=> downloadSongFolder(path);
       right.appendChild(favIcon);
       right.appendChild(dlBtn);
@@ -3489,7 +3142,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
         const baseUrl = getBaseUrl(manifest);
         const parsed = parseManifestEntry(manifest[path], baseUrl, path);
         if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
-          const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
+          const subdirs = parsed.type === 'subdirs' ?
+          parsed.value : parsed.subdirs;
           items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
         }
       } else {
@@ -3504,10 +3158,11 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       currentModPath = "";
       renderModsList(modsList);
       renderSongsList([]);
-      setStatus(((path||"Mods")) + ` — ${modsList.length} pastas`);
+      setStatus(((path||"Mods")) + ` — ${modsList.length} mods`);
       setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10);
       // update saved favorites variable in runtime scene
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || [])); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || []));
+      } catch(e){}
     } catch (err) {
       modsList = []; renderModsList(modsList);
       setStatus("Erro carregando pasta: " + (err && err.message ? err.message : err));
@@ -3535,7 +3190,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
         const baseUrl = getBaseUrl(manifest);
         const parsed = parseManifestEntry(manifest[path], baseUrl, path);
         if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
-          const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
+          const subdirs = parsed.type === 'subdirs' ?
+          parsed.value : parsed.subdirs;
           items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
         } else if (parsed && parsed.type === 'files') {
           // If manifest path directly lists files, treat each file as an item (name = filename, path = path/filename)
@@ -3566,7 +3222,6 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       const parsed = parseManifestEntry(manifest[path], baseUrl, path);
       
       if (!parsed) return null;
-      
       if (parsed.type === 'files') {
         return parsed.value;
       } else if (parsed.type === 'folder' && parsed.files) {
@@ -3688,12 +3343,13 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     try { btnClose.disabled = true; } catch(e){}
     try {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
-
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder));
+      } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongDifficulty").setString(difficultyName);
+      } catch(e){}
 
       setStatus("Listando arquivos (procura áudios: difficulty -> song -> mod)...");
-
       const audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
 
       let chartFiles = [];
@@ -3704,7 +3360,7 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       } else {
         try {
           const api = await ghListForFolderUsingEntry(activeRepo, difficultyPath);
-          chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) })); 
+          chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
         } catch(e){}
       }
 
@@ -3715,7 +3371,7 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       } else {
         try {
           const api = await ghListForFolderUsingEntry(activeRepo, rootFolder);
-          rootJsons = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) })); 
+          rootJsons = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
         } catch(e){}
       }
 
@@ -3746,7 +3402,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
             if (p && typeof p.then === "function") {
               p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: f.name}); });
             } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
-          } catch(e){ unlockQueue.push({audioEl, name: f.name}); }
+          } catch(e){ unlockQueue.push({audioEl, name: f.name});
+          }
         } catch(e){}
         await sleep(0);
       }
@@ -3786,7 +3443,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       }
 
       if (unlockQueue.length > 0) {
-        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play();
+        it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
         window.addEventListener('pointerdown', unlock, { once: true });
       }
 
@@ -3794,21 +3452,25 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     } catch(e){
       setStatus("Erro ao baixar: " + (e && e.message ? e.message : e));
     } finally {
-      try { btnClose.disabled = false; } catch(e){}
+      try { btnClose.disabled = false;
+      } catch(e){}
     }
   }
 
   async function downloadAllDifficulties(rootFolder, subdirs) {
-    try { btnClose.disabled = true; } catch(e){}
+    try { btnClose.disabled = true;
+    } catch(e){}
     try {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder));
+      } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongDifficulty").setString(difficultyName);
+      } catch(e){}
 
       setStatus("Procurando áudios (difficulty -> song -> mod)...");
       const hintDifficulty = (subdirs && subdirs.length>0) ? (rootFolder + "/" + subdirs[0]) : rootFolder;
       const audioFiles = await findAudioFilesWithFallback(rootFolder, hintDifficulty);
-
       window.gdjsCustomAudio = window.gdjsCustomAudio || {};
       window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
       const dest = window.gdjsCustomAudio[rootFolder];
@@ -3831,7 +3493,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
             if (p && typeof p.then === "function") {
               p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: f.name}); });
             } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
-          } catch(e){ unlockQueue.push({audioEl, name: f.name}); }
+          } catch(e){ unlockQueue.push({audioEl, name: f.name});
+          }
         } catch(e){}
         await sleep(0);
       }
@@ -3848,7 +3511,7 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
           } else {
             try {
               const api = await ghListForFolderUsingEntry(activeRepo, difficultyPath);
-              chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) })); 
+              chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
             } catch(e){}
           }
           for (const j of chartFiles) {
@@ -3886,7 +3549,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       }
 
       if (unlockQueue.length > 0) {
-        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play();
+        it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
         window.addEventListener('pointerdown', unlock, { once: true });
       }
 
@@ -3894,19 +3558,19 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     } catch(e){
       setStatus("Erro ao baixar: " + (e && e.message ? e.message : e));
     } finally {
-      try { btnClose.disabled = false; } catch(e){}
+      try { btnClose.disabled = false;
+      } catch(e){}
     }
   }
 
   async function downloadSongFolder(folderPath) {
-    try { btnClose.disabled = true; } catch(e){}
+    try { btnClose.disabled = true;
+    } catch(e){}
     try {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
-
       setStatus("Listando arquivos em " + folderPath + "...");
 
       let files = await getFilesFromManifest(folderPath);
-
       if (!files) {
         // Fallback para GitHub API
         const activeRepo = getActiveRepo();
@@ -3923,26 +3587,30 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
         }
       }
 
-      if (!Array.isArray(files) || files.length === 0) { setStatus("Pasta vazia."); return; }
+      if (!Array.isArray(files) || files.length === 0) { setStatus("Pasta vazia.");
+      return; }
 
       window.gdjsCustomAudio = window.gdjsCustomAudio || {};
-      window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || {audios:{}, rawFiles:{}}; 
+      window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || {audios:{}, rawFiles:{}};
       const dest = window.gdjsCustomAudio[folderPath];
 
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath); } catch(e){}
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(folderPath.split("/").pop()||folderPath)); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath);
+      } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(folderPath.split("/").pop()||folderPath));
+      } catch(e){}
 
       const totalFiles = files.length;
       let processed = 0;
-      let nextChannelIndex = (window.gdjsChannels) ? Object.keys(window.gdjsChannels).length : 0;
+      let nextChannelIndex = (window.gdjsChannels) ?
+      Object.keys(window.gdjsChannels).length : 0;
       const unlockQueue = [];
 
       for (const f of files) {
-        processed++; setStatus(`${processed} / ${totalFiles}`);
+        processed++;
+        setStatus(`${processed} / ${totalFiles}`);
         const fname = f.name;
         const url = f.url;
         if (!url) continue;
-
         if (isJsonFile(fname)) {
           try {
             const txtResp = await fetch(url);
@@ -3990,15 +3658,18 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
               if (p && typeof p.then === "function") {
                 p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: fname}); });
               } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
-            } catch(e){ unlockQueue.push({audioEl, name: fname}); }
-            try { const gg = (window.runtimeScene && window.runtimeScene.getGame) ? runtimeScene.getGame().getVariables() : null; if (gg && !gg.get("SongName").getAsString()) gg.get("SongName").setString(basenameNoExt(fname)); } catch(e){}
+            } catch(e){ unlockQueue.push({audioEl, name: fname});
+            }
+            try { const gg = (window.runtimeScene && window.runtimeScene.getGame) ?
+            runtimeScene.getGame().getVariables() : null; if (gg && !gg.get("SongName").getAsString()) gg.get("SongName").setString(basenameNoExt(fname)); } catch(e){}
           } catch(e){}
         }
         await sleep(0);
       }
 
       if (unlockQueue.length > 0) {
-        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play();
+        it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
         window.addEventListener('pointerdown', unlock, { once: true });
       }
 
@@ -4006,7 +3677,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     } catch(e){
       setStatus("Erro ao baixar pasta: " + (e && e.message ? e.message : e));
     } finally {
-      try { btnClose.disabled = false; } catch(e){}
+      try { btnClose.disabled = false;
+      } catch(e){}
     }
   }
 
@@ -4017,7 +3689,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     const box = document.createElement("div");
     Object.assign(box.style, { width: "420px", maxHeight: "70vh", overflowY: "auto", background: "#0f0f10", borderRadius: "8px", padding: "12px", boxShadow: "0 12px 40px rgba(0,0,0,0.6)", color: "#eee" });
     box.innerHTML = `<div style="font-weight:700;margin-bottom:8px">Escolha uma difficulty para:</div><div style="margin-bottom:8px;color:#bbb">${rootFolder}</div>`;
-    const list = document.createElement("div"); list.style.display = "flex"; list.style.flexDirection = "column"; list.style.gap = "6px";
+    const list = document.createElement("div"); list.style.display = "flex"; list.style.flexDirection = "column";
+    list.style.gap = "6px";
     for (const d of subdirs) {
       const b = document.createElement("button");
       b.textContent = d;
@@ -4038,16 +3711,23 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
   btnManage.onclick = ()=> showRepoManagerModal();
   btnCache.onclick = ()=> showCacheManager();
   btnRefresh.onclick = async ()=> {
-    try { setStatus("Atualizando..."); } catch(e){}
-    try { for (const it of modsList) delete hasSubCache[it.path]; } catch(e){}
-    try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
+    try { setStatus("Atualizando...");
+    } catch(e){}
+    try { for (const it of modsList) delete hasSubCache[it.path];
+    } catch(e){}
+    try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]);
+    } catch(e){}
+
+    // Limpa do localstorage o manifest do repo ativo para forçar download novo
+    try {
+        const active = getActiveRepo();
+        if(active && active.id) localStorage.removeItem(MANIFEST_CACHE_PREFIX + active.id);
+    } catch(e){}
 
     // guarda qual mod estava aberto antes do refresh
     const prevOpen = currentModPath;
-
     // Recarrega a lista raiz (evita transformar songs em mods)
     await loadFolder("");
-
     // tenta reabrir o mod antigo (se ainda existir)
     try {
       if (prevOpen && prevOpen === "__favorites__") {
@@ -4066,7 +3746,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
 
   // Substitua o handler de troca de repo (repoSelect.onchange) por este
   repoSelect.onchange = ()=> {
-    try { setActiveRepoById(repoSelect.value); } catch(e){}
+    try { setActiveRepoById(repoSelect.value);
+    } catch(e){}
     try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
     const prevOpen = currentModPath;
     // recarrega raiz e tenta reabrir o mod (se existir)
@@ -4078,7 +3759,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
           const found = modsList.find(m => m.path === prevOpen);
           if (found) openMod(prevOpen);
         }
-      } catch(e){}
+      } 
+      catch(e){}
     }).catch(()=>{});
   };
 
@@ -4087,7 +3769,7 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     const q = searchInput.value.trim().toLowerCase();
     if (!q) {
       renderModsList(modsList);
-      setStatus((currentModPath||"Mods")+` — ${modsList.length} pastas`);
+      setStatus((currentModPath||"Mods")+` — ${modsList.length}`);
       // if a mod is open, re-open it to show all songs
       if (currentModPath) {
         if (currentModPath === "__favorites__") openMod("__favorites__");
@@ -4103,7 +3785,8 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     renderModsList(filteredMods);
     // also filter songs: if a mod is selected, filter its songs; if favorites selected, filter favorites
     if (currentModPath === "__favorites__") {
-      const favItems = (favorites || []).map(f => ({ name: f.name || basenameNoExt(f.path.split("/").pop()||f.path), path: f.path }));
+      const favItems = (favorites || []).map(f => ({ name: f.name || basenameNoExt(f.path.split("/").pop()||f.path), path: f.path 
+      }));
       const filteredSongs = favItems.filter(s => (s.name || "").toLowerCase().includes(q));
       renderSongsList(filteredSongs);
       setStatus(`Resultado: ${filteredSongs.length} / ${favItems.length} (favorites)`);
@@ -4115,7 +3798,7 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
       setTimeout(()=> startBackgroundCheckOnSongs(filteredSongs), 10);
     } else {
       // no mod open: just inform mods results
-      setStatus(`Resultado: ${filteredMods.length} / ${modsList.length} pastas`);
+      setStatus(`Resultado: ${filteredMods.length} / ${modsList.length}`);
     }
   });
 
@@ -4129,16 +3812,14 @@ gdjs.PlayonlineCode.userFunc0x3061598(runtimeScene);
     // push favorites to runtime variable on init
     try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || [])); } catch(e){}
   })();
-
 })();
-
 };
 gdjs.PlayonlineCode.eventsList7 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0x3061aa0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x28a95e8(runtimeScene);
 
 }
 
@@ -4227,7 +3908,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36046932);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(31389148);
 }
 }
 if (isConditionTrue_0) {
@@ -4255,7 +3936,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoin2Objects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoin2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36049396);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36067948);
 }
 }
 if (isConditionTrue_0) {
@@ -4278,7 +3959,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36042180);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36057052);
 }
 }
 }
@@ -4390,7 +4071,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDHardObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36058580);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36048428);
 }
 }
 if (isConditionTrue_0) {
@@ -4436,7 +4117,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36060716);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(15937164);
 }
 }
 if (isConditionTrue_0) {
@@ -4463,7 +4144,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(36062476);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(15938964);
 }
 }
 if (isConditionTrue_0) {

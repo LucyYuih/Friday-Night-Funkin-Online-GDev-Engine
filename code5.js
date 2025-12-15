@@ -1819,7 +1819,7 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
 }
 
 
-};gdjs.PlayCode.userFunc0x2b50270 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x28e3b58 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   // Atualiza a referência da cena imediatamente
@@ -2856,7 +2856,7 @@ gdjs.copyArray(runtimeScene.getObjects("OppSideLifeBar"), gdjs.PlayCode.GDOppSid
 {
 
 
-gdjs.PlayCode.userFunc0x2b50270(runtimeScene);
+gdjs.PlayCode.userFunc0x28e3b58(runtimeScene);
 
 }
 
@@ -18916,7 +18916,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x2bd7990 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a865b0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19099,7 +19099,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x2c184d8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a87828 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19110,7 +19110,7 @@ gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x2bd7990(runtimeScene);
+gdjs.PlayCode.userFunc0x1a865b0(runtimeScene);
 
 }
 
@@ -19186,7 +19186,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x2c184d8(runtimeScene);
+gdjs.PlayCode.userFunc0x1a87828(runtimeScene);
 
 }
 
@@ -19286,7 +19286,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x2c19e58 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a41dd0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19469,7 +19469,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x2c16b58 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a8a1f8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19480,7 +19480,7 @@ gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x2c19e58(runtimeScene);
+gdjs.PlayCode.userFunc0x1a41dd0(runtimeScene);
 
 }
 
@@ -19556,7 +19556,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x2c16b58(runtimeScene);
+gdjs.PlayCode.userFunc0x1a8a1f8(runtimeScene);
 
 }
 
@@ -23329,7 +23329,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x2b40cd0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1be7650 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -23348,235 +23348,198 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x2b40d88 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x1be8348 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// Mostrar estimativa de "RAM total do jogo" no objeto de texto "fps"
+// SCRIPT C — FPS & RAM MONITOR (Singleton & Optimized)
 (function(runtimeScene){
   "use strict";
 
-  const OBJ_NAME = "fps";           // objeto de texto (1º encontrado)
-  const UPDATE_MS = 1000;           // intervalo para reavaliar (ms)
-  const MB = 1024 * 1024;
-  const CHANGE_THRESHOLD_MB = 1;   // atualiza texto só se diferença >= 1MB
+  // Always update the reference to the current scene so we can find the "fps" object
+  window.GDJS_CURRENT_SCENE = runtimeScene;
 
-  // caches locais
-  let fpsObj = null;
+  if (window.GDJS_FPS_MONITOR_ACTIVE) return;
+  window.GDJS_FPS_MONITOR_ACTIVE = true;
+
+  // --- CONFIG ---
+  const OBJ_NAME = "fps";           // Name of the text object
+  const UPDATE_MS = 1000;           // Update interval (1 second)
+  const MB = 1024 * 1024;
+  const CHANGE_THRESHOLD_MB = 1;    // Only update text if RAM changes > 1MB
+
+  // --- STATE ---
   let lastFps = -1;
   let frames = 0;
   let lastUpdateTime = performance.now();
-
-  // cache de tamanhos para blobUrls / data urls
-  const blobSizeCache = new Map(); // key: url -> size (bytes)
   let lastShownTotalMB = -1;
+  
+  // Cache for blob sizes to avoid repeated fetches
+  const blobSizeCache = new Map(); 
 
-  // pega o primeiro objeto texto chamado OBJ_NAME
+  // Cache for main canvas to avoid DOM queries every second
+  let cachedCanvas = null;
+
+  // --- HELPERS ---
+
   function findFpsObj() {
     try {
-      const arr = runtimeScene.getObjects(OBJ_NAME);
+      // Always look in the CURRENT active scene
+      if (!window.GDJS_CURRENT_SCENE) return null;
+      const arr = window.GDJS_CURRENT_SCENE.getObjects(OBJ_NAME);
       if (arr && arr.length > 0) return arr[0];
     } catch(e){}
     return null;
   }
 
-  // ler heap JS se disponível
   function readUsedJsHeap() {
     try {
+      // Chrome/Edge specific API
       if (performance && performance.memory && performance.memory.usedJSHeapSize) {
-        return performance.memory.usedJSHeapSize; // bytes
+        return performance.memory.usedJSHeapSize; 
       }
     } catch(e){}
-    return null;
+    return 0;
   }
 
-  // estima memória ocupada por todos canvas na página (width * height * 4)
   function estimateCanvasMemory() {
     try {
-      const canvases = Array.from(document.getElementsByTagName("canvas"));
-      let sum = 0;
-      for (const c of canvases) {
-        try {
-          const w = c.width || (c.clientWidth || 0);
-          const h = c.height || (c.clientHeight || 0);
-          if (w > 0 && h > 0) sum += w * h * 4; // 4 bytes por pixel (RGBA)
-        } catch(e){}
+      // Optimization: Cache the canvas reference
+      if (!cachedCanvas) {
+          const canvases = document.getElementsByTagName("canvas");
+          if (canvases.length > 0) cachedCanvas = canvases[0]; 
       }
-      return sum;
+      
+      if (cachedCanvas) {
+          const w = cachedCanvas.width || cachedCanvas.clientWidth || 0;
+          const h = cachedCanvas.height || cachedCanvas.clientHeight || 0;
+          if (w > 0 && h > 0) return w * h * 4; // 4 bytes per pixel (RGBA)
+      }
+      return 0;
     } catch(e){ return 0; }
   }
 
-  // tenta obter tamanho de blobUrl ou data: url (retorna null se não conseguir rapidamente)
   async function fetchBlobSizeIfNeeded(url) {
     if (!url) return 0;
     if (blobSizeCache.has(url)) return blobSizeCache.get(url);
+    
     try {
-      // Apenas tentar para blob: e data: e same-origin URLs (fetch local blob é rápido)
       if (url.startsWith("blob:") || url.startsWith("data:") || new URL(url, location.href).origin === location.origin) {
-        // Faz fetch da url (para blob: isso retorna o blob local)
         const resp = await fetch(url);
-        if (!resp.ok) {
-          blobSizeCache.set(url, 0);
-          return 0;
-        }
+        if (!resp.ok) { blobSizeCache.set(url, 0); return 0; }
         const b = await resp.blob();
         const s = b.size || 0;
         blobSizeCache.set(url, s);
         return s;
       }
     } catch(e){
-      // se falhar, grava 0 pra não ficar tentando toda hora
       blobSizeCache.set(url, 0);
       return 0;
     }
-    // se for cross-origin e não temos acesso, não contamos
     blobSizeCache.set(url, 0);
     return 0;
   }
 
-  // soma sizes de blobs presentes em window.gdjsCustomAudio (áudios) — chama fetchBlobSizeIfNeeded só quando necessário
   async function sumGdjsCustomAudioBlobs() {
     try {
       if (!window.gdjsCustomAudio) return 0;
-      const keys = Object.keys(window.gdjsCustomAudio);
       let total = 0;
       const tasks = [];
-      for (const k of keys) {
-        try {
-          const folder = window.gdjsCustomAudio[k] || {};
-          const audios = folder.audios || {};
-          for (const name of Object.keys(audios)) {
-            try {
-              const info = audios[name] || {};
-              // se tiver blobSize explícito, usar direto
-              if (info.blobSize && typeof info.blobSize === "number") {
-                total += info.blobSize;
-              } else if (info.blobUrl && typeof info.blobUrl === "string") {
-                // adiar fetch para batches
-                tasks.push(fetchBlobSizeIfNeeded(info.blobUrl).then(s => { total += s; }).catch(()=>{}));
-              } else if (info.url && typeof info.url === "string") {
-                // remote url: às vezes podemos HEAD ou fetch, mas evitamos (pode ser caro / cross-origin)
-                // ignoramos por padrão (poderia ser opcional)
+      
+      const folders = Object.values(window.gdjsCustomAudio);
+      for (const folder of folders) {
+          if(!folder) continue;
+          
+          // Audios
+          if (folder.audios) {
+              const audios = Object.values(folder.audios);
+              for (const info of audios) {
+                  if (info.blobSize) total += info.blobSize;
+                  else if (info.blobUrl) tasks.push(fetchBlobSizeIfNeeded(info.blobUrl).then(s => total += s));
               }
-            } catch(e){}
           }
-          // rawFiles são textos (JSONs) — estimativa: bytes ~ length of string
-          const raws = folder.rawFiles || {};
-          for (const rname of Object.keys(raws)) {
-            try {
-              const txt = raws[rname];
-              if (typeof txt === "string") total += (new TextEncoder().encode(txt)).length;
-            } catch(e){}
+          
+          // JSONs (Raw Files)
+          if (folder.rawFiles) {
+              const texts = Object.values(folder.rawFiles);
+              for (const txt of texts) {
+                  if (typeof txt === "string") total += txt.length; // Approximate bytes
+              }
           }
-        } catch(e){}
-      }
-      // aguarda tasks
-      if (tasks.length > 0) await Promise.all(tasks);
-      return total;
-    } catch(e){ return 0; }
-  }
-
-  // soma tamanhos de imagens <img> com src blob/data (opcional)
-  async function sumImageBlobSizes() {
-    try {
-      const imgs = Array.from(document.images || []);
-      let total = 0;
-      const tasks = [];
-      for (const im of imgs) {
-        try {
-          const s = im.src || "";
-          if (s && (s.startsWith("blob:") || s.startsWith("data:"))) {
-            tasks.push(fetchBlobSizeIfNeeded(s).then(sz => { total += sz; }).catch(()=>{}));
-          }
-        } catch(e){}
       }
       if (tasks.length > 0) await Promise.all(tasks);
       return total;
     } catch(e){ return 0; }
   }
 
-  // calcula estimativa total (em bytes)
   async function computeTotalRamEstimateBytes() {
     let total = 0;
-    // 1) JS heap se disponível
-    const heap = readUsedJsHeap();
-    if (heap && typeof heap === "number") total += heap;
-
-    // 2) blobs de áudio + jsons (window.gdjsCustomAudio)
-    const audioBlobs = await sumGdjsCustomAudioBlobs();
-    total += audioBlobs;
-
-    // 3) imagens blobs/data
-    const imgBlobs = await sumImageBlobSizes();
-    total += imgBlobs;
-
-    // 4) canvas estimate (textures / framebuffers)
-    const canv = estimateCanvasMemory();
-    total += canv;
-
-    // 5) fallback: se nada disponível, tentar usar heapTotal se exposto (performance.memory.totalJSHeapSize)
-    try {
-      if ((!heap || heap === 0) && performance && performance.memory && performance.memory.totalJSHeapSize) {
+    // 1. JS Heap
+    total += readUsedJsHeap();
+    // 2. Custom Audio Blobs
+    total += await sumGdjsCustomAudioBlobs();
+    // 3. Canvas Texture Estimate
+    total += estimateCanvasMemory();
+    
+    // Fallback if heap is unavailable/zero
+    if (total === 0 && performance && performance.memory && performance.memory.totalJSHeapSize) {
         total = performance.memory.totalJSHeapSize;
-      }
-    } catch(e){}
-
+    }
     return total;
   }
 
-  // atualiza objeto texto se mudou
   async function updateIfChanged() {
     try {
-      // calcula fps aproximado (já em frames desde lastUpdateTime)
       const now = performance.now();
       const dt = now - lastUpdateTime;
       let fpsVal = 0;
       if (dt > 0) fpsVal = Math.round((frames / dt) * 1000);
-      // reset contadores de frames pra próximo ciclo
+      
+      // Reset counters
       frames = 0;
       lastUpdateTime = now;
 
-      // calcula estimativa total (pode efetuar fetchs locais p/ blob:)
       const totalBytes = await computeTotalRamEstimateBytes();
       const totalMB = Math.round(totalBytes / MB);
 
-      // atualiza texto só se diferença significativa em MB
+      // Only update text object if values changed significantly
       if (Math.abs(totalMB - lastShownTotalMB) >= CHANGE_THRESHOLD_MB || fpsVal !== lastFps) {
         lastShownTotalMB = totalMB;
         lastFps = fpsVal;
-        try {
-          if (!fpsObj) fpsObj = findFpsObj();
-          if (fpsObj) {
-            const ramLine = "ram: " + totalMB + " MB";
-            const text = "fps: " + fpsVal + "\n" + ramLine;
-            fpsObj.setString(text);
-          }
-        } catch(e){}
+        
+        const obj = findFpsObj();
+        if (obj) {
+            // Update text efficiently
+            const ramText = "RAM: " + totalMB + " MB";
+            const fpsText = "FPS: " + fpsVal + "\n" + ramText;
+            
+            // Check if setString exists (GDevelop object)
+            if (obj.setString) obj.setString(fpsText);
+            // Fallback for DOM element if used instead
+            else if (obj.textContent !== undefined) obj.textContent = fpsText;
+        }
       }
     } catch(e){}
   }
 
-  // loop principal via rAF (conta frames e a cada UPDATE_MS chama updateIfChanged)
+  // --- MAIN LOOP ---
   let lastTick = performance.now();
+  
   function rafLoop(now) {
-    try {
-      frames++;
-      const elapsed = now - lastTick;
-      if (elapsed >= UPDATE_MS) {
+    frames++; // Count every frame
+    const elapsed = now - lastTick;
+    
+    if (elapsed >= UPDATE_MS) {
         lastTick = now;
-        updateIfChanged(); // não await aqui, é async mas ok (ele faz fetchs internos)
-      }
-    } catch(e){}
+        updateIfChanged(); // Async update
+    }
+    
     requestAnimationFrame(rafLoop);
   }
 
-  // inicialização
-  fpsObj = findFpsObj();
-  if (fpsObj) {
-    try { fpsObj.setString("fps: --\nram: -- MB"); } catch(e){}
-  }
+  // Start the loop once
   requestAnimationFrame(rafLoop);
+  console.log("[FPS Monitor] Started (Singleton)");
 
 })(runtimeScene);
-
 };
 gdjs.PlayCode.eventsList270 = function(runtimeScene) {
 
@@ -23613,7 +23576,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x2b40cd0(runtimeScene);
+gdjs.PlayCode.userFunc0x1be7650(runtimeScene);
 
 }
 
@@ -23621,7 +23584,7 @@ gdjs.PlayCode.userFunc0x2b40cd0(runtimeScene);
 {
 
 
-gdjs.PlayCode.userFunc0x2b40d88(runtimeScene);
+gdjs.PlayCode.userFunc0x1be8348(runtimeScene);
 
 }
 
@@ -23743,7 +23706,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x2b42d10 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x19fccf8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js
 (function(){
@@ -24200,7 +24163,7 @@ gdjs.PlayCode.eventsList275 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x2b42d10(runtimeScene);
+gdjs.PlayCode.userFunc0x19fccf8(runtimeScene);
 
 }
 
@@ -24280,65 +24243,83 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x2b44058 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1386668 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT B — loader OTIMIZADO (cache, concurrency, retries, audio pool, IndexedDB)
-// Princípios: não muda comportamento de autoplay; mantém compatibilidade com os demais scripts.
-// Use diretamente em GDevelop (runtimeScene disponível).
+// SCRIPT B — LOADER OTIMIZADO (Singleton, Memory Fixes, Blobs Cleanup)
+// Mantém compatibilidade total com o original, mas previne redefinição e memory leaks.
 (async function(runtimeScene){
   "use strict";
 
+  // --- ATUALIZAÇÃO DE REFERÊNCIA DA CENA (CRÍTICO PARA O LOOP FUNCIONAR) ---
+  // Isso garante que o loop de áudio sempre atualize as variáveis da cena ATUAL
+  window.GDJS_CURRENT_SCENE = runtimeScene;
+
+  // Se o núcleo do script já existe, apenas executamos a verificação de canais e saímos.
+  // Isso previne memory leaks e re-execução desnecessária de definições.
+  if (window.GDJS_SCRIPT_B_READY) {
+      if (window.GDJS_SCRIPT_B_HELPERS && window.GDJS_SCRIPT_B_HELPERS.ensureVars) {
+          window.GDJS_SCRIPT_B_HELPERS.ensureVars(runtimeScene);
+      }
+      if (window.GDJS_SCRIPT_B_HELPERS && window.GDJS_SCRIPT_B_HELPERS.ensureChannels) {
+          window.GDJS_SCRIPT_B_HELPERS.ensureChannels().catch(()=>{});
+      }
+      // Log de debug opcional
+      // console.log("[Script B] Scene updated, skipped re-init.");
+      return; 
+  }
+
+  // ==================================================================================
+  // BLOCO DE DEFINIÇÃO ÚNICA (Roda apenas 1 vez por sessão de jogo)
+  // ==================================================================================
+
   // ---------- CONFIGURAÇÕES ------------
   const CONFIG = {
-    manifestTTLms: 1000 * 60 * 10,     // 10 min cache para manifest.json na memória
+    manifestTTLms: 1000 * 60 * 10,     // 10 min cache para manifest.json
     ghListTTLms: 1000 * 60 * 5,        // 5 min cache para listagens GH
-    maxParallelDownloads: 4,           // nível de concorrência de downloads
-    fetchRetries: 2,                   // número de retries (além da 1ª tentativa)
-    fetchBackoffBase: 250,             // ms base para backoff exponencial
-    useIndexedDBCache: true,           // persistir blobs/jsons no IndexedDB
+    maxParallelDownloads: 4,           // nível de concorrência
+    fetchRetries: 2,                
+    fetchBackoffBase: 250,             
+    useIndexedDBCache: true,           
     indexedDBName: "gdjs-cache-v1",
     indexedDBStoreFiles: "files",
     indexedDBStoreMeta: "meta",
-    enableConsoleLogs: false           // true para logs de debug
+    enableConsoleLogs: false           
   };
 
-  // ---------- HELPERS GERAIS ------------
   const log = (...args) => { if (CONFIG.enableConsoleLogs) console.log("[gdjs-loader]", ...args); };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  // ---------- GAME VAR HELPERS (mesma API usada antes) ------------
-  const gg = runtimeScene.getGame().getVariables();
-  function ensureVarString(name, def=""){ if(!gg.has(name)) gg.get(name).setString(def); }
-  function ensureVarNumber(name, def=0){ if(!gg.has(name)) gg.get(name).setNumber(def); }
-  function getVarString(name){ try { return gg.get(name).getAsString(); } catch(e){ return ""; } }
-  function setVarString(name, v){ try { gg.get(name).setString(String(v)); } catch(e){} }
-  function getVarNumber(name){ try { return gg.get(name).getAsNumber(); } catch(e){ return 0; } }
-  function setVarNumber(name, n){ try { gg.get(name).setNumber(Number(n) || 0); } catch(e){} }
+  // ---------- GLOBALS ----------
+  window.gdjsCustomAudio = window.gdjsCustomAudio || {}; 
+  window.gdjsChannels = window.gdjsChannels || {};
+  
+  // ---------- GAME VAR HELPERS ----------
+  const ensureVars = (scene) => {
+      if(!scene || !scene.getGame) return;
+      const gg = scene.getGame().getVariables();
+      const s = (n,v) => { if(!gg.has(n)) gg.get(n).setString(v||""); };
+      const num = (n,v) => { if(!gg.has(n)) gg.get(n).setNumber(v||0); };
+      
+      s("selectedTrackKey");
+      s("BfChartJsonLoader");
+      s("OppChartJsonLoader");
+      s("metadatajson");
+      s("SongName");
+      num("jsmusicoffset");
+      num("Pause");
+      num("jsmusicfinish");
+      num("AllLoaded", 1);
+      num("StopJsMusic", 0);
+  };
+  ensureVars(runtimeScene); // Roda na primeira vez
 
-  ensureVarString("selectedTrackKey","");
-  ensureVarString("BfChartJsonLoader","");
-  ensureVarString("OppChartJsonLoader","");
-  ensureVarString("metadatajson","");
-  ensureVarString("SongName","");
-  ensureVarNumber("jsmusicoffset",0);
-  ensureVarNumber("Pause",0);
-  ensureVarNumber("jsmusicfinish",0);
-  ensureVarNumber("AllLoaded", 1);
-  ensureVarNumber("StopJsMusic", 0);
-
-  // ---------- GLOBALS (compatibilidade com scripts existentes) ----------
-  window.gdjsCustomAudio = window.gdjsCustomAudio || {}; // estrutura: { folderPath: { audios: {name:{blobUrl,audioEl}}, rawFiles: {name:txt} } }
-  window.gdjsChannels = window.gdjsChannels || {};       // channel index -> Audio element
-  window._gdjs_manifest = window._gdjs_manifest || undefined;
-  window._gdjs_manifest_cache_ts = window._gdjs_manifest_cache_ts || 0;
-
-  // ---------- UTILIDADES DE FETCH (retry/backoff e abort) ----------
+  // ---------- UTILS DE FETCH ----------
   async function fetchWithRetry(url, opts = {}, retries = CONFIG.fetchRetries) {
     let attempt = 0;
     let lastErr = null;
     while (attempt <= retries) {
       try {
-        const controller = opts.signal ? null : new AbortController(); // only create if user didn't pass signal
+        const controller = opts.signal ? null : new AbortController(); 
         const fetchOpts = Object.assign({}, opts);
         if (!fetchOpts.signal && controller) fetchOpts.signal = controller.signal;
         const resp = await fetch(url, fetchOpts);
@@ -24346,7 +24327,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         return resp;
       } catch (err) {
         lastErr = err;
-        if (err && err.name === "AbortError") throw err; // propagate abort immediately
+        if (err && err.name === "AbortError") throw err; 
         const backoff = CONFIG.fetchBackoffBase * (2 ** attempt);
         await sleep(backoff);
         attempt++;
@@ -24355,46 +24336,14 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     throw lastErr || new Error("fetch failed");
   }
 
-  async function fetchAsBlob(url, signal) {
-    const resp = await fetchWithRetry(url, { signal });
-    return await resp.blob();
-  }
-  async function fetchAsText(url, signal) {
-    const resp = await fetchWithRetry(url, { signal });
-    return await resp.text();
-  }
+  async function fetchAsBlob(url, signal) { const r = await fetchWithRetry(url, { signal }); return await r.blob(); }
+  async function fetchAsText(url, signal) { const r = await fetchWithRetry(url, { signal }); return await r.text(); }
 
-  // ---------- TOKEN / HEADER MEMOIZAÇÃO ----------
-  let _cachedGitHubToken = null;
-  function getGitHubTokenOnce() {
-    if (_cachedGitHubToken !== null) return _cachedGitHubToken;
-    try { _cachedGitHubToken = localStorage.getItem("gdjs_github_token") || ""; } catch(e){ _cachedGitHubToken = ""; }
-    try {
-      if ((!_cachedGitHubToken || _cachedGitHubToken.trim()==="") && runtimeScene && runtimeScene.getGame) {
-        const gv = runtimeScene.getGame().getVariables();
-        if (gv.has("GitHubToken")) _cachedGitHubToken = gv.get("GitHubToken").getAsString() || "";
-      }
-    } catch(e){}
-    return _cachedGitHubToken;
-  }
-  function getAuthHeaders() {
-    const token = getGitHubTokenOnce();
-    return token ? { "Authorization": "token " + token } : {};
-  }
+  // ---------- CACHES MEMORIA ----------
+  const manifestMemoryCache = new Map();
+  const ghListMemoryCache = new Map();
 
-  // ---------- MANIFEST & GH LIST CACHE (memória) ----------
-  // Chave baseada no repo ativo (owner/repo@branch) ou no URL custom.
-  const manifestMemoryCache = new Map(); // key -> { manifest, ts }
-  const ghListMemoryCache = new Map();   // key -> { data, ts }
-
-  function repoKeyFrom(entry) {
-    if (!entry) return "__default__";
-    if (entry.manifestUrl) return "url::" + entry.manifestUrl;
-    return `${entry.owner || ""}/${entry.repo || ""}@${entry.branch || "main"}`;
-  }
-
-  // ---------- IndexedDB (opcional) ----------
-  // simples wrapper minimal sem dependencies
+  // ---------- INDEXED DB ----------
   const idb = {
     db: null,
     async open() {
@@ -24407,46 +24356,45 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
           if (!db.objectStoreNames.contains(CONFIG.indexedDBStoreFiles)) db.createObjectStore(CONFIG.indexedDBStoreFiles);
           if (!db.objectStoreNames.contains(CONFIG.indexedDBStoreMeta)) db.createObjectStore(CONFIG.indexedDBStoreMeta);
         };
-        rq.onsuccess = function() {
-          idb.db = rq.result;
-          resolve(idb.db);
-        };
+        rq.onsuccess = function() { idb.db = rq.result; resolve(idb.db); };
         rq.onerror = function(){ reject(rq.error); };
       });
     },
     async put(storeName, key, value) {
       if (!CONFIG.useIndexedDBCache) return;
-      const db = await this.open();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, "readwrite");
-        tx.objectStore(storeName).put(value, key);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => reject(tx.error);
-      });
+      try {
+          const db = await this.open();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, "readwrite");
+            tx.objectStore(storeName).put(value, key);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => reject(tx.error);
+          });
+      } catch(e){}
     },
     async get(storeName, key) {
       if (!CONFIG.useIndexedDBCache) return null;
-      const db = await this.open();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, "readonly");
-        const req = tx.objectStore(storeName).get(key);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => reject(req.error);
-      });
+      try {
+          const db = await this.open();
+          return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, "readonly");
+            const req = tx.objectStore(storeName).get(key);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+          });
+      } catch(e){ return null; }
     },
     async del(storeName, key) {
       if (!CONFIG.useIndexedDBCache) return;
-      const db = await this.open();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, "readwrite");
-        tx.objectStore(storeName).delete(key);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => reject(tx.error);
-      });
+      try {
+          const db = await this.open();
+          const tx = db.transaction(storeName, "readwrite");
+          tx.objectStore(storeName).delete(key);
+      } catch(e){}
     }
   };
 
-  // ---------- REPO HELPERS (lê lista do localStorage / UI) ----------
+  // ---------- REPO & MANIFEST ----------
   function loadRepoList() {
     try { const raw = localStorage.getItem("gdjs_repo_list_v1"); if (!raw) return []; return JSON.parse(raw); } catch(e){ return []; }
   }
@@ -24459,6 +24407,11 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       return pick;
     } catch(e){ return { owner: "LucyYuih", repo: "gdev-custom-charts", branch: "main" }; }
   }
+  function repoKeyFrom(entry) {
+    if (!entry) return "__default__";
+    if (entry.manifestUrl) return "url::" + entry.manifestUrl;
+    return `${entry.owner || ""}/${entry.repo || ""}@${entry.branch || "main"}`;
+  }
   function buildManifestCdnUrl(entry) {
     if (!entry) return null;
     if (entry.manifestUrl) return entry.manifestUrl;
@@ -24466,62 +24419,40 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     return null;
   }
 
-  // ---------- MANIFEST LOADER (cache + fallbacks) ----------
+  // --- Loaders de Manifest ---
   async function tryManifestFromGameVar() {
-    try { if (runtimeScene && runtimeScene.getGame) { const v = runtimeScene.getGame().getVariables(); if (v.has("manifestjson")) { const s = v.get("manifestjson").getAsString(); if (s && s.trim()) { try { return JSON.parse(s); } catch(e){ return null; } } } } } catch(e){} return null;
+    try { if (window.GDJS_CURRENT_SCENE && window.GDJS_CURRENT_SCENE.getGame) { const v = window.GDJS_CURRENT_SCENE.getGame().getVariables();
+      if (v.has("manifestjson")) { const s = v.get("manifestjson").getAsString(); if (s && s.trim()) { try { return JSON.parse(s); } catch(e){ return null; } } } } } catch(e){} return null;
   }
   async function tryManifestFromProjectResource() {
-    try {
-      if (runtimeScene && runtimeScene.getGame && runtimeScene.getGame().getResourcesManager) {
-        const rm = runtimeScene.getGame().getResourcesManager();
-        if (rm.getResourceFullUrl) {
-          try {
-            const url = rm.getResourceFullUrl("manifest.json");
-            if (url) { const r = await fetchWithRetry(url, {cache:"no-cache"}); if (r.ok) return await r.json(); }
-          } catch(e){}
-        }
-      }
-    } catch(e){}
     const tries = ["manifest.json","resources/manifest.json","res/manifest.json","./manifest.json"];
-    for (const p of tries) {
-      try { const r = await fetchWithRetry(p, {cache:"no-cache"}); if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
-    }
+    for (const p of tries) { try { const r = await fetchWithRetry(p, {cache:"no-cache"}); if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){} }
     return null;
   }
-
   async function tryManifestFromCdnOf(entry) {
     try {
       const url = buildManifestCdnUrl(entry);
       if (!url) return null;
-      // verificar cache em idb primeiro
       if (CONFIG.useIndexedDBCache) {
         try {
           const cached = await idb.get(CONFIG.indexedDBStoreMeta, "manifest::" + repoKeyFrom(entry));
-          if (cached && cached.ts && (Date.now() - cached.ts) < CONFIG.manifestTTLms && cached.manifest) {
-            log("manifest from idb cache");
-            return cached.manifest;
-          }
-        } catch(e){ /* ignore */ }
+          if (cached && cached.ts && (Date.now() - cached.ts) < CONFIG.manifestTTLms && cached.manifest) return cached.manifest;
+        } catch(e){}
       }
       const r = await fetchWithRetry(url, {cache:"no-cache"});
       if (r.ok) {
         const json = await r.json();
-        // store in idb
         try { if (CONFIG.useIndexedDBCache) await idb.put(CONFIG.indexedDBStoreMeta, "manifest::" + repoKeyFrom(entry), {ts: Date.now(), manifest: json}); } catch(e){}
         return json;
       }
     } catch(e){}
     return null;
   }
-
+  
   async function loadManifestPreferLocalFor(entry) {
     const rk = repoKeyFrom(entry);
     const cached = manifestMemoryCache.get(rk);
-    if (cached && (Date.now() - cached.ts) < CONFIG.manifestTTLms) {
-      log("manifest memory cache hit", rk);
-      return cached.manifest;
-    }
-    // try order: game var -> project resource -> CDN -> null
+    if (cached && (Date.now() - cached.ts) < CONFIG.manifestTTLms) return cached.manifest;
     const a = await tryManifestFromGameVar(); if (a) { manifestMemoryCache.set(rk, { manifest: a, ts: Date.now() }); return a; }
     const b = await tryManifestFromProjectResource(); if (b) { manifestMemoryCache.set(rk, { manifest: b, ts: Date.now() }); return b; }
     const c = await tryManifestFromCdnOf(entry); if (c) { manifestMemoryCache.set(rk, { manifest: c, ts: Date.now() }); return c; }
@@ -24529,18 +24460,16 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     return null;
   }
 
-  // ---------- GitHub list (API) com cache ----------
+  // --- GitHub API List ---
   async function ghListApi(path="") {
     const active = getActiveRepo();
     if (!active.owner || !active.repo) throw new Error("No active GH repo configured");
     const key = repoKeyFrom(active) + "::" + path;
     const cached = ghListMemoryCache.get(key);
-    if (cached && (Date.now() - cached.ts) < CONFIG.ghListTTLms) {
-      log("ghList cache hit", key);
-      return cached.data;
-    }
+    if (cached && (Date.now() - cached.ts) < CONFIG.ghListTTLms) return cached.data;
     const apiUrl = `https://api.github.com/repos/${active.owner}/${active.repo}/contents/${encodeURIComponent(path)}?ref=${active.branch || "main"}`;
-    const headers = getAuthHeaders();
+    let token = ""; try { token = localStorage.getItem("gdjs_github_token") || ""; } catch(e){}
+    const headers = token ? { "Authorization": "token " + token } : {};
     const r = await fetchWithRetry(apiUrl, { headers });
     if (!r.ok) throw new Error(`GitHub API: ${r.status}`);
     const json = await r.json();
@@ -24549,56 +24478,22 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     return out;
   }
 
-  // fallback wrapper used in multiple lugares (keeps same contract)
-  async function ghListForFolderUsingEntry(entry, path="") {
-    if (!entry || (!entry.owner || !entry.repo)) throw new Error("No GitHub owner/repo specified for ghList");
-    return await ghListApi(path);
-  }
-
-  // ---------- CONCURRENCY LIMITER (simples) ----------
-  function createLimiter(concurrency = CONFIG.maxParallelDownloads) {
-    let active = 0;
-    const queue = [];
-    function next() {
-      if (active >= concurrency) return;
-      const task = queue.shift();
-      if (!task) return;
-      active++;
-      Promise.resolve().then(task.fn).then(task.resolve).catch(task.reject).finally(()=>{ active--; next(); });
-    }
-    return function limit(fn) {
-      return new Promise((resolve, reject) => {
-        queue.push({ fn, resolve, reject });
-        next();
-      });
-    };
-  }
-  const limit = createLimiter(CONFIG.maxParallelDownloads);
-
-  // ---------- AUDIO POOL e gerenciamento de blobUrls ----------
-  // Objetos:
-  //   window.gdjsCustomAudio[folder] = { audios: { name: { blobUrl, audioElId } }, rawFiles: { name: text } }
-  //   audioPool: array de elements HTMLAudioElement pré-criados
+  // ---------- AUDIO POOL ----------
   const audioPool = {
     pool: [],
     maxSize: 8,
     nextId: 0,
-    refsByBlob: new Map(), // blobUrl -> refcount
+    refsByBlob: new Map(), 
     createElement() {
       const el = new Audio();
-      el.preload = "auto";
-      el.crossOrigin = "anonymous";
-      el.loop = false;
-      const id = this.nextId++;
-      el._gdjs_pool_id = id;
+      el.preload = "auto"; el.crossOrigin = "anonymous"; el.loop = false;
+      el._gdjs_pool_id = this.nextId++;
       return el;
     },
     async init(size = 4) {
-      const needed = Math.max(2, Math.min(this.maxSize, size));
-      while (this.pool.length < needed) this.pool.push(this.createElement());
+      while (this.pool.length < Math.min(this.maxSize, size)) this.pool.push(this.createElement());
     },
     acquire(blobUrl) {
-      // reuse existing element if its src equals blobUrl
       for (const el of this.pool) {
         if (!el._gdjs_in_use) {
           el._gdjs_in_use = true;
@@ -24606,7 +24501,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
           return el;
         }
       }
-      // none available: create new if under maxSize
       if (this.pool.length < this.maxSize) {
         const el = this.createElement();
         el._gdjs_in_use = true;
@@ -24614,7 +24508,6 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         this.pool.push(el);
         return el;
       }
-      // fallback: reuse first one forcibly
       const el = this.pool[0];
       try { el.pause(); } catch(e){}
       try { el.src = blobUrl; } catch(e){}
@@ -24626,42 +24519,30 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       el._gdjs_in_use = false;
       try { el.pause(); el.currentTime = 0; } catch(e){}
     },
-    incBlobRef(blobUrl) {
-      if (!blobUrl) return;
-      const cur = this.refsByBlob.get(blobUrl) || 0;
-      this.refsByBlob.set(blobUrl, cur + 1);
-    },
+    incBlobRef(blobUrl) { if (!blobUrl) return; this.refsByBlob.set(blobUrl, (this.refsByBlob.get(blobUrl) || 0) + 1); },
     decBlobRef(blobUrl) {
       if (!blobUrl) return;
       const cur = this.refsByBlob.get(blobUrl) || 0;
       if (cur <= 1) {
         this.refsByBlob.delete(blobUrl);
-        // revoke URL to free memory
         try { URL.revokeObjectURL(blobUrl); } catch(e){ }
       } else {
         this.refsByBlob.set(blobUrl, cur - 1);
       }
     }
   };
-
-  // init pool
   audioPool.init(4);
 
-  // ---------- UTIL: basenameNoExt e isAudio/isJson ----------
+  // ---------- HELPERS UTIL ----------
   function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
   function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
   function isJsonFile(name){ return /\.json$/i.test(name); }
-
-  // ---------- Helper: mark audio as needing user interaction or decode failed ----------
   function markAudioRequiresUserInteraction(audioEl) {
     try {
       audioEl._gdjs_requires_user_interaction = true;
       audioEl._gdjs_play_attempts = (audioEl._gdjs_play_attempts || 0) + 1;
       audioEl._gdjs_last_play_try_ms = Date.now();
-      // if too many attempts, mark as decode failed to avoid infinite retries
-      if (audioEl._gdjs_play_attempts > 3) {
-        audioEl._gdjs_decode_failed = true;
-      }
+      if (audioEl._gdjs_play_attempts > 3) audioEl._gdjs_decode_failed = true;
     } catch(e){}
   }
   function clearAudioUserInteractionFlags(audioEl) {
@@ -24673,252 +24554,31 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     } catch(e){}
   }
 
-  // ---------- CARREGAMENTO DE ÁUDIOS/JSONS PARA UMA PASTA (melhorado) ----------
-  // Nota: esta função preserva a semântica original: NÃO chama play() automaticamente.
-  async function downloadAndPrepareFolderFlexible(folderPathOrRoot, outerController, opts) {
-    const ctrl = outerController;
-    const difficultyName = opts && opts.difficultyName ? opts.difficultyName : null;
-
-    try {
-      // cleanup anterior (revoke se necessário)
-      // mas não revocar os blobUrls que vamos reutilizar; apenas limpar canais
-      stopAndCleanupAll(true);
-
-      const rootFolder = (() => {
-        if (difficultyName) return folderPathOrRoot;
-        const parts = (folderPathOrRoot || "").split("/").filter(Boolean);
-        if (parts.length >= 3) return parts.slice(0, parts.length - 1).join("/");
-        return folderPathOrRoot;
-      })();
-
-      let inferredDifficulty = difficultyName;
-      if (!inferredDifficulty && (folderPathOrRoot || "").split("/").filter(Boolean).length >= 3) {
-        const parts = (folderPathOrRoot || "").split("/").filter(Boolean);
-        inferredDifficulty = parts.slice(-1)[0];
-      }
-
-      try { setVarString("SongName", basenameNoExt((rootFolder || "").split("/").pop()||"")); } catch(e){}
-      try { runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPathOrRoot); } catch(e){}
-
-      // sinal de carregando
-      setVarNumber("AllLoaded", 0);
-
-      // prepare manifest + active repo
-      const activeRepo = getActiveRepo();
-      const manifest = await loadManifestPreferLocalFor(activeRepo);
-
-      // listagem de arquivos de áudio
-      let audioFiles = [];
-      if (inferredDifficulty) {
-        const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
-        audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
-      } else {
-        const mp = (manifest && manifest.hasOwnProperty(folderPathOrRoot)) ? manifest[folderPathOrRoot] : null;
-        if (mp && Array.isArray(mp) && mp.length>0 && typeof mp[0] === "object") {
-          audioFiles = mp.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
-        } else {
-          try {
-            const api = await (async ()=> { try { return await ghListApi(folderPathOrRoot); } catch(e) { return []; } })();
-            audioFiles = (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
-          } catch(e){}
-        }
-      }
-
-      // charts / jsons map
-      const allJsonsMap = {};
-      if (inferredDifficulty) {
-        const difficultyPath = (rootFolder? rootFolder + "/" + inferredDifficulty : inferredDifficulty);
-        if (manifest && manifest.hasOwnProperty(difficultyPath)) {
-          const entry = manifest[difficultyPath];
-          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-            entry.filter(e=> isJsonFile(e.name)).forEach(e=> allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: difficultyPath });
-          }
-        } else {
-          try {
-            const api = await (async ()=> { try { return await ghListApi(difficultyPath); } catch(e){ return []; } })();
-            (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i => allJsonsMap[i.name] = { name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`), origin: difficultyPath });
-          } catch(e){}
-        }
-      }
-      // include jsons from rootFolder as fallback
-      try {
-        if (manifest && manifest.hasOwnProperty(rootFolder)) {
-          const entry = manifest[rootFolder];
-          if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-            entry.filter(e=> isJsonFile(e.name)).forEach(e=> { if (!allJsonsMap[e.name]) allJsonsMap[e.name] = { name: e.name, url: e.url || e.raw_url || null, origin: rootFolder }; });
-          }
-        } else {
-          const api = await (async ()=> { try { return await ghListApi(rootFolder); } catch(e){ return []; } })();
-          (api || []).filter(i=> i.type !== "dir" && isJsonFile(i.name)).forEach(i=> { if (!allJsonsMap[i.name]) allJsonsMap[i.name] = { name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`), origin: rootFolder }; });
-        }
-      } catch(e){}
-
-      // prepare storage
-      window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
-      const dest = window.gdjsCustomAudio[rootFolder];
-
-      // --------- download audios com limiter e cache idb ----------
-      let nextChannelIndex = 0;
-      const tasks = (audioFiles || []).map(f => async () => {
-        if (ctrl.signal.aborted) throw new Error("aborted");
-        try {
-          setVarString("SongName", setVarString || "" ); // noop guard to keep variable reference alive
-          // tentar recuperar de IDB se ativado
-          const cacheKeyBlob = "blob::" + folderPathOrRoot + "::" + f.name;
-          let blob = null;
-          if (CONFIG.useIndexedDBCache) {
-            try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyBlob); if (cached) blob = cached; } catch(e){ /* ignore */ }
-          }
-          if (!blob) {
-            // fetch e salvar
-            const b = await fetchAsBlob(f.url, ctrl.signal);
-            blob = b;
-            if (CONFIG.useIndexedDBCache) {
-              try { await idb.put(CONFIG.indexedDBStoreFiles, cacheKeyBlob, b); } catch(e){}
-            }
-          }
-          // create blobUrl e store
-          const blobUrl = URL.createObjectURL(blob);
-          audioPool.incBlobRef(blobUrl);
-          // create audio element from pool
-          const audioEl = audioPool.acquire(blobUrl);
-          // ensure internal flags clear for new element
-          clearAudioUserInteractionFlags(audioEl);
-          // store dest
-          dest.audios[f.name] = { blobUrl, audioEl };
-          window.gdjsChannels[nextChannelIndex] = audioEl;
-          nextChannelIndex++;
-        } catch(e){
-          // skip error for this file
-        }
-      });
-      // run tasks com concurrency
-      await Promise.all(tasks.map(t => limit(t)));
-
-      // --------- download jsons (charts) ----------
-      const ggvars = runtimeScene.getGame().getVariables();
-      const jsonTasks = Object.keys(allJsonsMap).map(name => async () => {
-        if (ctrl.signal.aborted) throw new Error("aborted");
-        try {
-          const j = allJsonsMap[name];
-          // idb cache key
-          const cacheKeyTxt = "txt::" + folderPathOrRoot + "::" + j.name;
-          let txt = null;
-          if (CONFIG.useIndexedDBCache) {
-            try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyTxt); if (cached) txt = cached; } catch(e){}
-          }
-          if (!txt) {
-            const text = await fetchAsText(j.url, ctrl.signal);
-            txt = text;
-            if (CONFIG.useIndexedDBCache) {
-              try { await idb.put(CONFIG.indexedDBStoreFiles, cacheKeyTxt, txt); } catch(e){}
-            }
-          }
-          const storeKey = (j.origin && j.origin !== rootFolder ? (j.origin.split("/").pop() + "/" + j.name) : j.name);
-          dest.rawFiles[storeKey] = txt;
-          const lname = j.name.toLowerCase();
-          if (ggvars) {
-            if (/metadata|meta/.test(lname)) ggvars.get("metadatajson").setString(txt);
-            else if (/(bf|chartbf|chart_bf)/.test(lname)) ggvars.get("BfChartJsonLoader").setString(txt);
-            else if (/(dad|opp|opponent)/.test(lname)) ggvars.get("OppChartJsonLoader").setString(txt);
-            else {
-              try {
-                const parsed = JSON.parse(txt);
-                if (parsed && parsed.notes) {
-                  if (!ggvars.get("BfChartJsonLoader").getAsString()) ggvars.get("BfChartJsonLoader").setString(txt);
-                  else if (!ggvars.get("OppChartJsonLoader").getAsString()) ggvars.get("OppChartJsonLoader").setString(txt);
-                  else if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
-                } else {
-                  if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
-                }
-              } catch(e){
-                if (!ggvars.get("metadatajson").getAsString()) ggvars.get("metadatajson").setString(txt);
-              }
-            }
-          }
-        } catch(e){}
-      });
-      await Promise.all(jsonTasks.map(t => limit(t)));
-
-      // finalize: connect channel 0 watcher / audio context setup (sem tocar)
-      attachEndedWatcherToChannel0();
-      await ensureAudioContext();
-      setVarNumber("jsmusicfinish", 0);
-
-      // success
-      setVarNumber("AllLoaded", 1);
-      return { ok:true };
-    } catch(err) {
-      try { stopAndCleanupAll(true); } catch(e){}
-      setVarNumber("AllLoaded", 0);
-      return { ok:false, reason: err && err.message ? err.message : String(err) };
+  // ---------- CONCURRENCY ----------
+  function createLimiter(concurrency = CONFIG.maxParallelDownloads) {
+    let active = 0; const queue = [];
+    function next() {
+      if (active >= concurrency) return;
+      const task = queue.shift(); if (!task) return;
+      active++;
+      Promise.resolve().then(task.fn).then(task.resolve).catch(task.reject).finally(()=>{ active--; next(); });
     }
+    return function limit(fn) { return new Promise((resolve, reject) => { queue.push({ fn, resolve, reject }); next(); }); };
   }
+  const limit = createLimiter(CONFIG.maxParallelDownloads);
 
-  // ---------- findAudioFilesWithFallback (mantive semântica, use activeRepo) ----------
-  async function findAudioFilesWithFallback(rootFolder, difficultyPath) {
-    const activeRepo = getActiveRepo();
-    const manifest = await loadManifestPreferLocalFor(activeRepo);
-
-    async function audioListFromManifestPath(p) {
-      try {
-        if (!manifest) return [];
-        if (!manifest.hasOwnProperty(p)) return [];
-        const entry = manifest[p];
-        if (Array.isArray(entry) && entry.length>0 && typeof entry[0] === "object") {
-          return entry.filter(e=> isAudioFile(e.name)).map(e=> ({ name: e.name, url: e.url || e.raw_url || null }));
-        }
-      } catch(e){}
-      return [];
-    }
-
-    async function audioListFromGithubPath(p) {
-      try {
-        const api = await (async ()=> { try { return await ghListApi(p); } catch(e) { return []; } })();
-        return (api || []).filter(i => i.type !== "dir" && isAudioFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
-      } catch(e){}
-      return [];
-    }
-
-    // 1) difficultyPath
-    try {
-      let list = await audioListFromManifestPath(difficultyPath);
-      if (list && list.length>0) return list;
-      list = await audioListFromGithubPath(difficultyPath);
-      if (list && list.length>0) return list;
-    } catch(e){}
-
-    // 2) rootFolder
-    try {
-      let list = await audioListFromManifestPath(rootFolder);
-      if (list && list.length>0) return list;
-      list = await audioListFromGithubPath(rootFolder);
-      if (list && list.length>0) return list;
-    } catch(e){}
-
-    // 3) modFolder parent
-    try {
-      const parts = (rootFolder || "").split("/").filter(Boolean);
-      if (parts.length >= 2) {
-        const modFolder = parts.slice(0, parts.length - 1).join("/");
-        if (modFolder) {
-          let list = await audioListFromManifestPath(modFolder);
-          if (list && list.length>0) return list;
-          list = await audioListFromGithubPath(modFolder);
-          if (list && list.length>0) return list;
-        }
-      }
-    } catch(e){}
-    return [];
-  }
-
-  // ---------- AUDIO CONTEXT / ended watcher ----------
+  // ---------- AUDIO CONTEXT ----------
   function attachEndedWatcherToChannel0(){
     const ch0 = window.gdjsChannels && window.gdjsChannels[0];
     if (!ch0) return;
     if (ch0._gdjs_ended_handler) { try{ ch0.removeEventListener('ended', ch0._gdjs_ended_handler); }catch(e){} ch0._gdjs_ended_handler = null; }
     ch0.loop = false;
-    const handler = ()=> { setVarNumber("jsmusicfinish", 1); };
+    const handler = ()=> { 
+        if (window.GDJS_CURRENT_SCENE) {
+            const gg = window.GDJS_CURRENT_SCENE.getGame().getVariables();
+            if(gg.has("jsmusicfinish")) gg.get("jsmusicfinish").setNumber(1);
+        }
+    };
     ch0.addEventListener('ended', handler);
     ch0._gdjs_ended_handler = handler;
   }
@@ -24945,7 +24605,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     } catch(e){}
   }
 
-  // ---------- STOP + CLEANUP (revoga blobs com controle) ----------
+  // ---------- STOP / CLEANUP ----------
   function stopAndCleanupAll(revokeBlobUrls = true){
     try {
       if (window.gdjsChannels) {
@@ -24955,12 +24615,10 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
             if (!a) return;
             try{ a.pause(); }catch(e){}
             try{ a.currentTime = 0; }catch(e){}
-            if (a._gdjs_ended_handler) {
-              try{ a.removeEventListener('ended', a._gdjs_ended_handler); }catch(e){} a._gdjs_ended_handler = null;
-            }
-            if (revokeBlobUrls && a.src && a.src.startsWith('blob:')) {
-              try{ audioPool.decBlobRef(a.src); }catch(e){}
-            }
+            if (a._gdjs_ended_handler) { try{ a.removeEventListener('ended', a._gdjs_ended_handler); }catch(e){} a._gdjs_ended_handler = null; }
+            if (revokeBlobUrls && a.src && a.src.startsWith('blob:')) { try{ audioPool.decBlobRef(a.src); }catch(e){} }
+            // Libera de volta pro pool
+            audioPool.release(a);
           } catch(e){}
         });
       }
@@ -24982,42 +24640,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     window.gdjsChannels = {};
   }
 
-  // ---------- carregador leve para reprodução-on-demand (mantém sem autoplay) ----------
-  // Garante que se existir entrada cached em window.gdjsCustomAudio[selected] ela será mapeada para channels
-  async function ensureChannelsReadyNonBlocking() {
-    try {
-      let selected = getVarString("selectedTrackKey");
-      if (!selected || !selected.trim()) {
-        const keys = Object.keys(window.gdjsCustomAudio||{});
-        if (keys.length>0) { selected = keys[0]; try { setVarString("selectedTrackKey", selected); } catch(e){} }
-      }
-      if (!selected) return;
-      const folderName = selected.split("/").pop() || selected;
-      if (!getVarString("SongName")) setVarString("SongName", basenameNoExt(folderName));
-      if (window.gdjsCustomAudio[selected] && Object.keys(window.gdjsCustomAudio[selected].audios||{}).length > 0) {
-        // rebuild channels mapping
-        window.gdjsChannels = {};
-        let i = 0;
-        for (const nm of Object.keys(window.gdjsCustomAudio[selected].audios)) {
-          const info = window.gdjsCustomAudio[selected].audios[nm];
-          const audioEl = info.audioEl || new Audio(info.blobUrl || info.url || "");
-          audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
-          // ensure flags
-          clearAudioUserInteractionFlags(audioEl);
-          window.gdjsChannels[i] = audioEl;
-          i++;
-        }
-        attachEndedWatcherToChannel0(); ensureAudioContext();
-        setVarNumber("jsmusicfinish", 0);
-        return;
-      }
-      // else try to load audios for track (non-blocking)
-      const loaded = await loadAudiosForTrack(selected);
-      if ((loaded || []).length > 0) { attachEndedWatcherToChannel0(); ensureAudioContext(); setVarNumber("jsmusicfinish", 0); }
-    } catch(e){}
-  }
-
-  // ---------- loadAudiosForTrack (compatível, otimizado: usa idb se possível) ----------
+  // ---------- CORE: DOWNLOADER ----------
   async function loadAudiosForTrack(selected) {
     if (!selected || !selected.trim()) return [];
     window.gdjsCustomAudio[selected] = window.gdjsCustomAudio[selected] || { audios: {}, rawFiles: {} };
@@ -25026,13 +24649,11 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     let files = null;
     if (manifest && manifest.hasOwnProperty(selected)) {
       const raw = manifest[selected];
-      if (Array.isArray(raw) && raw.length>0 && typeof raw[0] === "object") {
-        files = raw.map(e => ({ name: e.name, url: e.url }));
-      } else {
-        files = [];
-      }
+      if (Array.isArray(raw) && raw.length>0 && typeof raw[0] === "object") { files = raw.map(e => ({ name: e.name, url: e.url })); } 
+      else { files = []; }
     } else {
-      try { const list = await ghListApi(selected); files = list.map(i => ({ name: i.name, url: i.download_url || `https://cdn.jsdelivr.net/gh/${getActiveRepo().owner}/${getActiveRepo().repo}@${getActiveRepo().branch}/${i.path}` })); } catch(e){ files = []; }
+      try { const list = await ghListApi(selected);
+      files = list.map(i => ({ name: i.name, url: i.download_url || `https://cdn.jsdelivr.net/gh/${getActiveRepo().owner}/${getActiveRepo().repo}@${getActiveRepo().branch}/${i.path}` })); } catch(e){ files = []; }
     }
 
     const audioFiles = (files||[]).filter(f=> isAudioFile(f.name));
@@ -25042,30 +24663,25 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
       try {
         const cacheKeyBlob = "blob::" + selected + "::" + f.name;
         let blob = null;
-        if (CONFIG.useIndexedDBCache) {
-          try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyBlob); if (cached) blob = cached; } catch(e){}
-        }
+        if (CONFIG.useIndexedDBCache) { try { const cached = await idb.get(CONFIG.indexedDBStoreFiles, cacheKeyBlob); if (cached) blob = cached; } catch(e){} }
         if (!blob) {
           const b = await fetchAsBlob(f.url);
           blob = b;
-          if (CONFIG.useIndexedDBCache) {
-            try { await idb.put(CONFIG.indexedDBStoreFiles, cacheKeyBlob, b); } catch(e){}
-          }
+          if (CONFIG.useIndexedDBCache) { try { await idb.put(CONFIG.indexedDBStoreFiles, cacheKeyBlob, b); } catch(e){} }
         }
         const blobUrl = URL.createObjectURL(blob);
         audioPool.incBlobRef(blobUrl);
         const audioEl = audioPool.acquire(blobUrl);
-        // ensure flags reset
         clearAudioUserInteractionFlags(audioEl);
         entry.audios[f.name] = { blobUrl, audioEl };
         window.gdjsChannels[idx] = audioEl;
+        
         try {
+          // Tentativa inicial de play para carregar buffer (sem autoplay forçado se não for hora)
           const p = audioEl.play();
           if (p && typeof p.then === "function") {
             p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; }catch(e){} }).catch((err)=>{
-              // marca que precisa de interação do usuário / evitar retries incessantes
               markAudioRequiresUserInteraction(audioEl);
-              // push to unlock list to be handled by pointerdown unlock (preserving original behavior)
               unlock.push({audioEl, name:f.name});
             });
           } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
@@ -25073,11 +24689,16 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
           markAudioRequiresUserInteraction(audioEl);
           unlock.push({audioEl, name:f.name});
         }
-        if (!getVarString("SongName")) setVarString("SongName", basenameNoExt(f.name));
+        
+        if (window.GDJS_CURRENT_SCENE) {
+             const gg = window.GDJS_CURRENT_SCENE.getGame().getVariables();
+             if (!gg.get("SongName").getAsString()) gg.get("SongName").setString(basenameNoExt(f.name));
+        }
         idx++;
       } catch(e){}
     });
     await Promise.all(tasks.map(t => limit(t)));
+    
     if (unlock.length>0) {
       const handler = async ()=> { for (const it of unlock) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; clearAudioUserInteractionFlags(it.audioEl); } catch(e){ markAudioRequiresUserInteraction(it.audioEl); } } window.removeEventListener('pointerdown', handler); };
       window.addEventListener('pointerdown', handler, { once: true });
@@ -25085,42 +24706,74 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     return Object.keys(entry.audios || {});
   }
 
-  // ---------- helper wrappers que o resto do sistema usa (mantive nomes) ----------
-  window._gdjs_manifest = window._gdjs_manifest || undefined;
-
-  async function ghListForFolderUsingEntryWrapper(entry, path="") {
-    return await ghListForFolderUsingEntry(entry, path);
-  }
-
-  // ---------- minimal prewarm unlock listener (mantém sem autoplay) ----------
-  window.addEventListener("pointerdown", async function unlockOnce(){
-    try { if (window._gdjs_audio_ctx && window._gdjs_audio_ctx.state === "suspended") await window._gdjs_audio_ctx.resume(); } catch(e){}
+  // ---------- STARTUP LOGIC ----------
+  async function ensureChannelsReadyNonBlocking() {
     try {
-      const pauseVal = Number(getVarNumber("Pause") || 0);
-      const stopVal = Number(getVarNumber("StopJsMusic") || 0);
-      if (pauseVal === 0 && stopVal === 0) {
-        Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (!a) return; if ((a.paused && !a.ended) || a._gdjs_requires_user_interaction) { a.play().then(()=>{ try{ a.pause(); clearAudioUserInteractionFlags(a); a.currentTime = 0; }catch(e){} }).catch(()=>{ markAudioRequiresUserInteraction(a); }); } } catch(e){} });
+      if (!window.GDJS_CURRENT_SCENE) return;
+      const gg = window.GDJS_CURRENT_SCENE.getGame().getVariables();
+      
+      let selected = gg.get("selectedTrackKey").getAsString();
+      if (!selected || !selected.trim()) {
+        const keys = Object.keys(window.gdjsCustomAudio||{});
+        if (keys.length>0) { selected = keys[0]; try { gg.get("selectedTrackKey").setString(selected); } catch(e){} }
+      }
+      if (!selected) return;
+      
+      const folderName = selected.split("/").pop() || selected;
+      if (!gg.get("SongName").getAsString()) gg.get("SongName").setString(basenameNoExt(folderName));
+      
+      // Se já carregado, reconstrói canais
+      if (window.gdjsCustomAudio[selected] && Object.keys(window.gdjsCustomAudio[selected].audios||{}).length > 0) {
+        window.gdjsChannels = {};
+        let i = 0;
+        for (const nm of Object.keys(window.gdjsCustomAudio[selected].audios)) {
+          const info = window.gdjsCustomAudio[selected].audios[nm];
+          const audioEl = info.audioEl || new Audio(info.blobUrl || info.url || "");
+          audioEl.preload = "auto"; audioEl.crossOrigin = "anonymous"; audioEl.loop = false;
+          clearAudioUserInteractionFlags(audioEl);
+          window.gdjsChannels[i] = audioEl;
+          i++;
+        }
+        attachEndedWatcherToChannel0(); ensureAudioContext();
+        if(gg.has("jsmusicfinish")) gg.get("jsmusicfinish").setNumber(0);
+        return;
+      }
+      // Se não, carrega
+      const loaded = await loadAudiosForTrack(selected);
+      if ((loaded || []).length > 0) { 
+          attachEndedWatcherToChannel0(); 
+          ensureAudioContext(); 
+          if(gg.has("jsmusicfinish")) gg.get("jsmusicfinish").setNumber(0);
       }
     } catch(e){}
-    window.removeEventListener("pointerdown", unlockOnce);
-  }, { once:true, passive:true });
+  }
 
-  // ---------- initial ensure channels ready ----------
-  ensureChannelsReadyNonBlocking().catch(()=>{});
-
-  // ---------- sync loops (nome / jsmusicoffset / Pause respect) ----------
-  let _lastSelectedForNameCheck = getVarString("selectedTrackKey") || "";
-  let _lastSongNameForNameCheck = getVarString("SongName") || "";
+  // ---------- SYNC LOOP GLOBAL (requestAnimationFrame) ----------
+  // Este loop roda para sempre, mas usa window.GDJS_CURRENT_SCENE para afetar a cena certa
+  let _lastSelectedForNameCheck = "";
+  let _lastSongNameForNameCheck = "";
   let _nameCheckActive = true;
 
   (function rafLoop(){
     try {
-      const ch0 = window.gdjsChannels && window.gdjsChannels[0];
-      if (ch0) { const cur = ch0.currentTime || 0; setVarNumber("jsmusicoffset", cur); }
+      const scene = window.GDJS_CURRENT_SCENE;
+      if (!scene || !scene.getGame) {
+          requestAnimationFrame(rafLoop);
+          return;
+      }
+      const gg = scene.getGame().getVariables();
 
+      // 1. Sync Offset e Finish
+      const ch0 = window.gdjsChannels && window.gdjsChannels[0];
+      if (ch0) { 
+          const cur = ch0.currentTime || 0; 
+          if(gg.has("jsmusicoffset")) gg.get("jsmusicoffset").setNumber(cur); 
+      }
+
+      // 2. Sync Names
       try {
-        const selected = String(getVarString("selectedTrackKey") || "").trim();
-        const currentSongName = String(getVarString("SongName") || "");
+        const selected = String(gg.get("selectedTrackKey").getAsString() || "").trim();
+        const currentSongName = String(gg.get("SongName").getAsString() || "");
         const folderName = selected ? (selected.split("/").pop() || selected) : "";
         const expectedSong = basenameNoExt(folderName);
 
@@ -25128,19 +24781,14 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
           _nameCheckActive = true;
           _lastSelectedForNameCheck = selected;
         }
-
         if (currentSongName !== _lastSongNameForNameCheck) {
-          if (expectedSong && currentSongName !== expectedSong) {
-            _nameCheckActive = true;
-          } else {
-            _nameCheckActive = false;
-          }
+          if (expectedSong && currentSongName !== expectedSong) { _nameCheckActive = true; } 
+          else { _nameCheckActive = false; }
           _lastSongNameForNameCheck = currentSongName;
         }
-
         if (_nameCheckActive) {
           if (expectedSong && currentSongName !== expectedSong) {
-            setVarString("SongName", expectedSong);
+            gg.get("SongName").setString(expectedSong);
             _lastSongNameForNameCheck = expectedSong;
             _nameCheckActive = false;
           } else {
@@ -25150,38 +24798,31 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
         }
       } catch(e){}
 
-      const pauseVal = Number(getVarNumber("Pause") || 0);
-      const stopVal = Number(getVarNumber("StopJsMusic") || 0);
+      // 3. Play / Pause Logic
+      const pauseVal = Number(gg.get("Pause").getAsNumber() || 0);
+      const stopVal = Number(gg.get("StopJsMusic").getAsNumber() || 0);
+      
       if (pauseVal !== 0 || stopVal !== 0) {
         Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (a && !a.paused && !a.ended) a.pause(); } catch(e){} });
       } else {
-        // IMPORTANT FIX: não tentar dar play incessantemente em canais que falharam ao decodificar
-        // ou que precisam de interação do usuário. Também espaçamos tentativas para evitar spam frame-a-frame.
         const now = Date.now();
         Object.keys(window.gdjsChannels||{}).forEach(k=>{
           try {
             const a = window.gdjsChannels[k];
             if (!a) return;
-            // Skip if already playing
             if (!a.paused || a.ended) return;
-            // skip if marked as needing user interaction or decode failed
             if (a._gdjs_requires_user_interaction || a._gdjs_decode_failed) return;
-            // throttle attempts (2s)
+            
             const lastTry = a._gdjs_last_play_try_ms || 0;
-            if ((now - lastTry) < 2000) return;
-            // attempt play once; handle errors by marking
+            if ((now - lastTry) < 2000) return; // Throttle
+            
             a._gdjs_last_play_try_ms = now;
             try {
               const p = a.play();
               if (p && typeof p.then === "function") {
-                p.then(()=>{ /* if it started playing, leave it */ }).catch((err)=>{
-                  // mark as requiring user interaction or possibly decode failed
-                  markAudioRequiresUserInteraction(a);
-                });
+                p.then(()=>{ }).catch((err)=>{ markAudioRequiresUserInteraction(a); });
               }
-            } catch(e){
-              markAudioRequiresUserInteraction(a);
-            }
+            } catch(e){ markAudioRequiresUserInteraction(a); }
           } catch(e){}
         });
       }
@@ -25189,23 +24830,30 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
     requestAnimationFrame(rafLoop);
   })();
 
-  // ---------- Exports / util functions acessíveis via console (opcional) ----------
-  window._gdjs_loader_utils = window._gdjs_loader_utils || {};
-  window._gdjs_loader_utils.clearCaches = function() {
-    manifestMemoryCache.clear();
-    ghListMemoryCache.clear();
-    try { if (CONFIG.useIndexedDBCache) { idb.del(CONFIG.indexedDBStoreMeta, "manifest::" + repoKeyFrom(getActiveRepo())); } } catch(e){}
-    log("Caches cleared");
-  };
-  window._gdjs_loader_utils.setIndexedDB = function(enabled) {
-    CONFIG.useIndexedDBCache = !!enabled;
-    log("IndexedDB cache set to", CONFIG.useIndexedDBCache);
-  };
+  // ---------- UNLOCKER GLOBAL ----------
+  window.addEventListener("pointerdown", async function unlockOnce(){
+    try { if (window._gdjs_audio_ctx && window._gdjs_audio_ctx.state === "suspended") await window._gdjs_audio_ctx.resume(); } catch(e){}
+    try {
+      if(!window.GDJS_CURRENT_SCENE) return;
+      const gg = window.GDJS_CURRENT_SCENE.getGame().getVariables();
+      const pauseVal = Number(gg.get("Pause").getAsNumber() || 0);
+      const stopVal = Number(gg.get("StopJsMusic").getAsNumber() || 0);
+      if (pauseVal === 0 && stopVal === 0) {
+        Object.keys(window.gdjsChannels||{}).forEach(k=>{ try { const a = window.gdjsChannels[k]; if (!a) return; if ((a.paused && !a.ended) || a._gdjs_requires_user_interaction) { a.play().then(()=>{ try{ a.pause(); clearAudioUserInteractionFlags(a); a.currentTime = 0; }catch(e){} }).catch(()=>{ markAudioRequiresUserInteraction(a); }); } } catch(e){} });
+      }
+    } catch(e){}
+    window.removeEventListener("pointerdown", unlockOnce);
+  }, { once:true, passive:true });
 
-  // ---------- fim do script ----------
-  log("Script B (optimized) loaded");
+  // Salva helpers no window para reutilização no Singleton check
+  window.GDJS_SCRIPT_B_HELPERS = { ensureVars, ensureChannels: ensureChannelsReadyNonBlocking };
+  window.GDJS_SCRIPT_B_READY = true;
+
+  // Chamada inicial (já que é a primeira execução)
+  ensureChannelsReadyNonBlocking().catch(()=>{});
+  log("Script B (Singleton Optimized) loaded");
+
 })(runtimeScene);
-
 };
 gdjs.PlayCode.eventsList279 = function(runtimeScene) {
 
@@ -25224,7 +24872,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x2b44058(runtimeScene);
+gdjs.PlayCode.userFunc0x1386668(runtimeScene);
 
 }
 
