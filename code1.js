@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x11a7be0 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0xe86cd0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,7 +848,121 @@ gdjs.InicioCode.userFunc0x11a7be0 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.userFunc0x1e90f18 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.asyncCallback35111028 = function (runtimeScene, asyncObjectsList) {
+asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
+gdjs.InicioCode.localVariables.length = 0;
+}
+gdjs.InicioCode.idToCallbackMap.set(35111028, gdjs.InicioCode.asyncCallback35111028);
+gdjs.InicioCode.eventsList1 = function(runtimeScene) {
+
+{
+
+
+{
+{
+const asyncObjectsList = new gdjs.LongLivedObjectsList();
+asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(5), (runtimeScene) => (gdjs.InicioCode.asyncCallback35111028(runtimeScene, asyncObjectsList)), 35111028, asyncObjectsList);
+}
+}
+
+}
+
+
+};gdjs.InicioCode.eventsList2 = function(runtimeScene) {
+
+};gdjs.InicioCode.eventsList3 = function(runtimeScene) {
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+{isConditionTrue_0 = runtimeScene.getScene().getVariables().getFromIndex(9).getAsBoolean();
+}
+if (isConditionTrue_0) {
+{runtimeScene.getScene().getVariables().getFromIndex(9).setBoolean(false);
+}
+}
+
+}
+
+
+{
+
+
+
+}
+
+
+{
+
+
+gdjs.InicioCode.userFunc0xe86cd0(runtimeScene);
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+{
+{gdjs.evtTools.sound.preloadSound(runtimeScene, "freakyMenu.aac");
+}
+{gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "All songs Death Scene");
+}
+{gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "Gameplay Modifiers");
+}
+{gdjs.evtTools.input.touchSimulateMouse(runtimeScene, true);
+}
+}
+
+}
+
+
+{
+
+
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+isConditionTrue_0 = !(gdjs.evtTools.sound.isSoundOnChannelPlaying(runtimeScene, 1));
+if (isConditionTrue_0) {
+{gdjs.evtTools.sound.playSoundOnChannel(runtimeScene, "freakyMenu.aac", 1, true, 80, 1);
+}
+{gdjs.evtTools.sound.setGlobalVolume(runtimeScene, 100);
+}
+
+{ //Subevents
+gdjs.InicioCode.eventsList1(runtimeScene);} //End of subevents
+}
+
+}
+
+
+{
+
+gdjs.copyArray(runtimeScene.getObjects("nextbutton"), gdjs.InicioCode.GDnextbuttonObjects1);
+
+for (gdjs.InicioCode.forEachIndex2 = 0;gdjs.InicioCode.forEachIndex2 < gdjs.InicioCode.GDnextbuttonObjects1.length;++gdjs.InicioCode.forEachIndex2) {
+gdjs.InicioCode.GDnextbuttonObjects2.length = 0;
+
+
+gdjs.InicioCode.forEachTemporary2 = gdjs.InicioCode.GDnextbuttonObjects1[gdjs.InicioCode.forEachIndex2];
+gdjs.InicioCode.GDnextbuttonObjects2.push(gdjs.InicioCode.forEachTemporary2);
+let isConditionTrue_0 = false;
+if (true) {
+{for(var i = 0, len = gdjs.InicioCode.GDnextbuttonObjects2.length ;i < len;++i) {
+    gdjs.InicioCode.GDnextbuttonObjects2[i].deleteFromScene(runtimeScene);
+}
+}
+}
+}
+
+}
+
+
+};gdjs.InicioCode.userFunc0x1ddf318 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   if (window._gd_firebase_users_combined_v1) {
@@ -1489,131 +1603,19 @@ createAuthOverlayAndBind();
 })(runtimeScene);
 
 };
-gdjs.InicioCode.asyncCallback34928660 = function (runtimeScene, asyncObjectsList) {
-asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
-gdjs.InicioCode.localVariables.length = 0;
-}
-gdjs.InicioCode.idToCallbackMap.set(34928660, gdjs.InicioCode.asyncCallback34928660);
-gdjs.InicioCode.eventsList1 = function(runtimeScene) {
+gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 
 {
 
 
-{
-{
-const asyncObjectsList = new gdjs.LongLivedObjectsList();
-asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(5), (runtimeScene) => (gdjs.InicioCode.asyncCallback34928660(runtimeScene, asyncObjectsList)), 34928660, asyncObjectsList);
-}
-}
+gdjs.InicioCode.userFunc0x1ddf318(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.eventsList2 = function(runtimeScene) {
-
-};gdjs.InicioCode.eventsList3 = function(runtimeScene) {
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getScene().getVariables().getFromIndex(9).getAsBoolean();
-}
-if (isConditionTrue_0) {
-{runtimeScene.getScene().getVariables().getFromIndex(9).setBoolean(false);
-}
-}
-
-}
-
-
-{
-
-
-
-}
-
-
-{
-
-
-gdjs.InicioCode.userFunc0x11a7be0(runtimeScene);
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-{
-{gdjs.evtTools.sound.preloadSound(runtimeScene, "freakyMenu.aac");
-}
-{gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "All songs Death Scene");
-}
-{gdjs.evtTools.runtimeScene.prioritizeLoadingOfScene(runtimeScene, "Gameplay Modifiers");
-}
-{gdjs.evtTools.input.touchSimulateMouse(runtimeScene, true);
-}
-}
-
-}
-
-
-{
-
-
-gdjs.InicioCode.userFunc0x1e90f18(runtimeScene);
-
-}
-
-
-{
-
-
-let isConditionTrue_0 = false;
-isConditionTrue_0 = false;
-isConditionTrue_0 = !(gdjs.evtTools.sound.isSoundOnChannelPlaying(runtimeScene, 1));
-if (isConditionTrue_0) {
-{gdjs.evtTools.sound.playSoundOnChannel(runtimeScene, "freakyMenu.aac", 1, true, 80, 1);
-}
-{gdjs.evtTools.sound.setGlobalVolume(runtimeScene, 100);
-}
-
-{ //Subevents
-gdjs.InicioCode.eventsList1(runtimeScene);} //End of subevents
-}
-
-}
-
-
-{
-
-gdjs.copyArray(runtimeScene.getObjects("nextbutton"), gdjs.InicioCode.GDnextbuttonObjects1);
-
-for (gdjs.InicioCode.forEachIndex2 = 0;gdjs.InicioCode.forEachIndex2 < gdjs.InicioCode.GDnextbuttonObjects1.length;++gdjs.InicioCode.forEachIndex2) {
-gdjs.InicioCode.GDnextbuttonObjects2.length = 0;
-
-
-gdjs.InicioCode.forEachTemporary2 = gdjs.InicioCode.GDnextbuttonObjects1[gdjs.InicioCode.forEachIndex2];
-gdjs.InicioCode.GDnextbuttonObjects2.push(gdjs.InicioCode.forEachTemporary2);
-let isConditionTrue_0 = false;
-if (true) {
-{for(var i = 0, len = gdjs.InicioCode.GDnextbuttonObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDnextbuttonObjects2[i].deleteFromScene(runtimeScene);
-}
-}
-}
-}
-
-}
-
-
-};gdjs.InicioCode.userFunc0x110baa8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xe90e50 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// SCRIPT A — CORRIGIDO (compatível com manifest otimizado com áudios) + Favorites & search que atinge ambas as listas
+// SCRIPT A — CORRIGIDO (Manifest: GitHub Raw -> LocalStorage -> Fallbacks) + Cache Cleanup Fix
 (function () {
   if (document.getElementById("gdjs-mod-list-ui-final")) return;
 
@@ -1621,6 +1623,7 @@ if (true) {
   const REPO_STORAGE_KEY = "gdjs_repo_list_v1";
   const ACTIVE_REPO_KEY = "gdjs_active_repo_id_v1";
   const FAVORITES_STORAGE_KEY = "gdjs_fav_songs_v1";
+  const MANIFEST_CACHE_PREFIX = "gdjs_manifest_cache_"; // Prefixo para salvar manifests no localStorage
 
   function defaultRepoEntry() {
     return { id: "official", name: "oficial (LucyYuih/gdev-custom-charts)", owner: "LucyYuih", repo: "gdev-custom-charts", branch: "main", enabled: true };
@@ -1629,7 +1632,9 @@ if (true) {
   function loadRepoList() {
     try {
       const raw = localStorage.getItem(REPO_STORAGE_KEY);
-      if (!raw) { const list = [defaultRepoEntry()]; localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list)); return list; }
+      if (!raw) { 
+        const list = [defaultRepoEntry()]; localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list)); return list; 
+      }
       return JSON.parse(raw);
     } catch (e) { const list = [defaultRepoEntry()]; localStorage.setItem(REPO_STORAGE_KEY, JSON.stringify(list)); return list; }
   }
@@ -1674,11 +1679,23 @@ if (true) {
     return null;
   }
 
+  // Novo Helper: URL Raw do GitHub (evita cache de CDN)
+  function buildManifestRawUrl(entry) {
+    if (!entry) return null;
+    if (entry.manifestUrl) return entry.manifestUrl; // Se for URL direta customizada, usa ela
+    if (entry.owner && entry.repo) {
+        // Usa raw.githubusercontent.com para pegar a versão mais fresca
+        return `https://raw.githubusercontent.com/${entry.owner}/${entry.repo}/${entry.branch || "main"}/manifest.json`;
+    }
+    return null;
+  }
+
   // --- small util helpers ---
   function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
   function isAudioFile(name){ return /\.(mp3|ogg|wav|aac|m4a)$/i.test(name); }
   function isJsonFile(name){ return /\.json$/i.test(name); }
-  function basenameNoExt(p){ if(!p) return ""; const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
+  function basenameNoExt(p){ if(!p) return "";
+    const s = p.split("/").pop(); return s.replace(/\.[^.]+$/, ""); }
 
   // --- FUNÇÕES PARA MANIFEST OTIMIZADO COM ÁUDIOS ---
   function getBaseUrl(manifest) {
@@ -1705,10 +1722,8 @@ if (true) {
     return baseUrl + filePath;
   }
 
-  // parseManifestEntry agora recebe também folderPath (chave do manifest) para montar URLs corretamente
   function parseManifestEntry(entry, baseUrl = "", folderPath = "") {
     if (!entry) return null;
-
     // Se for array de strings (diretórios ou arquivos)
     if (Array.isArray(entry) && entry.length > 0 && typeof entry[0] === "string") {
       const firstItem = entry[0];
@@ -1803,7 +1818,8 @@ if (true) {
     try {
       const tries = ["manifest.json","resources/manifest.json","res/manifest.json","./manifest.json"];
       for (const p of tries) {
-        try { const r = await fetch(p, {cache:"no-cache"}); if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
+        try { const r = await fetch(p, {cache:"no-cache"});
+        if (r.ok) { try { return await r.json(); } catch(e){} } } catch(e){}
       }
     } catch(e){}
     return null;
@@ -1815,6 +1831,18 @@ if (true) {
       if (!url) return null;
       const r = await fetch(url, {cache:"no-cache"});
       if (r.ok) return await r.json();
+    } catch(e){}
+    return null;
+  }
+
+  // NOVA FUNÇÃO: Tenta pegar o manifest raw (Network)
+  async function tryManifestFromRawNetwork(entry) {
+    try {
+        const url = buildManifestRawUrl(entry);
+        if(!url) return null;
+        // Adicionando timestamp para evitar qualquer cache residual
+        const r = await fetch(url + "?t=" + Date.now()); 
+        if(r.ok) return await r.json();
     } catch(e){}
     return null;
   }
@@ -1833,13 +1861,55 @@ if (true) {
 
   const _manifest_cache_by_repo = {};
 
+  // --- LÓGICA DE CARREGAMENTO DO MANIFEST MODIFICADA ---
   async function loadManifestPreferLocalFor(entry, runtimeScene) {
     const repoId = (entry && entry.id) ? entry.id : "__default__";
-    if (typeof _manifest_cache_by_repo[repoId] !== "undefined") return _manifest_cache_by_repo[repoId];
+    
+    // Se já estiver em memória RAM nesta sessão, retorna direto
+    if (typeof _manifest_cache_by_repo[repoId] !== "undefined" && _manifest_cache_by_repo[repoId] !== null) {
+        return _manifest_cache_by_repo[repoId];
+    }
 
-    const a = await tryManifestFromGameVar(runtimeScene); if (a) { _manifest_cache_by_repo[repoId] = a; return a; }
-    const b = await tryManifestFromProjectResource(); if (b) { _manifest_cache_by_repo[repoId] = b; return b; }
-    const c = await tryManifestFromCdnOf(entry); if (c) { _manifest_cache_by_repo[repoId] = c; return c; }
+    const storageKey = MANIFEST_CACHE_PREFIX + repoId;
+
+    // 1. TENTATIVA: Network (GitHub Raw / API fake via raw file)
+    // Objetivo: Sempre tentar pegar o mais atual
+    const fromNetwork = await tryManifestFromRawNetwork(entry);
+    if (fromNetwork) {
+        // Se deu certo baixar, salva no localStorage e retorna
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(fromNetwork));
+        } catch(e) {
+            console.warn("Falha ao salvar manifest no localStorage (quota excedida?)", e);
+        }
+        _manifest_cache_by_repo[repoId] = fromNetwork;
+        return fromNetwork;
+    }
+
+    // 2. TENTATIVA: LocalStorage (Offline ou Falha de Rede)
+    try {
+        const localRaw = localStorage.getItem(storageKey);
+        if (localRaw) {
+            const parsed = JSON.parse(localRaw);
+            if (parsed) {
+                _manifest_cache_by_repo[repoId] = parsed;
+                return parsed;
+            }
+        }
+    } catch(e) {}
+
+    // 3. TENTATIVA: Variáveis de Jogo (GameVar)
+    const fromVar = await tryManifestFromGameVar(runtimeScene);
+    if (fromVar) { _manifest_cache_by_repo[repoId] = fromVar; return fromVar; }
+
+    // 4. TENTATIVA: Recursos do Projeto
+    const fromRes = await tryManifestFromProjectResource();
+    if (fromRes) { _manifest_cache_by_repo[repoId] = fromRes; return fromRes; }
+
+    // 5. TENTATIVA: Fallback para CDN JsDelivr (se o Raw falhou, talvez o CDN funcione, embora improvável se for erro de rede)
+    const fromCdn = await tryManifestFromCdnOf(entry);
+    if (fromCdn) { _manifest_cache_by_repo[repoId] = fromCdn; return fromCdn; }
+
     _manifest_cache_by_repo[repoId] = null;
     return null;
   }
@@ -1860,7 +1930,6 @@ if (true) {
     overflow: "hidden", display: "flex", flexDirection: "column",
     background: "linear-gradient(180deg, rgba(12,12,12,0.98), rgba(8,8,8,0.95))"
   });
-
   // Header
   const header = document.createElement("div");
   Object.assign(header.style, { padding: "10px", display: "flex", gap: "8px", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.04)", flex: "0 0 auto" });
@@ -1875,14 +1944,11 @@ if (true) {
     <input id="gdjs-final-search" placeholder="Pesquisar mods / músicas..." style="margin-left:8px;flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:#0b0b0b;color:#eee" />
     <button id="gdjs-final-close" style="margin-left:8px;padding:6px;border-radius:6px">Fechar</button>
   `;
-
   // Main split
   const main = document.createElement("div");
   Object.assign(main.style, { display: "flex", gap: "10px", padding: "10px", flex: "1 1 auto", minHeight: 0, overflow: "hidden" });
-
   const leftPane = document.createElement("div");
   Object.assign(leftPane.style, { width: "38%", minWidth: "260px", maxWidth: "640px", overflowY: "auto", borderRight: "1px solid rgba(255,255,255,0.03)", paddingRight: "8px" });
-
   const rightPane = document.createElement("div");
   Object.assign(rightPane.style, { flex: "1 1 auto", overflowY: "auto", paddingLeft: "8px" });
 
@@ -1914,7 +1980,8 @@ if (true) {
   let songsList = [];
   let modElementMap = {};
   let songElementMap = {};
-  let favorites = loadFavorites(); // array of { path, name, repoId }
+  let favorites = loadFavorites();
+  // array of { path, name, repoId }
 
   // --- Favorites helpers ---
   function loadFavorites() {
@@ -1976,7 +2043,6 @@ if (true) {
   }
 
   function showRepoManagerModal() {
-    // [código idêntico ao anterior...]
     const overlay = document.createElement("div");
     Object.assign(overlay.style, { position: "fixed", left: "0", top: "0", right: "0", bottom: "0", background: "rgba(0,0,0,0.6)", zIndex: 10000000, display: "flex", alignItems: "center", justifyContent: "center" });
     const box = document.createElement("div");
@@ -2006,7 +2072,8 @@ if (true) {
         setActiveBtn.onclick = () => { setActiveRepoById(r.id); renderRepoSelect(); loadFolder(""); overlay.remove(); };
         const del = document.createElement("button"); del.textContent = "Excluir"; del.style.padding = "6px"; del.style.borderRadius = "6px";
         del.onclick = () => { const idx = lst.findIndex(x=>x.id===r.id); if (idx>=0) { lst.splice(idx,1); saveRepoList(lst); renderListArea(); renderRepoSelect(); } };
-        controls.appendChild(toggle); controls.appendChild(setActiveBtn); controls.appendChild(del);
+        controls.appendChild(toggle); controls.appendChild(setActiveBtn);
+        controls.appendChild(del);
         row.appendChild(label); row.appendChild(controls); listArea.appendChild(row);
       }
       if ((lst||[]).length === 0) listArea.innerHTML = "<div style='opacity:0.8'>Nenhum repositório adicionado.</div>";
@@ -2052,9 +2119,23 @@ if (true) {
         Object.assign(row.style, { display: "flex", gap: "8px", alignItems: "center", padding: "8px", borderRadius: "6px", marginBottom: "6px", background: "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))" });
         const label = document.createElement("div"); label.style.flex = "1"; label.innerHTML = `<div style="font-weight:600">${k}</div><div style="font-size:12px;opacity:0.8">${Object.keys((window.gdjsCustomAudio[k] && window.gdjsCustomAudio[k].audios) || {}).length} audios • ${Object.keys((window.gdjsCustomAudio[k] && window.gdjsCustomAudio[k].rawFiles) || {}).length} jsons</div>`;
         const btns = document.createElement("div"); btns.style.display = "flex"; btns.style.gap = "6px";
-        const del = document.createElement("button"); del.textContent = "Deletar"; del.style.padding = "6px"; del.style.borderRadius = "6px";
-        del.onclick = () => { delete window.gdjsCustomAudio[k]; try { /* revoke blobs if any */ } catch(e){} renderCache(); };
-        const openBtn = document.createElement("button"); openBtn.textContent = "Abrir pasta"; openBtn.style.padding = "6px"; openBtn.style.borderRadius = "6px";
+        const del = document.createElement("button"); del.textContent = "Deletar"; del.style.padding = "6px";
+        del.style.borderRadius = "6px";
+        del.onclick = () => { 
+            // CORREÇÃO DE CLEANUP: Revogar blob URLs antes de deletar a referência
+            try { 
+                const data = window.gdjsCustomAudio[k];
+                if (data && data.audios) {
+                    Object.values(data.audios).forEach(a => {
+                        if (a.blobUrl) URL.revokeObjectURL(a.blobUrl);
+                    });
+                }
+            } catch(e){} 
+            delete window.gdjsCustomAudio[k];
+            renderCache(); 
+        };
+        const openBtn = document.createElement("button"); openBtn.textContent = "Abrir pasta";
+        openBtn.style.padding = "6px"; openBtn.style.borderRadius = "6px";
         openBtn.onclick = () => { showCacheDetails(k); };
         btns.appendChild(openBtn); btns.appendChild(del);
         row.appendChild(label); row.appendChild(btns); listArea.appendChild(row);
@@ -2073,24 +2154,48 @@ if (true) {
       const raws = (data && data.rawFiles) ? Object.keys(data.rawFiles) : [];
       if (audios.length === 0 && raws.length === 0) listEl.innerHTML = "<div style='opacity:0.8'>Vazio</div>";
       for (const a of audios) {
-        const row = document.createElement("div"); row.style.display = "flex"; row.style.justifyContent = "space-between"; row.style.alignItems = "center";
+        const row = document.createElement("div"); row.style.display = "flex";
+        row.style.justifyContent = "space-between"; row.style.alignItems = "center";
         row.innerHTML = `<div>${a}</div>`;
-        const btn = document.createElement("button"); btn.textContent = "Deletar"; btn.style.padding = "6px"; btn.style.borderRadius = "6px";
-        btn.onclick = () => { try { delete data.audios[a]; } catch(e){} row.remove(); };
+        const btn = document.createElement("button"); btn.textContent = "Deletar"; btn.style.padding = "6px";
+        btn.style.borderRadius = "6px";
+        btn.onclick = () => { 
+            try { 
+                // Revoke single blob
+                if(data.audios[a] && data.audios[a].blobUrl) URL.revokeObjectURL(data.audios[a].blobUrl);
+                delete data.audios[a]; 
+            } catch(e){} 
+            row.remove(); 
+        };
         row.appendChild(btn); listEl.appendChild(row);
       }
       for (const r of raws) {
-        const row = document.createElement("div"); row.style.display = "flex"; row.style.justifyContent = "space-between"; row.style.alignItems = "center";
+        const row = document.createElement("div");
+        row.style.display = "flex"; row.style.justifyContent = "space-between"; row.style.alignItems = "center";
         row.innerHTML = `<div>${r}</div>`;
-        const btn = document.createElement("button"); btn.textContent = "Deletar"; btn.style.padding = "6px"; btn.style.borderRadius = "6px";
+        const btn = document.createElement("button"); btn.textContent = "Deletar";
+        btn.style.padding = "6px"; btn.style.borderRadius = "6px";
         btn.onclick = () => { try { delete data.rawFiles[r]; } catch(e){} row.remove(); };
-        row.appendChild(btn); listEl.appendChild(row);
+        row.appendChild(btn);
+        listEl.appendChild(row);
       }
       b.querySelector("#gdjs-cache-detail-close").onclick = () => modal.remove();
     }
 
     box.querySelector("#gdjs-cache-clear").onclick = () => {
       if (!confirm("Deletar todo o cache de músicas?")) return;
+      // Revogar tudo antes de zerar
+      try {
+          if (window.gdjsCustomAudio) {
+              Object.values(window.gdjsCustomAudio).forEach(folder => {
+                  if(folder.audios) {
+                      Object.values(folder.audios).forEach(a => {
+                          if(a.blobUrl) URL.revokeObjectURL(a.blobUrl);
+                      });
+                  }
+              });
+          }
+      } catch(e){}
       try { window.gdjsCustomAudio = {}; } catch(e){}
       renderCache();
     };
@@ -2123,8 +2228,8 @@ if (true) {
     favRow.onclick = ()=> openMod("__favorites__");
     leftPane.appendChild(favRow);
     modElementMap["__favorites__"] = { element: favRow, data: { name: "Favorites", path: "__favorites__" } };
-
-    if (!items || items.length === 0) { const e = document.createElement("div"); e.textContent = "Nenhum mod encontrado."; e.style.opacity = "0.8"; leftPane.appendChild(e); return; }
+    if (!items || items.length === 0) { const e = document.createElement("div"); e.textContent = "Nenhum mod encontrado."; e.style.opacity = "0.8"; leftPane.appendChild(e);
+    return; }
     for (const item of items) {
       const row = document.createElement("div");
       Object.assign(row.style, {
@@ -2155,7 +2260,6 @@ if (true) {
           row.style.background = "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))";
         } catch(e){}
       });
-
       const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div>`;
       row.appendChild(left);
 
@@ -2169,13 +2273,17 @@ if (true) {
   function renderSongsList(items) {
     rightPane.innerHTML = "";
     songElementMap = {};
-    if (!items || items.length === 0) { const e = document.createElement("div"); e.textContent = "Selecione um mod à esquerda."; e.style.opacity = "0.8"; rightPane.appendChild(e); return; }
+    if (!items || items.length === 0) { const e = document.createElement("div");
+      e.textContent = "Selecione um mod à esquerda."; e.style.opacity = "0.8"; rightPane.appendChild(e); return;
+    }
     for (const item of items) {
       const row = document.createElement("div");
       Object.assign(row.style, { padding: "10px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", marginBottom: "8px", background: "linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))" });
       // left column: name only (removed path below name)
-      const left = document.createElement("div"); left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div>`;
-      const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px"; right.style.alignItems = "center";
+      const left = document.createElement("div");
+      left.style.display = "flex"; left.style.flexDirection = "column"; left.innerHTML = `<div style="font-weight:600">${item.name}</div>`;
+      const right = document.createElement("div"); right.style.display = "flex"; right.style.gap = "8px";
+      right.style.alignItems = "center";
       // star favorite icon
       const favIcon = document.createElement("div");
       favIcon.textContent = isFavorite(item.path) ? "★" : "☆";
@@ -2183,7 +2291,8 @@ if (true) {
       Object.assign(favIcon.style, { cursor: "pointer", fontSize: "18px", userSelect: "none" });
       favIcon.onclick = (ev) => { ev.stopPropagation(); toggleFavorite(item.path, item.name); };
       // action buttons container
-      const checkBtn = document.createElement("button"); checkBtn.textContent = "Checando..."; checkBtn.disabled = true; checkBtn.style.padding="6px"; checkBtn.style.borderRadius="6px";
+      const checkBtn = document.createElement("button"); checkBtn.textContent = "Checando..."; checkBtn.disabled = true; checkBtn.style.padding="6px";
+      checkBtn.style.borderRadius="6px";
       right.appendChild(favIcon);
       right.appendChild(checkBtn);
       row.appendChild(left); row.appendChild(right); rightPane.appendChild(row);
@@ -2197,19 +2306,20 @@ if (true) {
   const hasSubCache = {};
 
   function startBackgroundCheckOnSongs(items) {
-    if (bgController && typeof bgController.abort === "function") try { bgController.abort(); } catch(e){}
+    if (bgController && typeof bgController.abort === "function") try { bgController.abort();
+    } catch(e){}
     bgController = { aborted:false, abort(){ this.aborted=true; } };
     const list = items || [];
     const concurrency = 3;
     let idx = 0;
     const activeRepo = getActiveRepo();
-
     async function worker() {
       while(!bgController.aborted) {
         if (idx >= list.length) break;
         const p = list[idx++].path;
         try {
-          if (typeof hasSubCache[p] !== "undefined") { updateButtonsForDecisionFromCache(p, hasSubCache[p]); await sleep(0); continue; }
+          if (typeof hasSubCache[p] !== "undefined") { updateButtonsForDecisionFromCache(p, hasSubCache[p]);
+          await sleep(0); continue; }
           const manifest = await loadManifestPreferLocalFor(activeRepo, window.runtimeScene || undefined);
           let hasSubdirs = false;
           
@@ -2244,7 +2354,8 @@ if (true) {
   function updateButtonsForDecisionFromCache(path, hasSubdirs) {
     const el = songElementMap[path];
     if (!el) return;
-    const right = el.rightContainer; right.innerHTML = "";
+    const right = el.rightContainer;
+    right.innerHTML = "";
     const itemName = el.name || path.split("/").pop();
 
     // favorite icon (recreate to keep consistent)
@@ -2253,7 +2364,6 @@ if (true) {
     favIcon.title = isFavorite(path) ? "Remover dos favoritos" : "Adicionar aos favoritos";
     Object.assign(favIcon.style, { cursor: "pointer", fontSize: "18px", userSelect: "none" });
     favIcon.onclick = (ev) => { ev.stopPropagation(); toggleFavorite(path, itemName); };
-
     if (hasSubdirs) {
       const pickBtn = document.createElement("button"); pickBtn.textContent = "Selecionar difficulty"; pickBtn.style.padding="6px"; pickBtn.style.borderRadius="6px";
       pickBtn.onclick = async ()=>{ 
@@ -2261,15 +2371,18 @@ if (true) {
           setStatus("Carregando difficulties de " + itemName + "...");
           const activeRepo = getActiveRepo();
           const subdirs = await fetchSubdirsUsingEntry(activeRepo, path);
-          if (!subdirs || subdirs.length === 0) { setStatus("Nenhuma difficulty encontrada."); return; }
+          if (!subdirs || subdirs.length === 0) { setStatus("Nenhuma difficulty encontrada.");
+          return; }
           showDifficultyChooser(path, subdirs);
           setStatus("");
-        } catch(e){ setStatus("Erro listando difficulties."); }
+        } catch(e){ setStatus("Erro listando difficulties.");
+        }
       };
       right.appendChild(favIcon);
       right.appendChild(pickBtn);
     } else {
-      const dlBtn = document.createElement("button"); dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px";
+      const dlBtn = document.createElement("button");
+      dlBtn.textContent = "Selecionar e baixar"; dlBtn.style.padding="6px"; dlBtn.style.borderRadius="6px";
       dlBtn.onclick = ()=> downloadSongFolder(path);
       right.appendChild(favIcon);
       right.appendChild(dlBtn);
@@ -2309,7 +2422,8 @@ if (true) {
         const baseUrl = getBaseUrl(manifest);
         const parsed = parseManifestEntry(manifest[path], baseUrl, path);
         if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
-          const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
+          const subdirs = parsed.type === 'subdirs' ?
+          parsed.value : parsed.subdirs;
           items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
         }
       } else {
@@ -2327,7 +2441,8 @@ if (true) {
       setStatus(((path||"Mods")) + ` — ${modsList.length} mods`);
       setTimeout(()=> startBackgroundCheckOnSongs(modsList), 10);
       // update saved favorites variable in runtime scene
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || [])); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || []));
+      } catch(e){}
     } catch (err) {
       modsList = []; renderModsList(modsList);
       setStatus("Erro carregando pasta: " + (err && err.message ? err.message : err));
@@ -2355,7 +2470,8 @@ if (true) {
         const baseUrl = getBaseUrl(manifest);
         const parsed = parseManifestEntry(manifest[path], baseUrl, path);
         if (parsed && (parsed.type === 'subdirs' || (parsed.type === 'folder' && parsed.subdirs))) {
-          const subdirs = parsed.type === 'subdirs' ? parsed.value : parsed.subdirs;
+          const subdirs = parsed.type === 'subdirs' ?
+          parsed.value : parsed.subdirs;
           items = subdirs.map(name => ({ name, path: (path? path + "/" + name : name), type: "dir" }));
         } else if (parsed && parsed.type === 'files') {
           // If manifest path directly lists files, treat each file as an item (name = filename, path = path/filename)
@@ -2386,7 +2502,6 @@ if (true) {
       const parsed = parseManifestEntry(manifest[path], baseUrl, path);
       
       if (!parsed) return null;
-      
       if (parsed.type === 'files') {
         return parsed.value;
       } else if (parsed.type === 'folder' && parsed.files) {
@@ -2508,13 +2623,13 @@ if (true) {
     try { btnClose.disabled = true; } catch(e){}
     try {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
-
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongDifficulty").setString(difficultyName); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder));
+      } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongDifficulty").setString(difficultyName);
+      } catch(e){}
 
       setStatus("Listando arquivos (procura áudios: difficulty -> song -> mod)...");
-
       const audioFiles = await findAudioFilesWithFallback(rootFolder, difficultyPath);
 
       let chartFiles = [];
@@ -2525,7 +2640,7 @@ if (true) {
       } else {
         try {
           const api = await ghListForFolderUsingEntry(activeRepo, difficultyPath);
-          chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) })); 
+          chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
         } catch(e){}
       }
 
@@ -2536,7 +2651,7 @@ if (true) {
       } else {
         try {
           const api = await ghListForFolderUsingEntry(activeRepo, rootFolder);
-          rootJsons = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) })); 
+          rootJsons = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
         } catch(e){}
       }
 
@@ -2567,7 +2682,8 @@ if (true) {
             if (p && typeof p.then === "function") {
               p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: f.name}); });
             } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
-          } catch(e){ unlockQueue.push({audioEl, name: f.name}); }
+          } catch(e){ unlockQueue.push({audioEl, name: f.name});
+          }
         } catch(e){}
         await sleep(0);
       }
@@ -2607,7 +2723,8 @@ if (true) {
       }
 
       if (unlockQueue.length > 0) {
-        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play();
+        it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
         window.addEventListener('pointerdown', unlock, { once: true });
       }
 
@@ -2615,22 +2732,25 @@ if (true) {
     } catch(e){
       setStatus("Erro ao baixar: " + (e && e.message ? e.message : e));
     } finally {
-      try { btnClose.disabled = false; } catch(e){}
+      try { btnClose.disabled = false;
+      } catch(e){}
     }
   }
 
   async function downloadAllDifficulties(rootFolder, subdirs) {
-    try { btnClose.disabled = true; } catch(e){}
+    try { btnClose.disabled = true;
+    } catch(e){}
     try {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
       try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(rootFolder); } catch(e){}
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder)); } catch(e){}
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongDifficulty").setString(difficultyName); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(rootFolder.split("/").pop()||rootFolder));
+      } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongDifficulty").setString(difficultyName);
+      } catch(e){}
 
       setStatus("Procurando áudios (difficulty -> song -> mod)...");
       const hintDifficulty = (subdirs && subdirs.length>0) ? (rootFolder + "/" + subdirs[0]) : rootFolder;
       const audioFiles = await findAudioFilesWithFallback(rootFolder, hintDifficulty);
-
       window.gdjsCustomAudio = window.gdjsCustomAudio || {};
       window.gdjsCustomAudio[rootFolder] = window.gdjsCustomAudio[rootFolder] || { audios: {}, rawFiles: {} };
       const dest = window.gdjsCustomAudio[rootFolder];
@@ -2653,7 +2773,8 @@ if (true) {
             if (p && typeof p.then === "function") {
               p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: f.name}); });
             } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
-          } catch(e){ unlockQueue.push({audioEl, name: f.name}); }
+          } catch(e){ unlockQueue.push({audioEl, name: f.name});
+          }
         } catch(e){}
         await sleep(0);
       }
@@ -2670,7 +2791,7 @@ if (true) {
           } else {
             try {
               const api = await ghListForFolderUsingEntry(activeRepo, difficultyPath);
-              chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) })); 
+              chartFiles = (api || []).filter(i => i.type !== "dir" && isJsonFile(i.name)).map(i => ({ name: i.name, url: i.download_url || (`https://cdn.jsdelivr.net/gh/${activeRepo.owner}/${activeRepo.repo}@${activeRepo.branch}/${i.path}`) }));
             } catch(e){}
           }
           for (const j of chartFiles) {
@@ -2708,7 +2829,8 @@ if (true) {
       }
 
       if (unlockQueue.length > 0) {
-        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play();
+        it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
         window.addEventListener('pointerdown', unlock, { once: true });
       }
 
@@ -2716,19 +2838,19 @@ if (true) {
     } catch(e){
       setStatus("Erro ao baixar: " + (e && e.message ? e.message : e));
     } finally {
-      try { btnClose.disabled = false; } catch(e){}
+      try { btnClose.disabled = false;
+      } catch(e){}
     }
   }
 
   async function downloadSongFolder(folderPath) {
-    try { btnClose.disabled = true; } catch(e){}
+    try { btnClose.disabled = true;
+    } catch(e){}
     try {
       stopAndCleanupPrevious({ revokeBlobUrls: true });
-
       setStatus("Listando arquivos em " + folderPath + "...");
 
       let files = await getFilesFromManifest(folderPath);
-
       if (!files) {
         // Fallback para GitHub API
         const activeRepo = getActiveRepo();
@@ -2745,26 +2867,30 @@ if (true) {
         }
       }
 
-      if (!Array.isArray(files) || files.length === 0) { setStatus("Pasta vazia."); return; }
+      if (!Array.isArray(files) || files.length === 0) { setStatus("Pasta vazia.");
+      return; }
 
       window.gdjsCustomAudio = window.gdjsCustomAudio || {};
-      window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || {audios:{}, rawFiles:{}}; 
+      window.gdjsCustomAudio[folderPath] = window.gdjsCustomAudio[folderPath] || {audios:{}, rawFiles:{}};
       const dest = window.gdjsCustomAudio[folderPath];
 
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath); } catch(e){}
-      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(folderPath.split("/").pop()||folderPath)); } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("selectedTrackKey").setString(folderPath);
+      } catch(e){}
+      try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("SongName").setString(basenameNoExt(folderPath.split("/").pop()||folderPath));
+      } catch(e){}
 
       const totalFiles = files.length;
       let processed = 0;
-      let nextChannelIndex = (window.gdjsChannels) ? Object.keys(window.gdjsChannels).length : 0;
+      let nextChannelIndex = (window.gdjsChannels) ?
+      Object.keys(window.gdjsChannels).length : 0;
       const unlockQueue = [];
 
       for (const f of files) {
-        processed++; setStatus(`${processed} / ${totalFiles}`);
+        processed++;
+        setStatus(`${processed} / ${totalFiles}`);
         const fname = f.name;
         const url = f.url;
         if (!url) continue;
-
         if (isJsonFile(fname)) {
           try {
             const txtResp = await fetch(url);
@@ -2812,15 +2938,18 @@ if (true) {
               if (p && typeof p.then === "function") {
                 p.then(()=>{ try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }).catch(()=>{ unlockQueue.push({audioEl, name: fname}); });
               } else { try{ audioEl.pause(); audioEl.currentTime = 0; } catch(e){} }
-            } catch(e){ unlockQueue.push({audioEl, name: fname}); }
-            try { const gg = (window.runtimeScene && window.runtimeScene.getGame) ? runtimeScene.getGame().getVariables() : null; if (gg && !gg.get("SongName").getAsString()) gg.get("SongName").setString(basenameNoExt(fname)); } catch(e){}
+            } catch(e){ unlockQueue.push({audioEl, name: fname});
+            }
+            try { const gg = (window.runtimeScene && window.runtimeScene.getGame) ?
+            runtimeScene.getGame().getVariables() : null; if (gg && !gg.get("SongName").getAsString()) gg.get("SongName").setString(basenameNoExt(fname)); } catch(e){}
           } catch(e){}
         }
         await sleep(0);
       }
 
       if (unlockQueue.length > 0) {
-        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play(); it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
+        const unlock = async () => { for (const it of unlockQueue) { try { await it.audioEl.play();
+        it.audioEl.pause(); it.audioEl.currentTime = 0; } catch(e){} } window.removeEventListener('pointerdown', unlock); };
         window.addEventListener('pointerdown', unlock, { once: true });
       }
 
@@ -2828,7 +2957,8 @@ if (true) {
     } catch(e){
       setStatus("Erro ao baixar pasta: " + (e && e.message ? e.message : e));
     } finally {
-      try { btnClose.disabled = false; } catch(e){}
+      try { btnClose.disabled = false;
+      } catch(e){}
     }
   }
 
@@ -2839,7 +2969,8 @@ if (true) {
     const box = document.createElement("div");
     Object.assign(box.style, { width: "420px", maxHeight: "70vh", overflowY: "auto", background: "#0f0f10", borderRadius: "8px", padding: "12px", boxShadow: "0 12px 40px rgba(0,0,0,0.6)", color: "#eee" });
     box.innerHTML = `<div style="font-weight:700;margin-bottom:8px">Escolha uma difficulty para:</div><div style="margin-bottom:8px;color:#bbb">${rootFolder}</div>`;
-    const list = document.createElement("div"); list.style.display = "flex"; list.style.flexDirection = "column"; list.style.gap = "6px";
+    const list = document.createElement("div"); list.style.display = "flex"; list.style.flexDirection = "column";
+    list.style.gap = "6px";
     for (const d of subdirs) {
       const b = document.createElement("button");
       b.textContent = d;
@@ -2860,16 +2991,23 @@ if (true) {
   btnManage.onclick = ()=> showRepoManagerModal();
   btnCache.onclick = ()=> showCacheManager();
   btnRefresh.onclick = async ()=> {
-    try { setStatus("Atualizando..."); } catch(e){}
-    try { for (const it of modsList) delete hasSubCache[it.path]; } catch(e){}
-    try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
+    try { setStatus("Atualizando...");
+    } catch(e){}
+    try { for (const it of modsList) delete hasSubCache[it.path];
+    } catch(e){}
+    try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]);
+    } catch(e){}
+
+    // Limpa do localstorage o manifest do repo ativo para forçar download novo
+    try {
+        const active = getActiveRepo();
+        if(active && active.id) localStorage.removeItem(MANIFEST_CACHE_PREFIX + active.id);
+    } catch(e){}
 
     // guarda qual mod estava aberto antes do refresh
     const prevOpen = currentModPath;
-
     // Recarrega a lista raiz (evita transformar songs em mods)
     await loadFolder("");
-
     // tenta reabrir o mod antigo (se ainda existir)
     try {
       if (prevOpen && prevOpen === "__favorites__") {
@@ -2888,7 +3026,8 @@ if (true) {
 
   // Substitua o handler de troca de repo (repoSelect.onchange) por este
   repoSelect.onchange = ()=> {
-    try { setActiveRepoById(repoSelect.value); } catch(e){}
+    try { setActiveRepoById(repoSelect.value);
+    } catch(e){}
     try { Object.keys(_manifest_cache_by_repo).forEach(k=> delete _manifest_cache_by_repo[k]); } catch(e){}
     const prevOpen = currentModPath;
     // recarrega raiz e tenta reabrir o mod (se existir)
@@ -2900,7 +3039,8 @@ if (true) {
           const found = modsList.find(m => m.path === prevOpen);
           if (found) openMod(prevOpen);
         }
-      } catch(e){}
+      } 
+      catch(e){}
     }).catch(()=>{});
   };
 
@@ -2925,7 +3065,8 @@ if (true) {
     renderModsList(filteredMods);
     // also filter songs: if a mod is selected, filter its songs; if favorites selected, filter favorites
     if (currentModPath === "__favorites__") {
-      const favItems = (favorites || []).map(f => ({ name: f.name || basenameNoExt(f.path.split("/").pop()||f.path), path: f.path }));
+      const favItems = (favorites || []).map(f => ({ name: f.name || basenameNoExt(f.path.split("/").pop()||f.path), path: f.path 
+      }));
       const filteredSongs = favItems.filter(s => (s.name || "").toLowerCase().includes(q));
       renderSongsList(filteredSongs);
       setStatus(`Resultado: ${filteredSongs.length} / ${favItems.length} (favorites)`);
@@ -2951,21 +3092,19 @@ if (true) {
     // push favorites to runtime variable on init
     try { if (window.runtimeScene && window.runtimeScene.getGame) runtimeScene.getGame().getVariables().get("FavoriteSongs").setString(JSON.stringify(favorites || [])); } catch(e){}
   })();
-
 })();
-
 };
-gdjs.InicioCode.eventsList4 = function(runtimeScene) {
+gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0x110baa8(runtimeScene);
+gdjs.InicioCode.userFunc0xe90e50(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x11a8450 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xf3c570 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_loader.js (versão adaptada para novo manifest que guarda apenas filename em thumb/zip)
 (async function(runtimeScene) {
@@ -3577,46 +3716,46 @@ gdjs.InicioCode.userFunc0x110baa8(runtimeScene);
 })(runtimeScene);
 
 };
-gdjs.InicioCode.eventsList5 = function(runtimeScene) {
-
-{
-
-
-gdjs.InicioCode.userFunc0x11a8450(runtimeScene);
-
-}
-
-
-};gdjs.InicioCode.userFunc0x1109b00 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
-};
 gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0x1109b00(runtimeScene);
+gdjs.InicioCode.userFunc0xf3c570(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1a2cea0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x134b8a8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-window.openPlayerSaveImportUI(runtimeScene);
+if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
 gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0x1a2cea0(runtimeScene);
+gdjs.InicioCode.userFunc0x134b8a8(runtimeScene);
+
+}
+
+
+};gdjs.InicioCode.userFunc0xfbae10 = function GDJSInlineCode(runtimeScene) {
+"use strict";
+window.openPlayerSaveImportUI(runtimeScene);
+};
+gdjs.InicioCode.eventsList8 = function(runtimeScene) {
+
+{
+
+
+gdjs.InicioCode.userFunc0xfbae10(runtimeScene);
 
 }
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.eventsList8 = function(runtimeScene) {
+gdjs.InicioCode.eventsList9 = function(runtimeScene) {
 
 {
 
@@ -3648,7 +3787,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.asyncCallback35016572 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35121884 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(68), null);
 }
@@ -3662,8 +3801,8 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(35016572, gdjs.InicioCode.asyncCallback35016572);
-gdjs.InicioCode.eventsList9 = function(runtimeScene) {
+gdjs.InicioCode.idToCallbackMap.set(35121884, gdjs.InicioCode.asyncCallback35121884);
+gdjs.InicioCode.eventsList10 = function(runtimeScene) {
 
 {
 
@@ -3672,18 +3811,18 @@ gdjs.InicioCode.eventsList9 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback35016572(runtimeScene, asyncObjectsList)), 35016572, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback35121884(runtimeScene, asyncObjectsList)), 35121884, asyncObjectsList);
 }
 }
 
 }
 
-
-};gdjs.InicioCode.eventsList10 = function(runtimeScene) {
 
 };gdjs.InicioCode.eventsList11 = function(runtimeScene) {
 
 };gdjs.InicioCode.eventsList12 = function(runtimeScene) {
+
+};gdjs.InicioCode.eventsList13 = function(runtimeScene) {
 
 {
 
@@ -3744,13 +3883,13 @@ let isConditionTrue_0 = false;
 
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects2Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects2});
-gdjs.InicioCode.eventsList13 = function(runtimeScene) {
-
-};gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects2Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects2});
 gdjs.InicioCode.eventsList14 = function(runtimeScene) {
 
-};gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDOppIconObjects2Objects = Hashtable.newFrom({"OppIcon": gdjs.InicioCode.GDOppIconObjects2});
+};gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects2Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects2});
 gdjs.InicioCode.eventsList15 = function(runtimeScene) {
+
+};gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDOppIconObjects2Objects = Hashtable.newFrom({"OppIcon": gdjs.InicioCode.GDOppIconObjects2});
+gdjs.InicioCode.eventsList16 = function(runtimeScene) {
 
 {
 
@@ -3807,7 +3946,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.eventsList16 = function(runtimeScene) {
+};gdjs.InicioCode.eventsList17 = function(runtimeScene) {
 
 {
 
@@ -3823,7 +3962,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.eventsList17 = function(runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.eventsList18 = function(runtimeScene, asyncObjectsList) {
 
 {
 
@@ -3837,37 +3976,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback35168908 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35129676 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
-gdjs.InicioCode.eventsList17(runtimeScene, asyncObjectsList);} //End of subevents
+gdjs.InicioCode.eventsList18(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(35168908, gdjs.InicioCode.asyncCallback35168908);
-gdjs.InicioCode.eventsList18 = function(runtimeScene) {
-
-{
-
-
-{
-{
-const asyncObjectsList = new gdjs.LongLivedObjectsList();
-asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35168908(runtimeScene, asyncObjectsList)), 35168908, asyncObjectsList);
-}
-}
-
-}
-
-
-};gdjs.InicioCode.asyncCallback35158820 = function (runtimeScene, asyncObjectsList) {
-asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
-{runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
-}
-gdjs.InicioCode.localVariables.length = 0;
-}
-gdjs.InicioCode.idToCallbackMap.set(35158820, gdjs.InicioCode.asyncCallback35158820);
+gdjs.InicioCode.idToCallbackMap.set(35129676, gdjs.InicioCode.asyncCallback35129676);
 gdjs.InicioCode.eventsList19 = function(runtimeScene) {
 
 {
@@ -3877,24 +3993,20 @@ gdjs.InicioCode.eventsList19 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback35158820(runtimeScene, asyncObjectsList)), 35158820, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35129676(runtimeScene, asyncObjectsList)), 35129676, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback35077492 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback35139180 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
-gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
-
-{for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
-    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Tween").addObjectOpacityTween2("OpaOutPT", 0, "easeInQuad", 2, false);
-}
+{runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(35077492, gdjs.InicioCode.asyncCallback35077492);
+gdjs.InicioCode.idToCallbackMap.set(35139180, gdjs.InicioCode.asyncCallback35139180);
 gdjs.InicioCode.eventsList20 = function(runtimeScene) {
 
 {
@@ -3904,15 +4016,42 @@ gdjs.InicioCode.eventsList20 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback35139180(runtimeScene, asyncObjectsList)), 35139180, asyncObjectsList);
+}
+}
+
+}
+
+
+};gdjs.InicioCode.asyncCallback35144724 = function (runtimeScene, asyncObjectsList) {
+asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
+gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
+
+{for(var i = 0, len = gdjs.InicioCode.GDPointsTextObjects2.length ;i < len;++i) {
+    gdjs.InicioCode.GDPointsTextObjects2[i].getBehavior("Tween").addObjectOpacityTween2("OpaOutPT", 0, "easeInQuad", 2, false);
+}
+}
+gdjs.InicioCode.localVariables.length = 0;
+}
+gdjs.InicioCode.idToCallbackMap.set(35144724, gdjs.InicioCode.asyncCallback35144724);
+gdjs.InicioCode.eventsList21 = function(runtimeScene) {
+
+{
+
+
+{
+{
+const asyncObjectsList = new gdjs.LongLivedObjectsList();
+asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35077492(runtimeScene, asyncObjectsList)), 35077492, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback35144724(runtimeScene, asyncObjectsList)), 35144724, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.eventsList21 = function(runtimeScene) {
+};gdjs.InicioCode.eventsList22 = function(runtimeScene) {
 
 {
 
@@ -3923,7 +4062,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35074436);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35142204);
 }
 }
 if (isConditionTrue_0) {
@@ -3959,19 +4098,19 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35077572);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35144804);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList20(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList21(runtimeScene);} //End of subevents
 }
 
 }
 
 
-};gdjs.InicioCode.eventsList22 = function(runtimeScene) {
+};gdjs.InicioCode.eventsList23 = function(runtimeScene) {
 
 {
 
@@ -4024,6 +4163,22 @@ gdjs.InicioCode.eventsList3(runtimeScene);} //End of subevents
 {
 
 
+let isConditionTrue_0 = false;
+isConditionTrue_0 = false;
+{isConditionTrue_0 = !runtimeScene.getGame().getVariables().getFromIndex(89).getChild("Load").getAsBoolean();
+}
+if (isConditionTrue_0) {
+isConditionTrue_0 = false;
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35111452);
+}
+}
+if (isConditionTrue_0) {
+{runtimeScene.getGame().getVariables().getFromIndex(89).getChild("Load").setBoolean(true);
+}
+
+{ //Subevents
+gdjs.InicioCode.eventsList4(runtimeScene);} //End of subevents
+}
 
 }
 
@@ -4044,13 +4199,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34916308);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35115588);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList4(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList5(runtimeScene);} //End of subevents
 }
 
 }
@@ -4072,13 +4227,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34920444);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35116940);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList5(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList6(runtimeScene);} //End of subevents
 }
 
 }
@@ -4100,13 +4255,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDExportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDExportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34921828);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35118268);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList6(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList7(runtimeScene);} //End of subevents
 }
 
 }
@@ -4128,13 +4283,13 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDImportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDImportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34918172);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35119692);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList7(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList8(runtimeScene);} //End of subevents
 }
 
 }
@@ -4149,7 +4304,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35028356);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35120628);
 }
 }
 if (isConditionTrue_0) {
@@ -4208,7 +4363,7 @@ gdjs.InicioCode.GDbegfontObjects1.length = 0;
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList8(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList9(runtimeScene);} //End of subevents
 }
 
 }
@@ -4223,13 +4378,13 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35016364);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35121212);
 }
 }
 if (isConditionTrue_0) {
 
 { //Subevents
-gdjs.InicioCode.eventsList9(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList10(runtimeScene);} //End of subevents
 }
 
 }
@@ -4249,7 +4404,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList12(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList13(runtimeScene);} //End of subevents
 }
 
 }
@@ -4370,7 +4525,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.InicioCode.eventsList15(runtimeScene);} //Subevents end.
+gdjs.InicioCode.eventsList16(runtimeScene);} //Subevents end.
 }
 }
 
@@ -4445,7 +4600,7 @@ gdjs.copyArray(runtimeScene.getObjects("SwipeText"), gdjs.InicioCode.GDSwipeText
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList16(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList17(runtimeScene);} //End of subevents
 }
 
 }
@@ -4531,7 +4686,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35167196);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35123860);
 }
 }
 }
@@ -4548,7 +4703,7 @@ if (isConditionTrue_0) {
 }
 
 { //Subevents: 
-gdjs.InicioCode.eventsList18(runtimeScene);} //Subevents end.
+gdjs.InicioCode.eventsList19(runtimeScene);} //Subevents end.
 }
 }
 
@@ -4593,7 +4748,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35155628);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35135452);
 }
 }
 if (isConditionTrue_0) {
@@ -4634,7 +4789,7 @@ gdjs.copyArray(runtimeScene.getObjects("UpKeybind"), gdjs.InicioCode.GDUpKeybind
 }
 
 { //Subevents
-gdjs.InicioCode.eventsList19(runtimeScene);} //End of subevents
+gdjs.InicioCode.eventsList20(runtimeScene);} //End of subevents
 }
 
 }
@@ -4664,7 +4819,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35072948);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35140556);
 }
 }
 if (isConditionTrue_0) {
@@ -4680,7 +4835,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.eventsList21(runtimeScene);
+gdjs.InicioCode.eventsList22(runtimeScene);
 }
 
 
@@ -4741,7 +4896,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35090636);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35155348);
 }
 }
 if (isConditionTrue_0) {
@@ -5058,7 +5213,7 @@ gdjs.InicioCode.GDStatistics2Objects3.length = 0;
 gdjs.InicioCode.GDStatistics2Objects4.length = 0;
 gdjs.InicioCode.GDStatistics2Objects5.length = 0;
 
-gdjs.InicioCode.eventsList22(runtimeScene);
+gdjs.InicioCode.eventsList23(runtimeScene);
 gdjs.InicioCode.GDBackObjects1.length = 0;
 gdjs.InicioCode.GDBackObjects2.length = 0;
 gdjs.InicioCode.GDBackObjects3.length = 0;
