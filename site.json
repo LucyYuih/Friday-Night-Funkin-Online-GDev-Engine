@@ -1,70 +1,142 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Leaderboards GDev Online</title>
+  <title>GDev Online Leaderboards</title>
   <style>
     :root{
       --bg:#071028; --card:#0f1724; --muted:#9fb8ff; --accent:#2563eb; --glass: rgba(255,255,255,0.03);
       --text:#e6eef8; --danger:#ef4444; --accent-2:#10b981; --warning:#f59e0b;
     }
     *{box-sizing:border-box}
+    
+    html, body { height: 100%; overflow: hidden; }
+    
     body{ margin:0; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:linear-gradient(180deg,#041126 0%, #071028 100%); color:var(--text); }
-    .app{ max-width:1100px; margin:28px auto; padding:18px; }
-    header{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+    
+    .app { 
+        height: 100vh; 
+        display: flex; 
+        flex-direction: column; 
+        padding: 16px; 
+        max-width: 1400px; 
+        margin: 0 auto; 
+    }
+
+    header{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-shrink: 0; }
     h1{ margin:0; font-size:20px; }
+    
     .tabs{ display:flex; gap:8px; margin-bottom:12px; }
     .tab{ padding:8px 12px; background:var(--glass); border-radius:8px; cursor:pointer; color:var(--muted); border:1px solid rgba(255,255,255,0.03); }
     .tab.active{ background: linear-gradient(90deg, rgba(37,99,235,0.14), rgba(16,185,129,0.06)); color:var(--text); box-shadow:0 6px 18px rgba(2,6,23,0.5); border:1px solid rgba(99,102,241,0.12); }
+    
     .controls{ display:flex; gap:8px; align-items:center; }
     .btn{ padding:8px 10px; border-radius:8px; border:none; background:var(--accent); color:white; cursor:pointer; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
     .btn.secondary{ background:#0ea5a4; }
     .btn.danger{ background:var(--danger); }
     .btn.warning{ background:var(--warning); color:#000; }
     .btn:disabled{ opacity:0.6; cursor:not-allowed; }
-    input.search{ padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:#081222; color:var(--text); min-width:260px; }
-    .layout{ display:grid; grid-template-columns: 320px 1fr; gap:14px; align-items:start; }
-    .card{ background:var(--card); padding:12px; border-radius:12px; box-shadow:0 6px 20px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03); }
-    .list{ max-height:72vh; overflow:auto; padding-right:6px; }
-    .player-row, .song-row{ display:flex; gap:10px; align-items:center; padding:8px; border-radius:8px; cursor:pointer; }
+    
+    input.search, select.sort-select { padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:#081222; color:var(--text); }
+    input.search { min-width:260px; }
+    
+    .layout{ 
+        display:grid; 
+        grid-template-columns: 320px 1fr; 
+        gap:14px; 
+        align-items:start; 
+        flex: 1; 
+        min-height: 0; 
+        overflow: hidden; 
+    }
+
+    .card{ 
+        background:var(--card); 
+        padding:12px; 
+        border-radius:12px; 
+        box-shadow:0 6px 20px rgba(2,6,23,0.6); 
+        border:1px solid rgba(255,255,255,0.03); 
+        height: 100%; 
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; 
+    }
+
+    .static-content { flex-shrink: 0; overflow: visible !important; /* Fix for PFP overflow */ }
+
+    .list, #public-profile-content, #song-scores-area, .scrollable-area { 
+        overflow-y: auto; 
+        padding-right: 6px; 
+        flex: 1; 
+        min-height: 0;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+    .player-row, .song-row{ display:flex; gap:10px; align-items:center; padding:8px; border-radius:8px; cursor:pointer; flex-shrink: 0; }
     .player-row:hover, .song-row:hover{ background: rgba(255,255,255,0.02); }
     
-    .avatar{ width:88px; height:88px; border-radius:12px; object-fit:cover; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); display:block; position:relative; overflow:hidden; }
+    .avatar{ width:88px; height:88px; border-radius:12px; object-fit:cover; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); display:block; position:relative; overflow:hidden; z-index: 10; }
     .avatar.small{ width:44px; height:44px; border-radius:8px; }
     .avatar.fallback{ background: linear-gradient(135deg,#0b1220,#0f1724); display:flex; align-items:center; justify-content:center; color:var(--muted); font-weight:700; }
     
     .meta{ display:flex; flex-direction:column; min-width:0; }
     .muted{ color:var(--muted); font-size:13px; }
     .right{ margin-left:auto; text-align:right; font-size:13px; color:var(--muted); }
-    .section-title{ font-size:13px; color:var(--muted); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+    .section-title{ font-size:13px; color:var(--muted); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; margin-top: 8px; }
     table{ width:100%; border-collapse:collapse; font-size:13px; }
     th, td{ padding:8px 6px; text-align:left; border-bottom:1px dashed rgba(255,255,255,0.03); }
-    th{ color:var(--muted); font-weight:600; font-size:12px; }
+    th{ color:var(--muted); font-weight:600; font-size:12px; cursor:pointer; position: sticky; top: 0; background: var(--card); z-index: 10; }
+    th:hover { color: var(--text); }
     .folder{ font-weight:700; padding:8px 6px; color:#cbe7ff; display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-radius:6px; }
     .no-data{ color:var(--muted); padding:14px; text-align:center; }
     .small{ font-size:12px; color:var(--muted); }
-    .search-row{ display:flex; gap:8px; margin-bottom:10px; align-items:center; }
+    .search-row{ display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-shrink: 0; }
     .hidden{ display:none !important; }
-    .row{ display:flex; gap:12px; align-items:center; }
+    /* Fix: Ensure row allows PFP to stick out */
+    .row{ display:flex; gap:12px; align-items:center; overflow: visible !important; position: relative; }
 
     .desc-card{ background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:10px; padding:12px; margin-top:8px; border:1px solid rgba(255,255,255,0.03); }
     #pd-desc{ margin:0; font-size:14px; color:#dcecff; white-space:pre-wrap; line-height:1.35; cursor:default; }
     #pd-desc.editable{ cursor:text; border:1px dashed rgba(255,255,255,0.04); padding:6px; background:rgba(255,255,255,0.01); }
 
-    .pfp-wrapper{ position:relative; width:88px; height:88px; }
-    .pfp-edit-btn{ position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.35); color:var(--text); border:1px solid rgba(255,255,255,0.06); border-radius:6px; padding:6px; font-size:12px; cursor:pointer; opacity:0.95; backdrop-filter: blur(4px); }
+    /* Fix: Ensure wrapper allows matching PFPs to show */
+    .pfp-wrapper{ position:relative; width:88px; height:88px; flex-shrink: 0; overflow: visible !important; z-index: 50; }
+    
+    .pfp-edit-btn{ position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.35); color:var(--text); border:1px solid rgba(255,255,255,0.06); border-radius:6px; padding:6px; font-size:12px; cursor:pointer; opacity:0.95; backdrop-filter: blur(4px); z-index: 60; }
     .pfp-edit-btn.hidden{ display:none; }
 
-    /* Popover */
     .popover{ position:absolute; z-index:1200; min-width:260px; max-width:360px; background:var(--card); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,0.6); }
     .popover input[type="text"], .popover input[type="file"]{ width:100%; padding:8px; border-radius:6px; background:#081222; color:var(--text); border:1px solid rgba(255,255,255,0.03); }
     .popover .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
 
-    .matched-img{ position:absolute; width:88px; height:88px; border-radius:10px; object-fit:cover; border:2px solid rgba(255,255,255,0.06); box-shadow:0 6px 18px rgba(0,0,0,0.5); background:#081222; z-index:30; }
-    .matched-left{ left:-105%; top:50%; transform:translateY(-50%); }
-    .matched-right{ left:90%; margin-left:12px; top:50%; transform:translateY(-50%); }
+    /* MATCHING PFP STYLES */
+    .matched-img{ 
+        position:absolute; 
+        width:88px; 
+        height:88px; 
+        border-radius:10px; 
+        object-fit:cover; 
+        border:2px solid rgba(255,255,255,0.06); 
+        box-shadow:0 6px 18px rgba(0,0,0,0.5); 
+        background:#081222; 
+        z-index: 40; /* Above card background, below edit buttons */
+        animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    
+    @keyframes popIn {
+        from { transform: translateY(-50%) scale(0); opacity: 0; }
+        to { transform: translateY(-50%) scale(1); opacity: 1; }
+    }
+
+    /* Position Fixes */
+    .matched-left{ left:-105%; top:50%; }
+    .matched-right{ left:105%; margin-left:12px; top:50%; }
 
     .matching-pfp-btn{ display:inline-flex; align-items:center; justify-content:center; min-width:32px; min-height:20px; padding:4px 6px; border-radius:6px; background:rgba(0,0,0,0.18); color:var(--text); border:1px solid rgba(255,255,255,0.03); cursor:pointer; margin-left:60px; font-weight:700; font-size:12px; }
     .matching-pfp-btn.active{ box-shadow:0 4px 12px rgba(37,99,235,0.16); background:linear-gradient(90deg, rgba(37,99,235,0.12), rgba(16,185,129,0.06)); }
@@ -89,13 +161,32 @@
     
     .locked-content { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; color: var(--muted); gap: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-top: 10px; }
     .lock-icon { font-size: 24px; opacity: 0.7; }
-    .private-name { font-style: italic; color: var(--muted); opacity: 0.7; display: flex; align-items: center; gap: 4px; }
+    
+    /* Sorting Bar */
+    .sort-bar { display:flex; gap:10px; margin-bottom:12px; align-items:center; background:rgba(0,0,0,0.2); padding:8px; border-radius:8px; flex-shrink: 0; }
+    .sort-label { font-size:12px; color:var(--muted); font-weight:600; margin-right:4px; }
+    
+    #player-details, #song-details { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 
-    @media(max-width:880px){ .layout{ grid-template-columns: 1fr; } .list{ max-height:40vh; } .controls{ flex-wrap:wrap; } input.search{ min-width:160px; } .avatar{ width:64px; height:64px; } .pfp-wrapper{ width:64px; height:64px; } .matched-img{ width:40px; height:40px; } .matched-left{ left:-48px; } .matched-right{ margin-left:8px; } }
+    /* MOBILE */
+    @media(max-width:880px){ 
+        html, body { height: auto; overflow: auto; }
+        .app { height: auto; display: block; overflow: visible; padding: 12px; }
+        .layout{ display: block; height: auto; overflow: visible; } 
+        .card { height: auto; overflow: visible; margin-bottom: 14px; }
+        .list, #public-profile-content, #song-scores-area { height: auto; max-height: 50vh; overflow-y: auto; flex: none; }
+        .controls{ flex-wrap:wrap; } 
+        input.search{ min-width:160px; } 
+        .avatar{ width:64px; height:64px; } 
+        .pfp-wrapper{ width:64px; height:64px; } 
+        .matched-img{ width:40px; height:40px; } 
+        .matched-left{ left:-48px; } 
+        .matched-right{ left: auto; right: -48px; margin-left:0; } 
+    }
   </style>
 </head>
 <body>
-  <div class="app card">
+  <div class="app">
     <header>
       <div>
         <h1>Leaderboards GDev Online</h1>
@@ -104,33 +195,33 @@
             <div id="tab-players" class="tab active" role="tab">Players</div>
             <div id="tab-songs" class="tab" role="tab">Songs</div>
           </div>
-          <input id="global-search" class="search" placeholder="Pesquisar players / músicas..." />
-          <button id="btn-refresh" class="btn">Atualizar</button>
+          <input id="global-search" class="search" placeholder="Search players / songs..." />
+          <button id="btn-refresh" class="btn">Refresh</button>
         </div>
       </div>
 
       <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
         <div id="auth-area" style="display:flex; gap:8px; align-items:center;">
           <div id="signed-in-info" class="hidden" style="display:flex; gap:8px; align-items:center;">
-            <button id="btn-settings" class="settings-btn" title="Configurações e Solicitações">⚙️</button>
+            <button id="btn-settings" class="settings-btn" title="Settings & Requests">⚙️</button>
             
             <img id="mini-avatar" src="" alt="" class="avatar small" style="width:36px;height:36px;border-radius:8px;display:none;">
             <div id="mini-name" class="small muted"></div>
-            <button id="btn-logout" class="btn secondary">Sair</button>
+            <button id="btn-logout" class="btn secondary">Logout</button>
           </div>
 
           <div id="signed-out-area">
-            <button id="btn-email-toggle" class="btn secondary">Entrar / Registrar (email)</button>
+            <button id="btn-email-toggle" class="btn secondary">Login / Register</button>
           </div>
         </div>
 
-        <div id="email-auth" class="hidden card" style="width:320px; padding:10px;">
-          <div style="font-weight:700; margin-bottom:6px;">Entrar / Registrar</div>
+        <div id="email-auth" class="hidden card" style="width:320px; padding:10px; z-index: 100; position: absolute; right: 20px; top: 60px;">
+          <div style="font-weight:700; margin-bottom:6px;">Login / Register</div>
           <input id="email-input" placeholder="email" type="email" />
-          <input id="password-input" placeholder="senha" type="password" />
+          <input id="password-input" placeholder="password" type="password" />
           <div style="display:flex; gap:8px; margin-top:8px;">
-            <button id="btn-signin" class="btn">Entrar</button>
-            <button id="btn-signup" class="btn secondary">Registrar</button>
+            <button id="btn-signin" class="btn">Login</button>
+            <button id="btn-signup" class="btn secondary">Register</button>
           </div>
           <div id="email-auth-msg" class="status-msg"></div>
         </div>
@@ -138,71 +229,79 @@
     </header>
 
     <div class="layout">
-      <div>
-        <div id="left-card" class="card">
-          <div id="players-controls" class="players-controls">
-            <div class="section-title"><div>Players</div><div class="small" id="players-count">—</div></div>
-            <div class="search-row"><input id="player-search" class="search" placeholder="Buscar players..." /></div>
+      
+      <div id="left-card" class="card">
+        
+        <div id="players-controls" class="players-controls" style="display:flex; flex-direction:column; height:100%;">
+            <div class="static-content">
+                <div class="section-title"><div>Players</div><div class="small" id="players-count">—</div></div>
+                <div class="search-row"><input id="player-search" class="search" placeholder="Search players..." style="width:100%;" /></div>
+            </div>
             <div class="list" id="players-list"></div>
-          </div>
-
-          <div id="songs-controls" class="hidden">
-            <div class="section-title"><div>Músicas</div><div class="small" id="songs-count">—</div></div>
-            <div class="search-row"><input id="song-search" class="search" placeholder="Buscar músicas..." /></div>
-            <div class="list" id="songs-list"></div>
-          </div>
         </div>
+
+        <div id="songs-controls" class="hidden" style="display:flex; flex-direction:column; height:100%;">
+            <div class="static-content">
+                <div class="section-title"><div>Songs</div><div class="small" id="songs-count">—</div></div>
+                <div class="search-row"><input id="song-search" class="search" placeholder="Search songs..." style="width:100%;" /></div>
+            </div>
+            <div class="list" id="songs-list"></div>
+        </div>
+        
       </div>
 
-      <div>
-        <div id="right-card" class="card">
-          <div id="details-empty" class="no-data">Selecione um player ou música à esquerda para ver detalhes.</div>
+      <div id="right-card" class="card">
+        <div id="details-empty" class="no-data" style="margin:auto;">Select a player or song on the left to see details.</div>
 
-          <div id="player-details" class="hidden">
-            <div class="row" style="margin-bottom:10px; align-items: flex-start;">
-              <div id="pd-avatar-wrapper" class="pfp-wrapper"></div>
+        <div id="player-details" class="hidden">
+          <div class="static-content">
+              <div class="row" style="margin-bottom:10px; align-items: flex-start;">
+                <div id="pd-avatar-wrapper" class="pfp-wrapper"></div>
 
-              <div style="flex:1; min-width: 0;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div id="pd-name" style="font-weight:800;font-size:18px;"></div>
-                    <button id="btn-friend-action" class="btn small hidden" style="font-size:11px; padding:4px 8px;">Carregando...</button>
+                <div style="flex:1; min-width: 0;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <div id="pd-name" style="font-weight:800;font-size:18px;"></div>
+                      <button id="btn-friend-action" class="btn small hidden" style="font-size:11px; padding:4px 8px;">Loading...</button>
+                  </div>
+                  <div class="muted" id="pd-email"></div>
+
+                  <div class="desc-card">
+                    <div id="pd-desc" class=""></div>
+                  </div>
+
                 </div>
-                <div class="muted" id="pd-email"></div>
-
-                <div class="desc-card">
-                  <div id="pd-desc" class=""></div>
-                </div>
-
+                <div class="small muted" id="pd-uid"></div>
               </div>
-              <div class="small muted" id="pd-uid"></div>
-            </div>
 
-            <div id="private-profile-msg" class="hidden locked-content">
-                <div class="lock-icon">🔒</div>
-                <div>Este perfil é privado.</div>
-                <div class="small">Adicione como amigo para ver mais detalhes.</div>
-            </div>
-
-            <div id="public-profile-content">
-                <div class="section-title"><div>Músicas jogadas</div><div class="small">Ordenadas por bestScore (cresc.)</div></div>
-                <div id="player-songs-area"></div>
-            </div>
-          </div>
-
-          <div id="song-details" class="hidden">
-            <div class="row" style="margin-bottom:10px;">
-              <div style="flex:1">
-                <div id="sd-name" style="font-weight:700;font-size:16px;"></div>
-                <div class="muted" id="sd-id"></div>
+              <div id="private-profile-msg" class="hidden locked-content">
+                  <div class="lock-icon">🔒</div>
+                  <div>This profile is private.</div>
+                  <div class="small">Add as a friend to see more details.</div>
               </div>
-              <div class="small muted" id="sd-count"></div>
-            </div>
 
-            <div class="section-title"><div>Scores</div><div class="small">player • difficulty • bestScore</div></div>
-            <div id="song-scores-area"></div>
+              <div class="section-title"><div>Played Songs</div></div>
+              <div id="player-songs-controls"></div>
           </div>
-
+          
+          <div id="public-profile-content" class="scrollable-area">
+              <div id="player-songs-area"></div>
+          </div>
         </div>
+
+        <div id="song-details" class="hidden">
+            <div class="static-content">
+              <div class="row" style="margin-bottom:10px;">
+                <div style="flex:1">
+                  <div id="sd-name" style="font-weight:700;font-size:16px;"></div>
+                  </div>
+                <div class="small muted" id="sd-count"></div>
+              </div>
+              <div class="section-title"><div>Scores</div><div class="small"></div></div>
+            </div>
+
+            <div id="song-scores-area" class="scrollable-area"></div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -210,42 +309,42 @@
   <div id="settings-modal" class="modal-overlay hidden">
     <div class="modal-box">
       <div class="modal-header">
-        <span>Configurações & Amigos</span>
+        <span>Settings & Friends</span>
         <button id="btn-close-settings" style="background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;">&times;</button>
       </div>
 
       <div class="modal-section">
-        <div class="modal-subtitle">Solicitações de Amizade</div>
+        <div class="modal-subtitle">Friend Requests</div>
         <div id="pending-list" style="max-height:150px; overflow-y:auto;">
-            <div class="small muted">Carregando...</div>
+            <div class="small muted">Loading...</div>
         </div>
       </div>
 
       <div class="modal-section">
-        <div class="modal-subtitle">Privacidade</div>
+        <div class="modal-subtitle">Privacy</div>
         <div class="setting-row">
-            <label for="chk-private-photo">Mostrar foto apenas para amigos</label>
+            <label for="chk-private-photo">Show photo only to friends</label>
             <input type="checkbox" id="chk-private-photo">
         </div>
         <div class="setting-row">
-            <label for="chk-private-desc">Mostrar descrição apenas para amigos</label>
+            <label for="chk-private-desc">Show description only to friends</label>
             <input type="checkbox" id="chk-private-desc">
         </div>
         <div class="setting-row">
-            <label for="chk-private-songs">Mostrar músicas apenas para amigos</label>
+            <label for="chk-private-songs">Show songs history only to friends</label>
             <input type="checkbox" id="chk-private-songs">
         </div>
         <div class="setting-row">
-            <label for="chk-private-profile">Mostrar perfil APENAS para amigos (Remove da lista)</label>
+            <label for="chk-private-profile">Show profile ONLY to friends (Remove from list)</label>
             <input type="checkbox" id="chk-private-profile">
         </div>
         <div class="setting-row" style="border-top:1px dashed rgba(255,255,255,0.05); margin-top:8px; padding-top:8px;">
-            <label for="chk-hide-name" style="color:var(--accent-2);">Esconder nome nos Leaderboards</label>
+            <label for="chk-hide-name" style="color:var(--accent-2);">Hide name on Leaderboards</label>
             <input type="checkbox" id="chk-hide-name">
         </div>
 
         <div style="text-align:right; margin-top:10px;">
-            <button id="btn-save-settings" class="btn">Salvar Configurações</button>
+            <button id="btn-save-settings" class="btn">Save Settings</button>
         </div>
         <div id="settings-status" class="small muted" style="text-align:right; margin-top:4px;"></div>
       </div>
@@ -276,19 +375,33 @@
     let currentUser = null;
     let currentUserDoc = null; 
     
-    // --- Friendship Local State (Synced from friends/{uid}) ---
-    let myFriendsList = [];      // Confirmed friends
-    let myIncomingRequests = []; // Pending requests received
-    let mySentRequests = [];     // Pending requests sent
+    let myFriendsList = [];
+    let myIncomingRequests = [];
+    let mySentRequests = [];
 
     const profileMatches = {};
 
     const el = id => document.getElementById(id);
     function escapeHtml(s){ if (s===null||s===undefined) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
-    function formatDate(val){ if(!val) return '—'; if (val && typeof val.toDate === 'function') return val.toDate().toLocaleString(); try { return new Date(val).toLocaleString(); } catch(e) { return String(val); } }
+    
+    // UPDATED: Format date to English and Remove Seconds
+    function formatDate(val){ 
+        if(!val) return '—'; 
+        const date = (val && typeof val.toDate === 'function') ? val.toDate() : new Date(val);
+        // Validating date object
+        if (isNaN(date.getTime())) return String(val);
+
+        return date.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        }); 
+    }
+    
     function sanitizeKeyFromDisplay(s){ if(!s) return '__empty__'; return String(s).replace(/\./g,'_').replace(/\$/g,'_').replace(/\//g,'_').replace(/\[|\]|#/g,'_').replace(/\s+/g,'_').slice(0,90); }
 
-    // UI Refs
     const tabPlayers = el('tab-players'), tabSongs = el('tab-songs');
     const playersControls = el('players-controls'), songsControls = el('songs-controls');
     const playersList = el('players-list'), songsList = el('songs-list');
@@ -298,10 +411,10 @@
     const detailsEmpty = el('details-empty');
     const playerDetails = el('player-details'), songDetails = el('song-details');
     const pdAvatarWrapper = el('pd-avatar-wrapper'), pdName = el('pd-name'), pdEmail = el('pd-email'), pdUid = el('pd-uid'), pdDesc = el('pd-desc');
-    const playerSongsArea = el('player-songs-area');
+    const playerSongsArea = el('player-songs-area'), playerSongsControls = el('player-songs-controls');
     const btnFriendAction = el('btn-friend-action');
     const privateProfileMsg = el('private-profile-msg'), publicProfileContent = el('public-profile-content');
-    const sdName = el('sd-name'), sdId = el('sd-id'), sdCount = el('sd-count'), songScoresArea = el('song-scores-area');
+    const sdName = el('sd-name'), sdCount = el('sd-count'), songScoresArea = el('song-scores-area');
 
     const signedInInfo = el('signed-in-info'), signedOutArea = el('signed-out-area');
     const btnLogout = el('btn-logout'), btnEmailToggle = el('btn-email-toggle');
@@ -309,32 +422,53 @@
     const btnSignin = el('btn-signin'), btnSignup = el('btn-signup'), emailAuthMsg = el('email-auth-msg');
     const miniAvatar = el('mini-avatar'), miniName = el('mini-name');
     
-    // Settings
     const btnSettings = el('btn-settings'), settingsModal = el('settings-modal'), btnCloseSettings = el('btn-close-settings');
     const pendingList = el('pending-list');
     const btnSaveSettings = el('btn-save-settings'), settingsStatus = el('settings-status');
     const chkPrivatePhoto = el('chk-private-photo'), chkPrivateDesc = el('chk-private-desc'), chkPrivateSongs = el('chk-private-songs'), chkPrivateProfile = el('chk-private-profile'), chkHideName = el('chk-hide-name');
 
-    // --- Friendship Logic ---
+    // --- Helper for Sorting ---
+    function sortData(data, field, direction) {
+        return data.sort((a, b) => {
+            let valA, valB;
+            if (field === 'name') {
+                valA = (a.songName || a.playerName || '').toLowerCase();
+                valB = (b.songName || b.playerName || '').toLowerCase();
+                if (direction === 'asc') return valA.localeCompare(valB);
+                else return valB.localeCompare(valA);
+            }
+            if (field === 'accuracy') {
+                valA = parseFloat(String(a.accuracy).replace('%', '')) || 0;
+                valB = parseFloat(String(b.accuracy).replace('%', '')) || 0;
+            } else if (field === 'lastPoints') {
+                valA = Number(a.lastPoints || a.Points || 0);
+                valB = Number(b.lastPoints || b.Points || 0);
+            } else if (field === 'bestScore') {
+                valA = Number(a.bestScore || 0);
+                valB = Number(b.bestScore || 0);
+            } else if (field === 'misses') {
+                valA = Number(a.misses || 0);
+                valB = Number(b.misses || 0);
+            } else { valA = 0; valB = 0; }
+            
+            if (direction === 'asc') return valA - valB;
+            else return valB - valA;
+        });
+    }
 
-    // All status checks now rely on the local arrays populated from friends/{myUid}
+    // --- Friend Logic ---
     function getFriendStatus(targetUid) {
         if (!currentUser || !currentUserDoc) return 'none';
         if (targetUid === currentUser.uid) return 'self';
-        
         if (myFriendsList.includes(targetUid)) return 'friend';
         if (myIncomingRequests.includes(targetUid)) return 'received';
         if (mySentRequests.includes(targetUid)) return 'sent';
-        
         return 'none';
     }
 
-    // Update using ONLY friends collection (no users/{id} modification for friends)
     async function updateFriendAction(action, targetUid) {
         if (!currentUser) return;
         const myUid = currentUser.uid;
-        
-        // Refs for friends/{id} docs
         const myFriendsRef = doc(db, 'friends', myUid);
         const targetFriendsRef = doc(db, 'friends', targetUid);
 
@@ -343,106 +477,48 @@
 
         try {
             if (action === 'send') {
-                // Add to my Sent, add to target Incoming
-                // Use setDoc with merge in case doc doesn't exist yet
                 await setDoc(myFriendsRef, { sent: arrayUnion(targetUid) }, { merge: true });
                 await setDoc(targetFriendsRef, { requests: arrayUnion(myUid) }, { merge: true });
             } 
             else if (action === 'accept') {
-                // MOVE FROM REQUESTS/SENT TO FRIENDS, AND CLEAR *BOTH* PENDING REQUESTS IF THEY EXIST
-                
-                // 1. ME (myFriendsRef): 
-                //    - Add target to my friends list.
-                //    - Remove target from my incoming requests (request B -> A).
-                //    - Remove target from my sent requests (request A -> B) <--- ADICIONADO PARA CORRIGIR CONCORRÊNCIA
-                await setDoc(myFriendsRef, { 
-                    friends: arrayUnion(targetUid),
-                    requests: arrayRemove(targetUid),
-                    sent: arrayRemove(targetUid) // <--- Corrigindo concorrência
-                }, { merge: true });
-
-                // 2. TARGET (targetFriendsRef): 
-                //    - Add me to their friends list.
-                //    - Remove me from their sent requests (request B -> A).
-                //    - Remove me from their incoming requests (request A -> B) <--- ADICIONADO PARA CORRIGIR CONCORRÊNCIA
-                await setDoc(targetFriendsRef, { 
-                    friends: arrayUnion(myUid),
-                    sent: arrayRemove(myUid),
-                    requests: arrayRemove(myUid) // <--- Corrigindo concorrência
-                }, { merge: true });
+                await setDoc(myFriendsRef, { friends: arrayUnion(targetUid), requests: arrayRemove(targetUid), sent: arrayRemove(targetUid) }, { merge: true });
+                await setDoc(targetFriendsRef, { friends: arrayUnion(myUid), sent: arrayRemove(myUid), requests: arrayRemove(myUid) }, { merge: true });
             }
             else if (action === 'reject') {
-                // Remove from my requests, remove from target sent
                 await setDoc(myFriendsRef, { requests: arrayRemove(targetUid) }, { merge: true });
                 await setDoc(targetFriendsRef, { sent: arrayRemove(myUid) }, { merge: true });
             }
             else if (action === 'cancel') {
-                // Remove from my sent, remove from target requests
                 await setDoc(myFriendsRef, { sent: arrayRemove(targetUid) }, { merge: true });
                 await setDoc(targetFriendsRef, { requests: arrayRemove(myUid) }, { merge: true });
             }
             else if (action === 'remove') {
-                // Remove from friends list for both
                 await setDoc(myFriendsRef, { friends: arrayRemove(targetUid) }, { merge: true });
                 await setDoc(targetFriendsRef, { friends: arrayRemove(myUid) }, { merge: true });
             }
-            
-            await refreshUserData(); // Reload my local arrays
-            
-            // Refresh UI for the target user if open
+            await refreshUserData();
             const targetUser = CACHE.users.find(u => u.id === targetUid);
-            if (targetUser && currentState.selectedPlayer === targetUid) {
-                showPlayerDetails(targetUser, false);
-            }
-            // Update modal if open
+            if (targetUser && currentState.selectedPlayer === targetUid) showPlayerDetails(targetUser, false);
             if (!settingsModal.classList.contains('hidden')) renderSettingsModal();
-
-        } catch (e) {
-            console.error("Action error:", e);
-            alert("Erro: " + e.message);
-        } finally {
-            if(el('btn-friend-action')) el('btn-friend-action').disabled = false;
-        }
+        } catch (e) { console.error(e); alert("Error: " + e.message); } finally { if(el('btn-friend-action')) el('btn-friend-action').disabled = false; }
     }
 
-    // --- Settings & Modal ---
-
-    btnSettings.addEventListener('click', () => {
-        settingsModal.classList.remove('hidden');
-        renderSettingsModal();
-    });
+    btnSettings.addEventListener('click', () => { settingsModal.classList.remove('hidden'); renderSettingsModal(); });
     btnCloseSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
     
     async function renderSettingsModal() {
         if (!currentUserDoc) return;
         const data = currentUserDoc.data || {};
         const accSettings = data.accsettings || {};
-
-        chkPrivatePhoto.checked = !!accSettings.privatePhoto;
-        chkPrivateDesc.checked = !!accSettings.privateDesc;
-        chkPrivateSongs.checked = !!accSettings.privateSongs;
-        chkPrivateProfile.checked = !!accSettings.privateProfile;
-        chkHideName.checked = !!accSettings.hideName;
-
+        chkPrivatePhoto.checked = !!accSettings.privatePhoto; chkPrivateDesc.checked = !!accSettings.privateDesc; chkPrivateSongs.checked = !!accSettings.privateSongs; chkPrivateProfile.checked = !!accSettings.privateProfile; chkHideName.checked = !!accSettings.hideName;
         pendingList.innerHTML = '';
-        
-        // Use myIncomingRequests loaded from friends/{me}
-        if (myIncomingRequests.length === 0) {
-            pendingList.innerHTML = '<div class="small muted">Nenhuma solicitação pendente.</div>';
-        } else {
+        if (myIncomingRequests.length === 0) { pendingList.innerHTML = '<div class="small muted">No pending requests.</div>'; } 
+        else {
             for (const uid of myIncomingRequests) {
                 let user = CACHE.users.find(u => u.id === uid);
                 const name = user ? (user.data.displayName || user.data.name || uid) : uid;
-                
-                const item = document.createElement('div');
-                item.className = 'friend-req-item';
-                item.innerHTML = `
-                    <div style="flex:1; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(name)}</div>
-                    <div class="friend-actions">
-                        <button class="btn small" id="accept-${uid}">✔</button>
-                        <button class="btn small danger" id="reject-${uid}">✖</button>
-                    </div>
-                `;
+                const item = document.createElement('div'); item.className = 'friend-req-item';
+                item.innerHTML = `<div style="flex:1; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(name)}</div><div class="friend-actions"><button class="btn small" id="accept-${uid}">✔</button><button class="btn small danger" id="reject-${uid}">✖</button></div>`;
                 pendingList.appendChild(item);
                 el(`accept-${uid}`).addEventListener('click', () => updateFriendAction('accept', uid));
                 el(`reject-${uid}`).addEventListener('click', () => updateFriendAction('reject', uid));
@@ -452,32 +528,17 @@
 
     btnSaveSettings.addEventListener('click', async () => {
         if (!currentUser) return;
-        btnSaveSettings.disabled = true;
-        settingsStatus.textContent = "Salvando...";
-        const newSettings = {
-            privatePhoto: chkPrivatePhoto.checked,
-            privateDesc: chkPrivateDesc.checked,
-            privateSongs: chkPrivateSongs.checked,
-            privateProfile: chkPrivateProfile.checked,
-            hideName: chkHideName.checked
-        };
-        try {
-            await updateDoc(doc(db, 'users', currentUser.uid), { accsettings: newSettings, updatedAt: new Date().toISOString() });
-            if(currentUserDoc) currentUserDoc.data.accsettings = newSettings;
-            settingsStatus.textContent = "Salvo.";
-            setTimeout(() => { settingsStatus.textContent = ""; btnSaveSettings.disabled = false; settingsModal.classList.add('hidden'); refreshAll(); }, 800);
-        } catch(e) { console.error(e); settingsStatus.textContent = "Erro."; btnSaveSettings.disabled = false; }
+        btnSaveSettings.disabled = true; settingsStatus.textContent = "Saving...";
+        const newSettings = { privatePhoto: chkPrivatePhoto.checked, privateDesc: chkPrivateDesc.checked, privateSongs: chkPrivateSongs.checked, privateProfile: chkPrivateProfile.checked, hideName: chkHideName.checked };
+        try { await updateDoc(doc(db, 'users', currentUser.uid), { accsettings: newSettings, updatedAt: new Date().toISOString() }); if(currentUserDoc) currentUserDoc.data.accsettings = newSettings; settingsStatus.textContent = "Saved."; setTimeout(() => { settingsStatus.textContent = ""; btnSaveSettings.disabled = false; settingsModal.classList.add('hidden'); refreshAll(); }, 800); } catch(e) { console.error(e); settingsStatus.textContent = "Error."; btnSaveSettings.disabled = false; }
     });
-
-    // --- Core UI Functions ---
 
     function setTab(tab, updateUrl = true){
       tabPlayers.classList.remove('active'); tabSongs.classList.remove('active');
       playersControls.classList.add('hidden'); songsControls.classList.add('hidden');
       if (tab === 'players') { tabPlayers.classList.add('active'); playersControls.classList.remove('hidden'); }
       else { tabSongs.classList.add('active'); songsControls.classList.remove('hidden'); }
-      currentState.tab = tab;
-      currentState.selectedPlayer = null; currentState.selectedSong = null; currentState.selectedSide = null; currentState.selectedDifficulty = null;
+      currentState.tab = tab; currentState.selectedPlayer = null; currentState.selectedSong = null; currentState.selectedSide = null; currentState.selectedDifficulty = null;
       if (updateUrl) updateURL();
       clearDetails();
     }
@@ -485,8 +546,7 @@
     tabSongs.addEventListener('click', ()=>setTab('songs'));
 
     function updateURL(){
-      const params = new URLSearchParams();
-      params.set('tab', currentState.tab);
+      const params = new URLSearchParams(); params.set('tab', currentState.tab);
       if (currentState.selectedPlayer) params.set('player', currentState.selectedPlayer);
       if (currentState.selectedSong) params.set('song', currentState.selectedSong);
       if (currentState.selectedSide) params.set('side', currentState.selectedSide);
@@ -500,15 +560,9 @@
       const tab = params.get('tab'); const playerId = params.get('player'); const songId = params.get('song'); const side = params.get('side'); const difficulty = params.get('difficulty');
       if (tab) { currentState.tab = tab; setTab(tab, false); }
       setTimeout(()=>{
-        if (playerId && CACHE.users.length > 0) { 
-            const player = CACHE.users.find(u => u.id === playerId); 
-            if (player) showPlayerDetails(player, false); 
-        }
+        if (playerId && CACHE.users.length > 0) { const player = CACHE.users.find(u => u.id === playerId); if (player) showPlayerDetails(player, false); }
         if (songId && CACHE.songs.length > 0) { const song = CACHE.songs.find(s => s.id === songId); if (song) showSongDetails(song, false); }
-        if (side && difficulty && songId) {
-          const song = CACHE.songs.find(s => s.id === songId);
-          if (song) { showSongDetails(song, false); setTimeout(()=>{ const card = document.querySelector(`.card[data-side="${side}"][data-difficulty="${difficulty}"]`); if (card) card.click(); },150); }
-        }
+        if (side && difficulty && songId) { const song = CACHE.songs.find(s => s.id === songId); if (song) { showSongDetails(song, false); setTimeout(()=>{ const card = document.querySelector(`.card[data-side="${side}"][data-difficulty="${difficulty}"]`); if (card) card.click(); },150); } }
       }, 500);
     }
 
@@ -530,42 +584,24 @@
     function attachUsernameLinkEvents() {
       document.querySelectorAll('.username-link').forEach(link => {
         if (link._usernameEventAttached) return; link._usernameEventAttached = true;
-        link.addEventListener('click', function(e) {
-          e.preventDefault(); e.stopPropagation();
-          const username = this.getAttribute('data-username');
-          const user = searchUserByName(username);
-          if (user) { setTab('players'); showPlayerDetails(user); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-          else { alert(`Usuário "${username}" não encontrado.`); }
-        });
+        link.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); const username = this.getAttribute('data-username'); const user = searchUserByName(username); if (user) { setTab('players'); showPlayerDetails(user); window.scrollTo({ top: 0, behavior: 'smooth' }); } else { alert(`User "${username}" not found.`); } });
         link.style.color = 'var(--accent)'; link.style.cursor = 'pointer'; link.style.textDecoration = 'underline'; link.style.fontWeight = '700';
       });
       document.querySelectorAll('.matching-pfp-btn').forEach(btn => {
         if (btn._matchingEventAttached) return; btn._matchingEventAttached = true;
-        btn.addEventListener('click', function(e) {
-          e.preventDefault(); e.stopPropagation();
-          const username = this.getAttribute('data-username');
-          const preferredSide = this.getAttribute('data-side');
-          const currentProfileId = currentState.selectedPlayer;
-          if (!currentProfileId) return;
-          toggleProfileMatch(currentProfileId, username, preferredSide);
-        });
+        btn.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); const username = this.getAttribute('data-username'); const preferredSide = this.getAttribute('data-side'); const currentProfileId = currentState.selectedPlayer; if (!currentProfileId) return; toggleProfileMatch(currentProfileId, username, preferredSide); });
       });
     }
 
     function searchUserByName(username){
       if (!username || username.trim() === '') return null;
       const s = username.toLowerCase().trim();
-      return CACHE.users.find(user => {
-        const displayName = (user.data.displayName || '').toLowerCase();
-        const name = (user.data.name || '').toLowerCase();
-        return displayName === s || name === s || displayName.includes(s) || name.includes(s) || user.id.toLowerCase() === s;
-      });
+      return CACHE.users.find(user => { const displayName = (user.data.displayName || '').toLowerCase(); const name = (user.data.name || '').toLowerCase(); return displayName === s || name === s || displayName.includes(s) || name.includes(s) || user.id.toLowerCase() === s; });
     }
 
     function toggleProfileMatch(profileId, username, preferredSide) {
       if (!profileMatches[profileId]) profileMatches[profileId] = { left: null, right: null };
-      const state = profileMatches[profileId];
-      const side = (preferredSide === 'Left') ? 'right' : 'left'; const other = side === 'left' ? 'left' : 'right';
+      const state = profileMatches[profileId]; const side = (preferredSide === 'Left') ? 'right' : 'left'; const other = side === 'left' ? 'left' : 'right';
       if (state.left === username) { state.left = null; renderProfileMatches(profileId); return; }
       if (state.right === username) { state.right = null; renderProfileMatches(profileId); return; }
       if (!state[side]) { state[side] = username; } else { if (!state[other]) { state[other] = username; } else { state[side] = username; } }
@@ -574,252 +610,114 @@
 
     function renderProfileMatches(profileId) {
       if (currentState.selectedPlayer !== profileId) return;
-      const wrapper = pdAvatarWrapper;
-      wrapper.querySelectorAll('.matched-img').forEach(n=>n.remove());
+      const wrapper = pdAvatarWrapper; wrapper.querySelectorAll('.matched-img').forEach(n=>n.remove());
       const state = profileMatches[profileId] || { left: null, right: null };
-      function createMatchedImgFor(username, cls) {
-        if (!username) return;
-        const user = searchUserByName(username);
-        if (!user) return;
-        const img = document.createElement('img'); img.className = 'matched-img ' + cls; img.alt = user.data.displayName || user.id; img.src = user.data.avatarURL || user.data.photoURL || ''; img.title = user.data.displayName || user.id;
-        wrapper.appendChild(img);
-      }
+      function createMatchedImgFor(username, cls) { if (!username) return; const user = searchUserByName(username); if (!user) return; const img = document.createElement('img'); img.className = 'matched-img ' + cls; img.alt = user.data.displayName || user.id; img.src = user.data.avatarURL || user.data.photoURL || ''; img.title = user.data.displayName || user.id; wrapper.appendChild(img); }
       if (state.left) createMatchedImgFor(state.left, 'matched-left');
       if (state.right) createMatchedImgFor(state.right, 'matched-right');
-      document.querySelectorAll('.matching-pfp-btn').forEach(b => {
-        const u = b.getAttribute('data-username');
-        if (state.left === u || state.right === u) b.classList.add('active'); else b.classList.remove('active');
-      });
+      document.querySelectorAll('.matching-pfp-btn').forEach(b => { const u = b.getAttribute('data-username'); if (state.left === u || state.right === u) b.classList.add('active'); else b.classList.remove('active'); });
     }
 
-    let activePopover = null;
-    let activePopoverClickHandler = null;
+    let activePopover = null; let activePopoverClickHandler = null;
     function removePopover(){ if (activePopover && activePopover.el){ activePopover.el.remove(); activePopover = null; if (activePopoverClickHandler) document.removeEventListener('click', activePopoverClickHandler); activePopoverClickHandler = null; } }
 
     function clearDetails(){
       detailsEmpty.classList.add('hidden'); playerDetails.classList.add('hidden'); songDetails.classList.add('hidden');
-      playerSongsArea.innerHTML = ''; songScoresArea.innerHTML = '';
+      playerSongsArea.innerHTML = ''; songScoresArea.innerHTML = ''; playerSongsControls.innerHTML = '';
       currentState.selectedPlayer = null; currentState.selectedSong = null;
       removePopover();
     }
 
-    async function fetchUsers(){
-      const col = collection(db, 'users');
-      const snap = await getDocs(col);
-      const arr = [];
-      snap.forEach(d=> arr.push({ id: d.id, data: d.data() }) );
-      CACHE.users = arr;
-      playersCount.textContent = arr.length + ' players';
-      return arr;
-    }
-    async function fetchSongs(){
-      const col = collection(db, 'songs');
-      const snap = await getDocs(col);
-      const arr = [];
-      snap.forEach(d=> arr.push({ id: d.id, data: d.data() }) );
-      CACHE.songs = arr;
-      songsCount.textContent = arr.length + ' músicas';
-      return arr;
-    }
+    async function fetchUsers(){ const col = collection(db, 'users'); const snap = await getDocs(col); const arr = []; snap.forEach(d=> arr.push({ id: d.id, data: d.data() }) ); CACHE.users = arr; playersCount.textContent = arr.length + ' players'; return arr; }
+    async function fetchSongs(){ const col = collection(db, 'songs'); const snap = await getDocs(col); const arr = []; snap.forEach(d=> arr.push({ id: d.id, data: d.data() }) ); CACHE.songs = arr; songsCount.textContent = arr.length + ' songs'; return arr; }
     
-    // Loads current user doc AND friend data from friends/{uid}
     async function refreshUserData() {
-        if (!currentUser) {
-            currentUserDoc = null;
-            myFriendsList = [];
-            myIncomingRequests = [];
-            mySentRequests = [];
-            return;
-        }
-        // User Doc (Profile)
+        if (!currentUser) { currentUserDoc = null; myFriendsList = []; myIncomingRequests = []; mySentRequests = []; return; }
         const snap = await getDoc(doc(db, 'users', currentUser.uid));
-        if (snap.exists()) currentUserDoc = { id: currentUser.uid, data: snap.data() };
-        else currentUserDoc = { id: currentUser.uid, data: {} };
-
-        // Friend Doc (friends/{uid}) - The source of truth
-        try {
-            const fSnap = await getDoc(doc(db, 'friends', currentUser.uid));
-            if (fSnap.exists()) {
-                const d = fSnap.data();
-                myIncomingRequests = d.requests || [];
-                myFriendsList = d.friends || [];
-                mySentRequests = d.sent || [];
-            } else {
-                myIncomingRequests = [];
-                myFriendsList = [];
-                mySentRequests = [];
-            }
-        } catch(e) { console.error("Err fetching requests", e); myIncomingRequests = []; }
-
-        // Update gear notification
-        if (myIncomingRequests.length > 0) btnSettings.classList.add('has-notif');
-        else btnSettings.classList.remove('has-notif');
+        if (snap.exists()) currentUserDoc = { id: currentUser.uid, data: snap.data() }; else currentUserDoc = { id: currentUser.uid, data: {} };
+        try { const fSnap = await getDoc(doc(db, 'friends', currentUser.uid)); if (fSnap.exists()) { const d = fSnap.data(); myIncomingRequests = d.requests || []; myFriendsList = d.friends || []; mySentRequests = d.sent || []; } else { myIncomingRequests = []; myFriendsList = []; mySentRequests = []; } } catch(e) { console.error("Err fetching requests", e); myIncomingRequests = []; }
+        if (myIncomingRequests.length > 0) btnSettings.classList.add('has-notif'); else btnSettings.classList.remove('has-notif');
     }
 
     async function refreshAll(){
-      playersList.innerHTML = '<div class="small muted">Carregando players…</div>';
-      songsList.innerHTML = '<div class="small muted">Carregando músicas…</div>';
+      playersList.innerHTML = '<div class="small muted">Loading players…</div>'; songsList.innerHTML = '<div class="small muted">Loading songs…</div>';
       clearDetails();
-      try { 
-        if (currentUser) await refreshUserData();
-        await Promise.all([ fetchUsers(), fetchSongs() ]); 
-        renderPlayersList(); 
-        renderSongsList(); 
-        restoreStateFromURL(); 
-      } catch(e){ console.error(e); playersList.innerHTML = '<div class="no-data">Erro ao carregar.</div>'; songsList.innerHTML = '<div class="no-data">Erro ao carregar.</div>'; }
+      try { if (currentUser) await refreshUserData(); await Promise.all([ fetchUsers(), fetchSongs() ]); renderPlayersList(); renderSongsList(); restoreStateFromURL(); } catch(e){ console.error(e); playersList.innerHTML = '<div class="no-data">Error loading data.</div>'; songsList.innerHTML = '<div class="no-data">Error loading data.</div>'; }
     }
 
     function renderPlayersList(){
-      const q = (playerSearch.value||'').toLowerCase().trim();
-      const myUid = currentUser ? currentUser.uid : null;
-      
+      const q = (playerSearch.value||'').toLowerCase().trim(); const myUid = currentUser ? currentUser.uid : null;
       const filtered = CACHE.users.filter(u=>{ 
-        // 1. Text Search Filter
-        const dn=(u.data.displayName||'').toLowerCase(); const em=(u.data.email||'').toLowerCase(); 
-        const matchesSearch = (!q) || dn.includes(q) || em.includes(q) || u.id.toLowerCase().includes(q);
-        if (!matchesSearch) return false;
-
-        // 2. Privacy Filter (Hide Profile from List)
-        const settings = u.data.accsettings || {};
-        if (settings.privateProfile) {
-            // Logic: Visible only if I am the user OR I am a friend (checked via local list)
-            if (u.id === myUid) return true;
-            if (myFriendsList.includes(u.id)) return true;
-            return false; // Hide from list
-        }
-        return true;
+        const dn=(u.data.displayName||'').toLowerCase(); const em=(u.data.email||'').toLowerCase(); const matchesSearch = (!q) || dn.includes(q) || em.includes(q) || u.id.toLowerCase().includes(q); if (!matchesSearch) return false;
+        const settings = u.data.accsettings || {}; if (settings.privateProfile) { if (u.id === myUid) return true; if (myFriendsList.includes(u.id)) return true; return false; } return true;
       });
-
       playersCount.textContent = filtered.length + ' players';
-      if (!filtered.length) { playersList.innerHTML = '<div class="no-data">Nenhum player encontrado.</div>'; return; }
+      if (!filtered.length) { playersList.innerHTML = '<div class="no-data">No players found.</div>'; return; }
       playersList.innerHTML = '';
-      
       for (const u of filtered){
-        const name = u.data.displayName || u.data.name || u.id;
-        const email = u.data.email || '';
-        const settings = u.data.accsettings || {};
-        
-        // Privacy logic for Avatar in List
-        let canSeePhoto = true;
-        if (settings.privatePhoto) {
-            if (u.id !== myUid && !myFriendsList.includes(u.id)) canSeePhoto = false;
-        }
-
+        const name = u.data.displayName || u.data.name || u.id; const email = u.data.email || ''; const settings = u.data.accsettings || {};
+        let canSeePhoto = true; if (settings.privatePhoto) { if (u.id !== myUid && !myFriendsList.includes(u.id)) canSeePhoto = false; }
         const div = document.createElement('div'); div.className = 'player-row';
         let avatarElement;
-        
-        if (canSeePhoto && (u.data.avatarURL || u.data.photoURL)) {
-          avatarElement = document.createElement('img'); avatarElement.className = 'avatar small';
-          avatarElement.src = u.data.avatarURL || u.data.photoURL;
-        } else {
-          avatarElement = document.createElement('div'); avatarElement.className = 'avatar fallback small';
-          // Show Lock if private photo and not friend
-          if (!canSeePhoto) avatarElement.textContent = '🔒';
-          else avatarElement.textContent = (String(name||'').slice(0,1)||'?').toUpperCase();
-        }
-        
+        if (canSeePhoto && (u.data.avatarURL || u.data.photoURL)) { avatarElement = document.createElement('img'); avatarElement.className = 'avatar small'; avatarElement.src = u.data.avatarURL || u.data.photoURL; } else { avatarElement = document.createElement('div'); avatarElement.className = 'avatar fallback small'; if (!canSeePhoto) avatarElement.textContent = '🔒'; else avatarElement.textContent = (String(name||'').slice(0,1)||'?').toUpperCase(); }
         div.appendChild(avatarElement);
-        const meta = document.createElement('div'); meta.className = 'meta';
-        meta.innerHTML = '<div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(name) + '</div><div class="muted">' + escapeHtml(email) + '</div>';
-        div.appendChild(meta);
-        playersList.appendChild(div);
-        div.addEventListener('click', ()=> showPlayerDetails(u));
+        const meta = document.createElement('div'); meta.className = 'meta'; meta.innerHTML = '<div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(name) + '</div><div class="muted">' + escapeHtml(email) + '</div>';
+        div.appendChild(meta); playersList.appendChild(div); div.addEventListener('click', ()=> showPlayerDetails(u));
       }
     }
 
     function renderSongsList(){
-      const q = (songSearch.value||'').toLowerCase().trim();
-      const songs = CACHE.songs.slice();
+      const q = (songSearch.value||'').toLowerCase().trim(); const songs = CACHE.songs.slice();
       const filtered = songs.filter(s=> { const name=(s.data.originalName||s.id||'').toLowerCase(); return (!q) || name.includes(q) || s.id.toLowerCase().includes(q); });
-      songsCount.textContent = filtered.length + ' músicas';
-      if (!filtered.length) { songsList.innerHTML = '<div class="no-data">Nenhuma música encontrada.</div>'; return; }
-      const groups = {};
-      for (const s of filtered){
-        const name = (s.data.originalName || s.id || '').trim();
-        const key = (name && name[0]) ? name[0].toUpperCase() : '#';
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(s);
-      }
-      const keys = Object.keys(groups).sort();
-      songsList.innerHTML = '';
+      songsCount.textContent = filtered.length + ' songs';
+      if (!filtered.length) { songsList.innerHTML = '<div class="no-data">No songs found.</div>'; return; }
+      const groups = {}; for (const s of filtered){ const name = (s.data.originalName || s.id || '').trim(); const key = (name && name[0]) ? name[0].toUpperCase() : '#'; if (!groups[key]) groups[key] = []; groups[key].push(s); }
+      const keys = Object.keys(groups).sort(); songsList.innerHTML = '';
       for (const k of keys){
-        const folderEl = document.createElement('div'); folderEl.className = 'folder';
-        folderEl.innerHTML = '<div>' + escapeHtml(k) + '</div><div class="small muted">' + groups[k].length + '</div>';
-        songsList.appendChild(folderEl);
+        const folderEl = document.createElement('div'); folderEl.className = 'folder'; folderEl.innerHTML = '<div>' + escapeHtml(k) + '</div><div class="small muted">' + groups[k].length + '</div>'; songsList.appendChild(folderEl);
         const inner = document.createElement('div'); inner.style.margin = '8px 0 12px 6px';
         groups[k].sort((a,b)=> (String(a.data.originalName||a.id).localeCompare(String(b.data.originalName||b.id))));
         for (const s of groups[k]){
-          const name = s.data.originalName || s.id;
-          const row = document.createElement('div'); row.className = 'song-row';
+          const name = s.data.originalName || s.id; const row = document.createElement('div'); row.className = 'song-row';
           row.innerHTML = '<div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(name) + '</div><div class="small muted">' + escapeHtml(s.id) + '</div>';
-          inner.appendChild(row);
-          row.addEventListener('click', ()=> showSongDetails(s));
-          row.setAttribute('data-song-id', s.id); row.setAttribute('data-song-name', name);
+          inner.appendChild(row); row.addEventListener('click', ()=> showSongDetails(s)); row.setAttribute('data-song-id', s.id); row.setAttribute('data-song-name', name);
         }
         songsList.appendChild(inner);
       }
     }
 
     async function showPlayerDetails(userObj, updateUrl = true){
-      removePopover();
-      detailsEmpty.classList.add('hidden'); songDetails.classList.add('hidden'); playerDetails.classList.remove('hidden');
-      currentState.selectedPlayer = userObj.id; currentState.selectedSong = null;
-      if (updateUrl) updateURL();
+      removePopover(); detailsEmpty.classList.add('hidden'); songDetails.classList.add('hidden'); playerDetails.classList.remove('hidden');
+      currentState.selectedPlayer = userObj.id; currentState.selectedSong = null; if (updateUrl) updateURL();
       
-      const status = await getFriendStatus(userObj.id);
-      const isFriend = (status === 'friend' || status === 'self');
-      const settings = userObj.data.accsettings || {};
-
+      const status = await getFriendStatus(userObj.id); const isFriend = (status === 'friend' || status === 'self'); const settings = userObj.data.accsettings || {};
       let canSeePhoto = true, canSeeDesc = true, canSeeSongs = true, isProfilePrivate = false;
+      if (settings.privateProfile && !isFriend) { isProfilePrivate = true; canSeePhoto = false; canSeeDesc = false; canSeeSongs = false; } else { if (settings.privatePhoto && !isFriend) canSeePhoto = false; if (settings.privateDesc && !isFriend) canSeeDesc = false; if (settings.privateSongs && !isFriend) canSeeSongs = false; }
 
-      if (settings.privateProfile && !isFriend) { isProfilePrivate = true; canSeePhoto = false; canSeeDesc = false; canSeeSongs = false; }
-      else {
-          if (settings.privatePhoto && !isFriend) canSeePhoto = false;
-          if (settings.privateDesc && !isFriend) canSeeDesc = false;
-          if (settings.privateSongs && !isFriend) canSeeSongs = false;
-      }
-
-      // Friend Button
-      btnFriendAction.classList.remove('hidden', 'danger', 'secondary', 'warning');
-      btnFriendAction.onclick = null; btnFriendAction.disabled = false;
+      btnFriendAction.classList.remove('hidden', 'danger', 'secondary', 'warning'); btnFriendAction.onclick = null; btnFriendAction.disabled = false;
       if (!currentUser || status === 'self') btnFriendAction.classList.add('hidden');
-      else if (status === 'friend') { btnFriendAction.textContent = "Amigos (Remover)"; btnFriendAction.classList.add('danger'); btnFriendAction.onclick = () => { if(confirm("Desfazer amizade?")) updateFriendAction('remove', userObj.id); }; }
-      else if (status === 'sent') { btnFriendAction.textContent = "Solicitação Enviada (Cancelar)"; btnFriendAction.classList.add('secondary'); btnFriendAction.onclick = () => updateFriendAction('cancel', userObj.id); }
-      else if (status === 'received') { btnFriendAction.textContent = "Aceitar Solicitação"; btnFriendAction.classList.add('warning'); btnFriendAction.onclick = () => updateFriendAction('accept', userObj.id); }
-      else { btnFriendAction.textContent = "Adicionar Amigo"; btnFriendAction.onclick = () => updateFriendAction('send', userObj.id); }
+      else if (status === 'friend') { btnFriendAction.textContent = "Friend (Remove)"; btnFriendAction.classList.add('danger'); btnFriendAction.onclick = () => { if(confirm("Unfriend?")) updateFriendAction('remove', userObj.id); }; }
+      else if (status === 'sent') { btnFriendAction.textContent = "Request Sent (Cancel)"; btnFriendAction.classList.add('secondary'); btnFriendAction.onclick = () => updateFriendAction('cancel', userObj.id); }
+      else if (status === 'received') { btnFriendAction.textContent = "Accept Request"; btnFriendAction.classList.add('warning'); btnFriendAction.onclick = () => updateFriendAction('accept', userObj.id); }
+      else { btnFriendAction.textContent = "Add Friend"; btnFriendAction.onclick = () => updateFriendAction('send', userObj.id); }
 
-      if (isProfilePrivate) {
-         privateProfileMsg.classList.remove('hidden'); publicProfileContent.classList.add('hidden');
-         pdName.textContent = userObj.data.displayName || userObj.id; pdUid.textContent = userObj.id; pdEmail.textContent = "";
-         pdAvatarWrapper.innerHTML = '<div class="avatar fallback" style="width:88px;height:88px;border-radius:12px;font-size:24px;">🔒</div>';
-         pdDesc.innerHTML = '<span class="small muted">Descrição oculta.</span>';
-         playerSongsArea.innerHTML = '';
-         return; 
-      } else { privateProfileMsg.classList.add('hidden'); publicProfileContent.classList.remove('hidden'); }
+      if (isProfilePrivate) { privateProfileMsg.classList.remove('hidden'); publicProfileContent.classList.add('hidden'); pdName.textContent = userObj.data.displayName || userObj.id; pdUid.textContent = userObj.id; pdEmail.textContent = ""; pdAvatarWrapper.innerHTML = '<div class="avatar fallback" style="width:88px;height:88px;border-radius:12px;font-size:24px;">🔒</div>'; pdDesc.innerHTML = '<span class="small muted">Description hidden.</span>'; playerSongsArea.innerHTML = ''; return; } else { privateProfileMsg.classList.add('hidden'); publicProfileContent.classList.remove('hidden'); }
 
       if (!profileMatches[userObj.id]) profileMatches[userObj.id] = { left: null, right: null };
       const wrapper = pdAvatarWrapper; wrapper.innerHTML = ''; wrapper.style.position = 'relative';
       const name = userObj.data.displayName || userObj.id; const avatar = userObj.data.avatarURL || userObj.data.photoURL || '';
-      if (canSeePhoto && avatar) { const img = document.createElement('img'); img.className = 'avatar'; img.src = avatar; wrapper.appendChild(img); }
-      else { const div = document.createElement('div'); div.className = 'avatar fallback'; div.style.width='88px'; div.style.height='88px'; div.style.borderRadius='12px'; div.textContent = (!canSeePhoto) ? '🔒' : (String(name||'').slice(0,1)||'?').toUpperCase(); wrapper.appendChild(div); }
-      
+      if (canSeePhoto && avatar) { const img = document.createElement('img'); img.className = 'avatar'; img.src = avatar; wrapper.appendChild(img); } else { const div = document.createElement('div'); div.className = 'avatar fallback'; div.style.width='88px'; div.style.height='88px'; div.style.borderRadius='12px'; div.textContent = (!canSeePhoto) ? '🔒' : (String(name||'').slice(0,1)||'?').toUpperCase(); wrapper.appendChild(div); }
       const btn = document.createElement('button'); btn.className = 'pfp-edit-btn'; btn.textContent = '✎';
-      if (!currentUser || currentUser.uid !== userObj.id) btn.classList.add('hidden');
-      wrapper.appendChild(btn);
+      if (!currentUser || currentUser.uid !== userObj.id) btn.classList.add('hidden'); wrapper.appendChild(btn);
       btn.addEventListener('click', (ev)=>{ ev.stopPropagation(); if (activePopover) { removePopover(); return; } createEditProfilePopover(btn, userObj); });
 
-      if (canSeeDesc) {
-        const rawDesc = (userObj.data && (userObj.data.description || userObj.data.desc || userObj.data.profileDescription)) ? String(userObj.data.description || userObj.data.desc || userObj.data.profileDescription) : '';
-        pdDesc.innerHTML = rawDesc ? processUsernameLinks(escapeHtml(rawDesc)) : '<span class="small muted">Sem descrição.</span>';
-        if (currentUser && currentUser.uid === userObj.id){ pdDesc.classList.add('editable'); pdDesc.style.cursor = 'text'; pdDesc.onclick = () => openDescEditor(userObj, rawDesc); }
-        else { pdDesc.classList.remove('editable'); pdDesc.onclick = null; pdDesc.style.cursor = 'default'; }
-      } else { pdDesc.innerHTML = '<span class="small muted">🔒 Descrição visível apenas para amigos.</span>'; pdDesc.classList.remove('editable'); pdDesc.onclick = null; }
+      if (canSeeDesc) { const rawDesc = (userObj.data && (userObj.data.description || userObj.data.desc || userObj.data.profileDescription)) ? String(userObj.data.description || userObj.data.desc || userObj.data.profileDescription) : ''; pdDesc.innerHTML = rawDesc ? processUsernameLinks(escapeHtml(rawDesc)) : '<span class="small muted">No description.</span>'; if (currentUser && currentUser.uid === userObj.id){ pdDesc.classList.add('editable'); pdDesc.style.cursor = 'text'; pdDesc.onclick = () => openDescEditor(userObj, rawDesc); } else { pdDesc.classList.remove('editable'); pdDesc.onclick = null; pdDesc.style.cursor = 'default'; } } else { pdDesc.innerHTML = '<span class="small muted">🔒 Description only for friends.</span>'; pdDesc.classList.remove('editable'); pdDesc.onclick = null; }
 
       pdName.innerHTML = processUsernameLinks(escapeHtml(name)); pdEmail.innerHTML = processUsernameLinks(escapeHtml(userObj.data.email || '')); pdUid.textContent = userObj.id || '';
       setTimeout(attachUsernameLinkEvents, 0); renderProfileMatches(userObj.id);
 
-      playerSongsArea.innerHTML = '';
-      if (!canSeeSongs) { playerSongsArea.innerHTML = '<div class="locked-content"><div class="lock-icon">🔒</div><div>Histórico de partidas visível apenas para amigos.</div></div>'; }
+      playerSongsArea.innerHTML = ''; playerSongsControls.innerHTML = '';
+      if (!canSeeSongs) { playerSongsArea.innerHTML = '<div class="locked-content"><div class="lock-icon">🔒</div><div>Match history visible only to friends.</div></div>'; }
       else {
           const playerKey = sanitizeKeyFromDisplay(userObj.data.displayName || userObj.data.name || userObj.id);
           const plays = [];
@@ -830,30 +728,68 @@
               for (const diffKey of Object.keys(sideObj)){
                 const diffObj = sideObj[diffKey]; if (!diffObj) continue;
                 for (const pk of Object.keys(diffObj)){
-                  if (pk === playerKey){ const entry = diffObj[pk]; plays.push({ songDocId: s.id, songName: doc.originalName || s.id, side: sideKey, difficulty: diffKey, bestScore: Number(entry.bestScore) || 0, Points: entry.LastPoints || 0, accuracy: entry.accuracy + '%' || '', updatedAt: entry.updatedAt || null }); }
+                  if (pk === playerKey){ 
+                      const entry = diffObj[pk]; 
+                      plays.push({ 
+                          songDocId: s.id, 
+                          songName: doc.originalName || s.id, 
+                          side: sideKey, 
+                          difficulty: diffKey, 
+                          bestScore: Number(entry.bestScore) || 0, 
+                          lastPoints: Number(entry.lastPoints) || 0, 
+                          accuracy: entry.accuracy + '%' || '',
+                          misses: Number(entry.misses) || 0,
+                          updatedAt: entry.updatedAt || null 
+                      }); 
+                  }
                 }
               }
             }
           }
-          plays.sort((a,b)=> (Number(a.bestScore) - Number(b.bestScore)));
-          if (!plays.length) playerSongsArea.innerHTML = '<div class="no-data">Nenhuma música encontrada.</div>';
-          else {
-            const t = document.createElement('table'); t.innerHTML = '<thead><tr><th>Música</th><th>Side</th><th>Dificuldade</th><th>Best Score</th><th>Points</th><th>Accuracy</th><th>Updated</th></tr></thead>';
-            const tbody = document.createElement('tbody');
-            for (const p of plays){
+          
+          const sortState = { field: 'lastPoints', direction: 'desc' }; // Default Request
+          
+          const renderList = () => {
+             playerSongsArea.innerHTML = '';
+             sortData(plays, sortState.field, sortState.direction);
+             
+             if (!plays.length) { playerSongsArea.innerHTML = '<div class="no-data">No songs played.</div>'; return; }
+             
+             const t = document.createElement('table'); t.innerHTML = '<thead><tr><th>Song</th><th>Side</th><th>Difficulty</th><th>Score</th><th>Points</th><th>Accuracy</th><th>Misses</th><th>Date</th></tr></thead>';
+             const tbody = document.createElement('tbody');
+             for (const p of plays){
               const tr = document.createElement('tr');
-              tr.innerHTML = '<td>' + processUsernameLinks(escapeHtml(p.songName)) + '</td><td>' + escapeHtml(p.side) + '</td><td>' + escapeHtml(p.difficulty) + '</td><td>' + p.bestScore + '</td><td>' + p.Points + '</td><td>' + escapeHtml(p.accuracy) + '</td><td>' + formatDate(p.updatedAt) + '</td>';
+              tr.innerHTML = '<td>' + processUsernameLinks(escapeHtml(p.songName)) + '</td><td>' + escapeHtml(p.side) + '</td><td>' + escapeHtml(p.difficulty) + '</td><td>' + p.bestScore.toLocaleString() + '</td><td style="font-weight:700;color:var(--accent-2);">' + p.lastPoints.toLocaleString() + '</td><td>' + escapeHtml(p.accuracy) + '</td><td>' + p.misses + '</td><td>' + formatDate(p.updatedAt) + '</td>';
               tbody.appendChild(tr);
-            }
-            t.appendChild(tbody); playerSongsArea.appendChild(t);
-          }
+             }
+             t.appendChild(tbody); playerSongsArea.appendChild(t);
+             setTimeout(attachUsernameLinkEvents, 0);
+          };
+
+          const ctrlDiv = document.createElement('div'); ctrlDiv.className = 'sort-bar';
+          
+          const selLabel = document.createElement('span'); selLabel.className = 'sort-label'; selLabel.textContent = 'Sort by:';
+          const sel = document.createElement('select'); sel.className = 'sort-select';
+          sel.innerHTML = `<option value="lastPoints">Points</option><option value="bestScore">Score</option><option value="accuracy">Accuracy</option><option value="misses">Misses</option><option value="name">Song Name</option>`;
+          sel.value = sortState.field;
+          sel.addEventListener('change', ()=>{ sortState.field = sel.value; renderList(); });
+
+          const dirBtn = document.createElement('button'); dirBtn.className = 'btn small'; 
+          const updateDirText = () => { dirBtn.textContent = sortState.direction === 'desc' ? '⬇ Descending' : '⬆ Ascending'; };
+          updateDirText();
+          dirBtn.addEventListener('click', ()=>{ sortState.direction = (sortState.direction==='desc'?'asc':'desc'); updateDirText(); renderList(); });
+          
+          ctrlDiv.appendChild(selLabel); ctrlDiv.appendChild(sel); ctrlDiv.appendChild(dirBtn);
+          playerSongsControls.appendChild(ctrlDiv);
+
+          renderList();
       }
     }
 
     function openDescEditor(userObj, currentText) {
         const ta = document.createElement('textarea'); ta.style.width='100%'; ta.style.minHeight='100px'; ta.value = currentText;
-        const save = document.createElement('button'); save.className='btn'; save.textContent='Salvar';
-        const cancel = document.createElement('button'); cancel.className='btn secondary'; cancel.textContent='Cancelar';
+        const save = document.createElement('button'); save.className='btn'; save.textContent='Save';
+        const cancel = document.createElement('button'); cancel.className='btn secondary'; cancel.textContent='Cancel';
         const wrapperElm = pdDesc.parentElement; pdDesc.style.display = 'none';
         const editor = document.createElement('div'); const actions = document.createElement('div'); actions.style.marginTop='8px'; actions.style.display='flex'; actions.style.gap='8px';
         actions.appendChild(cancel); actions.appendChild(save); editor.appendChild(ta); editor.appendChild(actions); wrapperElm.appendChild(editor);
@@ -866,104 +802,49 @@
 
     function createEditProfilePopover(btn, userObj) {
         const cont = document.createElement('div');
-        const title = document.createElement('div'); title.style.fontWeight='700'; title.style.marginBottom='8px'; title.textContent='Editar perfil'; cont.appendChild(title);
+        const title = document.createElement('div'); title.style.fontWeight='700'; title.style.marginBottom='8px'; title.textContent='Edit Profile'; cont.appendChild(title);
         const previewImg = document.createElement('img'); previewImg.className='preview'; previewImg.src = userObj.data.avatarURL || ''; cont.appendChild(previewImg);
-        const nameInput = document.createElement('input'); nameInput.type='text'; nameInput.placeholder='Nome'; nameInput.value = userObj.data.displayName || ''; cont.appendChild(nameInput);
-        const urlInput = document.createElement('input'); urlInput.type='text'; nameInput.style.marginBottom='8px'; urlInput.placeholder='URL Imagem (opcional)'; cont.appendChild(urlInput);
+        const nameInput = document.createElement('input'); nameInput.type='text'; nameInput.placeholder='Name'; nameInput.value = userObj.data.displayName || ''; cont.appendChild(nameInput);
+        const urlInput = document.createElement('input'); urlInput.type='text'; nameInput.style.marginBottom='8px'; urlInput.placeholder='Image URL (optional)'; cont.appendChild(urlInput);
         const fileInput = document.createElement('input'); fileInput.type='file'; fileInput.accept='image/*'; cont.appendChild(fileInput);
         const actions = document.createElement('div'); actions.className='actions';
         const cancelBtn = document.createElement('button'); cancelBtn.className='btn secondary'; cancelBtn.textContent='Cancel';
         const saveBtn = document.createElement('button'); saveBtn.className='btn'; saveBtn.textContent='Save';
         actions.appendChild(cancelBtn); actions.appendChild(saveBtn); cont.appendChild(actions);
 
-        // ATUALIZAÇÃO: Usar resizeImageAndConvertToBase64 para preview
-        fileInput.addEventListener('change', async ()=> { 
-            const f = fileInput.files && fileInput.files[0]; 
-            if(f) {
-                try { 
-                    previewImg.src = await resizeImageAndConvertToBase64(f); 
-                } catch(e){
-                    console.error("Erro no preview:", e);
-                    previewImg.src = ''; 
-                }
-            }
-        });
+        fileInput.addEventListener('change', async ()=> { const f = fileInput.files && fileInput.files[0]; if(f) { try { previewImg.src = await resizeImageAndConvertToBase64(f); } catch(e){ console.error("Error preview:", e); previewImg.src = ''; } } });
         urlInput.addEventListener('input', ()=> { if(urlInput.value) previewImg.src = urlInput.value; });
         cancelBtn.addEventListener('click', ()=> removePopover());
         
         saveBtn.addEventListener('click', async ()=>{
-            if(!currentUser) return;
-            saveBtn.disabled = true;
-            try {
-                let name = nameInput.value.trim().replace(/[^\w\-]/g,'');
-                let avatar = currentUserDoc.data.avatarURL || '';
-                
-                if(fileInput.files[0]) {
-                    // ATUALIZAÇÃO: Usar resizeImageAndConvertToBase64 para salvar
-                    avatar = await resizeImageAndConvertToBase64(fileInput.files[0]); 
-                } else if(urlInput.value) {
-                    avatar = urlInput.value;
-                }
-                
-                await updateDoc(doc(db, 'users', currentUser.uid), { displayName: name, avatarURL: avatar });
-                await refreshAll(); removePopover();
-            } catch(e){ alert('Erro ao salvar imagem: ' + e.message); saveBtn.disabled=false; }
+            if(!currentUser) return; saveBtn.disabled = true;
+            try { let name = nameInput.value.trim().replace(/[^\w\-]/g,''); let avatar = currentUserDoc.data.avatarURL || ''; if(fileInput.files[0]) { avatar = await resizeImageAndConvertToBase64(fileInput.files[0]); } else if(urlInput.value) { avatar = urlInput.value; } await updateDoc(doc(db, 'users', currentUser.uid), { displayName: name, avatarURL: avatar }); await refreshAll(); removePopover(); } catch(e){ alert('Error saving: ' + e.message); saveBtn.disabled=false; }
         });
-        
         createPopover(btn, cont);
     }
     
     function createPopover(anchorEl, contentEl){ removePopover(); const pop = document.createElement('div'); pop.className = 'popover'; pop.appendChild(contentEl); document.body.appendChild(pop); activePopover = { el: pop, anchor: anchorEl }; const r = anchorEl.getBoundingClientRect(); pop.style.left = (r.right+8)+'px'; pop.style.top = (r.top+window.scrollY-8)+'px'; activePopoverClickHandler = function(ev){ if (!pop.contains(ev.target) && ev.target.closest('.pfp-edit-btn') === null) removePopover(); }; setTimeout(()=> document.addEventListener('click', activePopoverClickHandler), 0); return pop; }
     
-    // NOVA FUNÇÃO: Redimensiona a imagem para no máximo 240x240 e converte para Base64 com otimização.
     function resizeImageAndConvertToBase64(file, maxWidth = 240, maxHeight = 240, quality = 0.9) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
-                    let width = img.width;
-                    let height = img.height;
-
-                    // Apenas redimensiona se a imagem for maior que o máximo
-                    if (width > maxWidth || height > maxHeight) {
-                        const ratio = Math.min(maxWidth / width, maxHeight / height);
-                        width *= ratio;
-                        height *= ratio;
-                    }
-                    // Se for menor, mantém as dimensões originais (não expande)
-
-                    const canvas = document.createElement('canvas');
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Desenha a imagem no canvas com as novas dimensões
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    // Converte para Base64 (DataURL) com otimização (image/jpeg com quality 0.9)
-                    try {
-                        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-                        resolve(dataUrl);
-                    } catch (e) {
-                        console.warn("JPEG conversion failed, falling back to original type/default quality.", e);
-                        resolve(canvas.toDataURL(file.type || 'image/png'));
-                    }
-                };
-                img.onerror = () => reject(new Error("Falha ao carregar a imagem para redimensionamento."));
-                img.src = event.target.result;
-            };
-            reader.onerror = () => reject(new Error("Falha ao ler o arquivo."));
-            reader.readAsDataURL(file);
+                    let width = img.width; let height = img.height;
+                    if (width > maxWidth || height > maxHeight) { const ratio = Math.min(maxWidth / width, maxHeight / height); width *= ratio; height *= ratio; }
+                    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+                    try { const dataUrl = canvas.toDataURL('image/jpeg', quality); resolve(dataUrl); } catch (e) { resolve(canvas.toDataURL(file.type || 'image/png')); }
+                }; img.onerror = () => reject(new Error("Failed to load image.")); img.src = event.target.result;
+            }; reader.onerror = () => reject(new Error("Failed to read file.")); reader.readAsDataURL(file);
         });
     }
 
-    // --- Song Details with Anonymous Logic ---
     function showSongDetails(songObj, updateUrl = true){
       detailsEmpty.classList.add('hidden'); playerDetails.classList.add('hidden'); songDetails.classList.remove('hidden');
-      currentState.selectedSong = songObj.id; currentState.selectedPlayer = null;
-      if (updateUrl) updateURL();
-      sdName.innerHTML = processUsernameLinks(escapeHtml(songObj.data.originalName || songObj.id)); sdId.textContent = songObj.id;
+      currentState.selectedSong = songObj.id; currentState.selectedPlayer = null; if (updateUrl) updateURL();
+      sdName.innerHTML = processUsernameLinks(escapeHtml(songObj.data.originalName || songObj.id)); 
+      // Duplicate ID display removed as requested
       setTimeout(attachUsernameLinkEvents, 0);
 
       const entries = [];
@@ -973,39 +854,23 @@
           const diffObj = sideObj[diffKey] || {};
           for (const playerKey of Object.keys(diffObj)) {
             const e = diffObj[playerKey] || {};
-            entries.push({ playerKey, playerName: playerKey, side: sideKey, difficulty: diffKey, bestScore: Number(e.bestScore) || 0, Points: Number(e.Points) || 0, accuracy: e.accuracy + '%' || '', updatedAt: e.updatedAt || null });
+            entries.push({ playerKey, playerName: playerKey, side: sideKey, difficulty: diffKey, bestScore: Number(e.bestScore) || 0, lastPoints: Number(e.lastPoints) || 0, accuracy: e.accuracy + '%' || '', misses: Number(e.misses) || 0, updatedAt: e.updatedAt || null });
           }
         }
       }
       
-      const userMap = {};
-      for (const u of CACHE.users) { const k = sanitizeKeyFromDisplay(u.data.displayName || u.data.name || u.id); userMap[k] = u; }
-      
+      const userMap = {}; for (const u of CACHE.users) { const k = sanitizeKeyFromDisplay(u.data.displayName || u.data.name || u.id); userMap[k] = u; }
       const myUid = currentUser ? currentUser.uid : null;
 
       const processedEntries = entries.map(en => {
         let displayObj = { ...en, isClickable: true, isAnonymous: false };
         const user = userMap[en.playerKey];
-        
         if (user) {
             displayObj.realName = user.data.displayName || user.data.name || user.id;
             const settings = user.data.accsettings || {};
             const isFriend = (user.id === myUid || myFriendsList.includes(user.id));
-            
-            // Logic 1: Hide Name in Leaderboards
-            if (settings.hideName) {
-                displayObj.playerName = "Anônimo 🔒";
-                displayObj.isClickable = false;
-                displayObj.isAnonymous = true;
-            } 
-            else {
-                displayObj.playerName = displayObj.realName;
-                // Logic 2: Private Profile check
-                if (settings.privateProfile && !isFriend) {
-                    displayObj.isClickable = false; // Name visible, but no click
-                    displayObj.playerName += " 🔒"; // Visual indicator
-                }
-            }
+            if (settings.hideName) { displayObj.playerName = "Anonymous 🔒"; displayObj.isClickable = false; displayObj.isAnonymous = true; } 
+            else { displayObj.playerName = displayObj.realName; if (settings.privateProfile && !isFriend) { displayObj.isClickable = false; displayObj.playerName += " 🔒"; } }
         }
         return displayObj;
       });
@@ -1013,8 +878,7 @@
       processedEntries.sort((a, b) => { if (a.side !== b.side) return a.side.localeCompare(b.side); if (a.difficulty !== b.difficulty) return a.difficulty.localeCompare(b.difficulty); return (Number(b.bestScore) - Number(a.bestScore)); });
       
       songScoresArea.innerHTML = '';
-      const difficultyGroups = {};
-      for (const e of processedEntries) { const groupKey = e.side + ' - ' + e.difficulty; if (!difficultyGroups[groupKey]) difficultyGroups[groupKey] = []; difficultyGroups[groupKey].push(e); }
+      const difficultyGroups = {}; for (const e of processedEntries) { const groupKey = e.side + ' - ' + e.difficulty; if (!difficultyGroups[groupKey]) difficultyGroups[groupKey] = []; difficultyGroups[groupKey].push(e); }
       const cardContainer = document.createElement('div'); cardContainer.style.display = 'grid'; cardContainer.style.gridTemplateColumns = 'repeat(auto-fill, minmax(220px, 1fr))'; cardContainer.style.gap = '12px';
       
       const sortedKeys = Object.keys(difficultyGroups).sort();
@@ -1024,8 +888,9 @@
         grp.sort((a, b) => Number(b.bestScore) - Number(a.bestScore));
         const top = grp[0];
         
-        const card = document.createElement('div'); card.className = 'card'; card.style.padding = '12px'; card.style.cursor = 'pointer'; card.style.border = '1px solid rgba(255, 255, 255, 0.05)';
-        card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-weight:700;font-size:15px;color:var(--accent);">${escapeHtml(sideKey)}</div><div class="small muted" style="font-size:11px;">${grp.length} scores</div></div><div style="font-weight:600;color:var(--text);margin-bottom:8px;font-size:13px;">${escapeHtml(diffKey)}</div><div class="muted small" style="margin-bottom:2px;">Melhor Score:</div><div style="font-weight:800;color:var(--accent-2);font-size:22px;margin-bottom:10px;text-align:center;">${top.bestScore.toLocaleString()}</div><div class="muted small" style="margin-top:8px;border-top:1px dashed rgba(255,255,255,0.03);padding-top:6px;">Top: ${escapeHtml(top.playerName)}</div>`;
+        const card = document.createElement('div'); card.className = 'card'; card.setAttribute('data-side', sideKey); card.setAttribute('data-difficulty', diffKey);
+        card.style.padding = '12px'; card.style.cursor = 'pointer'; card.style.border = '1px solid rgba(255, 255, 255, 0.05)'; card.style.height = 'auto';
+        card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-weight:700;font-size:15px;color:var(--accent);">${escapeHtml(sideKey)}</div><div class="small muted" style="font-size:11px;">${grp.length} scores</div></div><div style="font-weight:600;color:var(--text);margin-bottom:8px;font-size:13px;">${escapeHtml(diffKey)}</div><div class="muted small" style="margin-bottom:2px;">Best Score:</div><div style="font-weight:800;color:var(--accent-2);font-size:22px;margin-bottom:10px;text-align:center;">${top.bestScore.toLocaleString()}</div><div class="muted small" style="margin-top:8px;border-top:1px dashed rgba(255,255,255,0.03);padding-top:6px;">Top: ${escapeHtml(top.playerName)}</div>`;
         card.addEventListener('click', (e) => { e.stopPropagation(); showDetailedScoresTable(sideKey, diffKey, grp, cardContainer); });
         cardContainer.appendChild(card);
       }
@@ -1034,47 +899,63 @@
 
       function showDetailedScoresTable(sideKey, diffKey, rows, cardsContainer) {
         cardsContainer.classList.add('hidden');
-        const back = document.createElement('button'); back.className = 'btn secondary'; back.innerHTML = '← Voltar'; back.style.marginBottom = '12px';
+        const back = document.createElement('button'); back.className = 'btn secondary'; back.innerHTML = '← Back'; back.style.marginBottom = '12px';
         const title = document.createElement('div'); title.className = 'section-title'; title.innerHTML = `<div>${escapeHtml(sideKey)} / ${escapeHtml(diffKey)}</div>`;
-        const tbl = document.createElement('table'); tbl.innerHTML = `<thead><tr><th>Player</th><th>Score</th><th>Acc</th><th>Date</th></tr></thead>`;
-        const tbody = document.createElement('tbody');
-        rows.sort((a, b) => Number(b.bestScore) - Number(a.bestScore));
-        
-        for (const r of rows) {
-          const tr = document.createElement('tr');
-          let nameCellHTML = escapeHtml(r.playerName);
-          if (!r.isAnonymous) nameCellHTML = processUsernameLinks(nameCellHTML);
+        const tblContainer = document.createElement('div');
 
-          tr.innerHTML = `<td>${nameCellHTML}</td><td style="font-weight:700;color:var(--accent-2);">${r.bestScore.toLocaleString()}</td><td>${escapeHtml(r.accuracy)}</td><td class="small muted">${formatDate(r.updatedAt)}</td>`;
-          const tdName = tr.querySelector('td');
-          
-          if (r.isClickable && !r.isAnonymous) {
-             tdName.style.cursor = 'pointer'; tdName.style.color = 'var(--accent)';
-             tdName.addEventListener('click', (ev) => {
-                 ev.stopPropagation();
-                 const user = searchUserByName(r.realName || r.playerKey);
-                 if (user) { setTab('players'); showPlayerDetails(user); window.scrollTo({top:0,behavior:'smooth'}); }
-             });
-          } else {
-             tdName.style.cursor = 'default';
-             tdName.style.color = r.isAnonymous ? 'var(--muted)' : 'var(--text)';
-             if(r.isAnonymous) tdName.style.fontStyle = 'italic';
-          }
-          tbody.appendChild(tr);
-        }
-        tbl.appendChild(tbody);
+        let sortState = { field: 'lastPoints', direction: 'desc' }; 
+
+        const renderTable = () => {
+            tblContainer.innerHTML = '';
+            sortData(rows, sortState.field, sortState.direction);
+
+            const tbl = document.createElement('table'); 
+            tbl.innerHTML = `<thead><tr><th>Player</th><th>Score</th><th>Points</th><th>Acc</th><th>Misses</th><th>Date</th></tr></thead>`;
+            const tbody = document.createElement('tbody');
+            
+            for (const r of rows) {
+              const tr = document.createElement('tr');
+              let nameCellHTML = escapeHtml(r.playerName);
+              if (!r.isAnonymous) nameCellHTML = processUsernameLinks(nameCellHTML);
+
+              tr.innerHTML = `<td>${nameCellHTML}</td><td>${r.bestScore.toLocaleString()}</td><td style="font-weight:700;color:var(--accent-2);">${r.lastPoints.toLocaleString()}</td><td>${escapeHtml(r.accuracy)}</td><td>${r.misses}</td><td class="small muted">${formatDate(r.updatedAt)}</td>`;
+              const tdName = tr.querySelector('td');
+              if (r.isClickable && !r.isAnonymous) {
+                 tdName.style.cursor = 'pointer'; tdName.style.color = 'var(--accent)';
+                 tdName.addEventListener('click', (ev) => { ev.stopPropagation(); const user = searchUserByName(r.realName || r.playerKey); if (user) { setTab('players'); showPlayerDetails(user); window.scrollTo({top:0,behavior:'smooth'}); } });
+              } else { tdName.style.cursor = 'default'; tdName.style.color = r.isAnonymous ? 'var(--muted)' : 'var(--text)'; if(r.isAnonymous) tdName.style.fontStyle = 'italic'; }
+              tbody.appendChild(tr);
+            }
+            tbl.appendChild(tbody);
+            tblContainer.appendChild(tbl);
+            setTimeout(attachUsernameLinkEvents, 0);
+        };
+
+        const ctrlDiv = document.createElement('div'); ctrlDiv.className = 'sort-bar';
+        const selLabel = document.createElement('span'); selLabel.className = 'sort-label'; selLabel.textContent = 'Sort by:';
+        const sel = document.createElement('select'); sel.className = 'sort-select';
+        sel.innerHTML = `<option value="lastPoints">Points</option><option value="bestScore">Score</option><option value="accuracy">Accuracy</option><option value="misses">Misses</option><option value="name">Player Name</option>`;
+        sel.value = sortState.field;
+        sel.addEventListener('change', ()=>{ sortState.field = sel.value; renderTable(); });
+
+        const dirBtn = document.createElement('button'); dirBtn.className = 'btn small'; 
+        const updateDirText = () => { dirBtn.textContent = sortState.direction === 'desc' ? '⬇ Descending' : '⬆ Ascending'; };
+        updateDirText();
+        dirBtn.addEventListener('click', ()=>{ sortState.direction = (sortState.direction==='desc'?'asc':'desc'); updateDirText(); renderTable(); });
+        ctrlDiv.appendChild(selLabel); ctrlDiv.appendChild(sel); ctrlDiv.appendChild(dirBtn);
+
         const detDiv = document.createElement('div');
         back.addEventListener('click', () => { detDiv.remove(); cardsContainer.classList.remove('hidden'); });
-        detDiv.appendChild(back); detDiv.appendChild(title); detDiv.appendChild(tbl);
+        detDiv.appendChild(back); detDiv.appendChild(title); detDiv.appendChild(ctrlDiv); detDiv.appendChild(tblContainer);
+        
         songScoresArea.appendChild(detDiv);
-        setTimeout(attachUsernameLinkEvents, 0);
+        renderTable();
       }
     }
 
-    // Init
     btnEmailToggle.addEventListener('click', ()=> { emailAuthBox.classList.toggle('hidden'); });
-    btnSignup.addEventListener('click', async ()=>{ const email = emailInput.value.trim(); const pw = passInput.value; if (!email || !pw) { emailAuthMsg.textContent = 'Preencha email e senha.'; return; } try { await createUserWithEmailAndPassword(auth, email, pw); } catch(err){ emailAuthMsg.textContent = 'Erro ao registrar: ' + (err.message || err); } });
-    btnSignin.addEventListener('click', async ()=>{ const email = emailInput.value.trim(); const pw = passInput.value; if (!email || !pw) { emailAuthMsg.textContent = 'Preencha email e senha.'; return; } try { await signInWithEmailAndPassword(auth, email, pw); } catch(err){ emailAuthMsg.textContent = 'Erro ao entrar: ' + (err.message || err); } });
+    btnSignup.addEventListener('click', async ()=>{ const email = emailInput.value.trim(); const pw = passInput.value; if (!email || !pw) { emailAuthMsg.textContent = 'Enter email and password.'; return; } try { await createUserWithEmailAndPassword(auth, email, pw); } catch(err){ emailAuthMsg.textContent = 'Error registering: ' + (err.message || err); } });
+    btnSignin.addEventListener('click', async ()=>{ const email = emailInput.value.trim(); const pw = passInput.value; if (!email || !pw) { emailAuthMsg.textContent = 'Enter email and password.'; return; } try { await signInWithEmailAndPassword(auth, email, pw); } catch(err){ emailAuthMsg.textContent = 'Error logging in: ' + (err.message || err); } });
     btnLogout.addEventListener('click', async ()=> { try { await signOut(auth); } catch(err){ console.error(err); } });
 
     onAuthStateChanged(auth, async (u)=>{
@@ -1084,14 +965,9 @@
         miniName.textContent = u.displayName || u.email || u.uid;
         try { const avatarFromAuth = u.photoURL || ''; if (avatarFromAuth) { miniAvatar.src = avatarFromAuth; miniAvatar.style.display = 'block'; } else miniAvatar.style.display = 'none'; } catch(e){ miniAvatar.style.display = 'none'; }
         emailAuthBox.classList.add('hidden');
-        const userDocRef = doc(db, 'users', u.uid);
-        const snap = await getDoc(userDocRef);
-        if (!snap.exists()){ try { await setDoc(userDocRef, { displayName: u.displayName || '', email: u.email || '', avatarURL: u.photoURL || '', createdAt: new Date().toISOString() }, { merge: true }); } catch(err){ console.error(err); } }
-        await refreshAll();
-        if (currentUserDoc && currentUserDoc.data && currentUserDoc.data.avatarURL){ try { miniAvatar.src = currentUserDoc.data.avatarURL; miniAvatar.style.display = 'block'; } catch(e){} }
-      } else {
-        signedOutArea.classList.remove('hidden'); signedInInfo.classList.add('hidden'); miniAvatar.style.display='none'; miniName.textContent=''; currentUserDoc = null; myIncomingRequests=[]; myFriendsList=[]; mySentRequests=[]; await refreshAll();
-      }
+        const userDocRef = doc(db, 'users', u.uid); const snap = await getDoc(userDocRef); if (!snap.exists()){ try { await setDoc(userDocRef, { displayName: u.displayName || '', email: u.email || '', avatarURL: u.photoURL || '', createdAt: new Date().toISOString() }, { merge: true }); } catch(err){ console.error(err); } }
+        await refreshAll(); if (currentUserDoc && currentUserDoc.data && currentUserDoc.data.avatarURL){ try { miniAvatar.src = currentUserDoc.data.avatarURL; miniAvatar.style.display = 'block'; } catch(e){} }
+      } else { signedOutArea.classList.remove('hidden'); signedInInfo.classList.add('hidden'); miniAvatar.style.display='none'; miniName.textContent=''; currentUserDoc = null; myIncomingRequests=[]; myFriendsList=[]; mySentRequests=[]; await refreshAll(); }
     });
 
     playerSearch.addEventListener('input', ()=> renderPlayersList());

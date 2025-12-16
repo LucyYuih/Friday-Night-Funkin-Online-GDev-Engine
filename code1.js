@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x34cd2c8 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1315c78 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,7 +848,7 @@ gdjs.InicioCode.userFunc0x34cd2c8 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.userFunc0x34cd508 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x32e4ca0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   // --- GESTÃO DE UI E CENA (AUTO-CLEANUP) ---
@@ -1499,7 +1499,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x34cd2c8(runtimeScene);
+gdjs.InicioCode.userFunc0x1315c78(runtimeScene);
 
 }
 
@@ -1525,7 +1525,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.InicioCode.userFunc0x34cd508(runtimeScene);
+gdjs.InicioCode.userFunc0x32e4ca0(runtimeScene);
 
 }
 
@@ -1578,7 +1578,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x34cde58 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x941418 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A (ORIGINAL) — OTIMIZADO + AUTO-CLEANUP (Scene Watcher)
 (function () {
@@ -2371,12 +2371,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x34cde58(runtimeScene);
+gdjs.InicioCode.userFunc0x941418(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x34ce128 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1dd6b18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (async function(runtimeScene) {
   // --- 1. CONFIGURAÇÃO DE CLEANUP (Scene Watcher) ---
@@ -2739,12 +2739,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x34ce128(runtimeScene);
+gdjs.InicioCode.userFunc0x1dd6b18(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x34ce448 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xb65300 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
@@ -2753,12 +2753,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x34ce448(runtimeScene);
+gdjs.InicioCode.userFunc0xb65300(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x34ce788 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xbd5048 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 };
@@ -2767,7 +2767,7 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x34ce788(runtimeScene);
+gdjs.InicioCode.userFunc0xbd5048(runtimeScene);
 
 }
 
