@@ -147,7 +147,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0xaa37d8 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0x34815a8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER AUTOSSUFICIENTE (Skins + Música + UI Própria)
 (async function(runtimeScene){
@@ -466,7 +466,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xaa37d8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x34815a8(runtimeScene);
 
 }
 
@@ -615,7 +615,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xaa41f0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x3670138 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin player
 (function(){
@@ -1148,12 +1148,12 @@ gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xaa41f0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x3670138(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0x13e53a0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x3670420 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (async function(runtimeScene) {
   // --- 1. CONFIGURAÇÃO DE CLEANUP ---
@@ -1398,12 +1398,12 @@ gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x13e53a0(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x3670420(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xaa3430 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x3670908 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A (MULTIPLAYER) — OTIMIZADO + AUTO-CLEANUP (Scene Watcher)
 (function () {
@@ -1551,7 +1551,7 @@ gdjs.PlayonlineCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xaa3430(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x3670908(runtimeScene);
 
 }
 
@@ -1640,7 +1640,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoinObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoinObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35911364);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35148972);
 }
 }
 if (isConditionTrue_0) {
@@ -1668,7 +1668,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDJoin2Objects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDJoin2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35913828);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35151436);
 }
 }
 if (isConditionTrue_0) {
@@ -1691,7 +1691,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isPlayerConnected(2);
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35906612);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35144268);
 }
 }
 }
@@ -1803,7 +1803,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDHardObjects1.length;i<l;++i) {
 gdjs.PlayonlineCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35923012);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35160260);
 }
 }
 if (isConditionTrue_0) {
@@ -1849,7 +1849,7 @@ for (var i = 0, k = 0, l = gdjs.PlayonlineCode.GDselesongtextObjects1.length;i<l
 gdjs.PlayonlineCode.GDselesongtextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35925148);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35162396);
 }
 }
 if (isConditionTrue_0) {
@@ -1876,7 +1876,7 @@ isConditionTrue_0 = false;
 isConditionTrue_0 = gdjs.multiplayer.isCurrentPlayerHost();
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35926908);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(35164156);
 }
 }
 if (isConditionTrue_0) {
