@@ -1819,7 +1819,7 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
 }
 
 
-};gdjs.PlayCode.userFunc0x1ac6588 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1985d10 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   // Atualiza a referência da cena imediatamente
@@ -2856,7 +2856,7 @@ gdjs.copyArray(runtimeScene.getObjects("OppSideLifeBar"), gdjs.PlayCode.GDOppSid
 {
 
 
-gdjs.PlayCode.userFunc0x1ac6588(runtimeScene);
+gdjs.PlayCode.userFunc0x1985d10(runtimeScene);
 
 }
 
@@ -18916,7 +18916,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x197b040 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1a13530 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19099,7 +19099,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x197c680 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1b002f8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19110,7 +19110,7 @@ gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x197b040(runtimeScene);
+gdjs.PlayCode.userFunc0x1a13530(runtimeScene);
 
 }
 
@@ -19186,7 +19186,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x197c680(runtimeScene);
+gdjs.PlayCode.userFunc0x1b002f8(runtimeScene);
 
 }
 
@@ -19286,7 +19286,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x1298d98 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1900c18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19469,7 +19469,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x13345d0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1afaf78 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19480,7 +19480,7 @@ gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x1298d98(runtimeScene);
+gdjs.PlayCode.userFunc0x1900c18(runtimeScene);
 
 }
 
@@ -19556,7 +19556,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x13345d0(runtimeScene);
+gdjs.PlayCode.userFunc0x1afaf78(runtimeScene);
 
 }
 
@@ -23329,7 +23329,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x2c55988 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1345160 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -23348,7 +23348,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x2c55a28 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x18fea80 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT C — MONITOR (Correção "Instant Find" na primeira carga)
 (function(runtimeScene){
@@ -23502,7 +23502,7 @@ gdjs.PlayCode.eventsList270 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x2c55a28(runtimeScene);
+gdjs.PlayCode.userFunc0x18fea80(runtimeScene);
 
 }
 
@@ -23566,7 +23566,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x2c55988(runtimeScene);
+gdjs.PlayCode.userFunc0x1345160(runtimeScene);
 
 }
 
@@ -23701,456 +23701,556 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x2abb630 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1344bb8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// skin_player.js
 (function(){
-  // --- CONFIGURAÇÃO E CACHE GLOBAL ---
+  // --- CONFIGURAÇÃO GLOBAL E CACHE ---
+  if (!window.GD_SKIN_CACHE) {
+    window.GD_SKIN_CACHE = {
+        zips: {},     
+        textures: [],
+        packages: {} // Cache de skins prontas
+    };
+  }
+
   const JSZIP_CDN = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
-  const PLAYER_GLOBAL = "__gd_skin_player";
-  const CACHE_GLOBAL = "__gd_skin_cache"; 
+  const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
+  const PLAYER_GLOBAL = "__gd_skin_player"; 
 
-  if (!window[CACHE_GLOBAL]) window[CACHE_GLOBAL] = {};
+  function log(...s){ console.log("[gd-skin-player]", ...s); }
+  function warn(...s){ console.warn("[gd-skin-player]", ...s); }
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-  function log(...s){ console.log("[gd-skin-final]", ...s); }
-  function warn(...s){ console.warn("[gd-skin-final]", ...s); }
-
-  // --- LIMPEZA DE INSTÂNCIA ANTERIOR ---
-  if (window[PLAYER_GLOBAL] && typeof window[PLAYER_GLOBAL].cleanup === "function") {
-    window[PLAYER_GLOBAL].cleanup();
-  }
-
-  // --- UTILITÁRIOS ---
-  async function ensureJSZip(){
-    if (window.JSZip) return window.JSZip;
-    if (window.loadingJSZip) await window.loadingJSZip;
-    if (window.JSZip) return window.JSZip;
-
-    window.loadingJSZip = new Promise((res, rej) => {
-      const s = document.createElement("script");
-      s.src = JSZIP_CDN;
-      s.onload = () => { delete window.loadingJSZip; res(window.JSZip); };
-      s.onerror = () => { delete window.loadingJSZip; rej(new Error("Failed to load JSZip")); };
-      document.head.appendChild(s);
-    });
-    return window.loadingJSZip;
-  }
-
-  function safeParseJson(s){ try { return JSON.parse(s); } catch(e){ return null; } }
-  
-  function getObjectSize(obj){
-    try {
-      if (!obj) return {w:0,h:0};
-      if (typeof obj.getWidth === "function" && typeof obj.getHeight === "function") return { w: obj.getWidth(), h: obj.getHeight() };
-      const ro = obj.getRendererObject && obj.getRendererObject();
-      if (ro) {
-        if (typeof ro.width === "number" && typeof ro.height === "number") return { w: ro.width, h: ro.height };
-        if (ro.getBounds && typeof ro.getBounds === "function") { const b = ro.getBounds(); return { w: b.width||0, h: b.height||0 }; }
-      }
-      return {w:0,h:0};
-    } catch(e){ return {w:0,h:0}; }
-  }
-  
-  function getTexturePixelSize(tex){
-    try {
-      if (!tex) return {w:0,h:0};
-      if (tex.orig) return { w: tex.orig.width, h: tex.orig.height }; 
-      if (tex.frame) {
-        if (tex.frame.width && tex.frame.height) return { w: tex.frame.width, h: tex.frame.height };
-      }
-      if (tex.baseTexture) {
-        if (tex.baseTexture.realWidth) return { w: tex.baseTexture.realWidth, h: tex.baseTexture.realHeight };
-        if (tex.baseTexture.width) return { w: tex.baseTexture.width, h: tex.baseTexture.height };
-      }
-      if (typeof tex.width === "number") return { w: tex.width, h: tex.height };
-      return {w:0,h:0};
-    } catch(e){ return {w:0,h:0}; }
-  }
-
-  // --- CARREGAMENTO (COM CACHE) ---
-  function findJsonAndBasePath(zip){
-    const entries = Object.keys(zip.files);
-    const candidates = [];
-    for (const name of entries) {
-      if (name.toLowerCase().endsWith(".json")) candidates.push({ name, ts: zip.files[name].date ? zip.files[name].date.getTime() : 0 });
-    }
-    if (candidates.length === 0) throw new Error("Metadata JSON not found");
-    
-    const metaMatches = candidates.filter(c => c.name.toLowerCase().includes("metadata"));
-    let chosen = metaMatches.length ? metaMatches.sort((a,b)=>b.ts-a.ts)[0] : candidates.sort((a,b)=>b.ts-a.ts)[0];
-
-    const parts = chosen.name.split("/");
-    const baseFolderPrefix = parts.slice(0, parts.length - 1).join("/");
-    return { jsonEntryName: chosen.name, baseFolderPrefix };
-  }
-
-  function groupImageEntries(entries, baseFolderPrefix, metadata){
-    const groups = {};
-    const animNames = (metadata && Array.isArray(metadata.animations)) ? metadata.animations.map(a=>a.anim) : [];
-    if (animNames.length === 0) groups["idle"] = [];
-    for (const anim of animNames) groups[anim] = [];
-    
-    for (const e of entries){
-      let rel = e;
-      if (baseFolderPrefix && e.startsWith(baseFolderPrefix + "/")) rel = e.slice(baseFolderPrefix.length + 1);
+  // --- SINGLETON DEFINITION ---
+  if (!window.GD_SKIN_PLAYER_DEFINED) {
       
-      let assigned = false;
-      for (const anim of animNames){
-        const check1 = rel.startsWith(anim + "/");
-        const check2 = metadata && metadata.image && rel.startsWith(metadata.image + "/" + anim + "/");
-        const check3 = rel.split("/").pop().toLowerCase().startsWith(anim.toLowerCase() + "_");
-        if ((check1 || check2 || check3) && /\.(png|jpg|jpeg|gif)$/i.test(rel)){
-          groups[anim].push(e);
-          assigned = true;
-        }
-      }
-      if (!assigned && animNames.length === 0 && /\.(png|jpg|jpeg|gif)$/i.test(rel)) groups["idle"].push(e);
-    }
-    for (const k of Object.keys(groups)) groups[k].sort((a,b)=>a.localeCompare(b, undefined, { numeric: true }));
-    return groups;
-  }
-
-  async function loadTexturesFromZipEntries(zip, entryNames){
-    const loadPromises = entryNames.map(async (n) => {
-      try {
-        const file = zip.file(n);
-        if (!file) return null;
-        const blob = await file.async("blob");
-        const url = URL.createObjectURL(blob);
-        const tex = PIXI.Texture.from(url);
-        await new Promise((resolve, reject) => {
-          if (tex.baseTexture.valid) return resolve();
-          const tId = setTimeout(() => reject(new Error("Timeout " + n)), 3000);
-          tex.baseTexture.once('loaded', () => { clearTimeout(tId); resolve(); });
-          tex.baseTexture.once('error', () => { clearTimeout(tId); reject(); });
+      async function ensureJSZip(){
+        if (window.JSZip) return window.JSZip;
+        if (window.JSZipLoadingPromise) return window.JSZipLoadingPromise;
+        window.JSZipLoadingPromise = new Promise((res, rej) => {
+          const s = document.createElement("script");
+          s.src = JSZIP_CDN;
+          s.onload = () => { window.JSZipLoadingPromise = null; res(window.JSZip); };
+          s.onerror = () => { window.JSZipLoadingPromise = null; rej(new Error("Failed to load JSZip")); };
+          document.head.appendChild(s);
         });
-        return { tex, blobUrl: url };
-      } catch(e){ return null; }
-    });
-    const results = await Promise.all(loadPromises);
-    return results.filter(t => t !== null);
-  }
-
-  async function processZipToPackage(arrayBuffer, cacheKey){
-    if (cacheKey && window[CACHE_GLOBAL][cacheKey]) {
-      log("Using CACHED skin:", cacheKey);
-      return window[CACHE_GLOBAL][cacheKey];
-    }
-
-    await ensureJSZip();
-    const zip = await window.JSZip().loadAsync(arrayBuffer);
-    const { jsonEntryName, baseFolderPrefix } = findJsonAndBasePath(zip);
-    const txt = await zip.file(jsonEntryName).async("string");
-    const metadata = JSON.parse(txt);
-
-    const allEntries = Object.keys(zip.files);
-    const groups = groupImageEntries(allEntries, baseFolderPrefix, metadata);
-    const animations = {};
-    const allBlobUrls = [];
-
-    for (const am of (metadata.animations || [])){
-      animations[am.anim] = { name: am.anim, fps: am.fps||24, frames: [], loop: am.anim === "idle" };
-    }
-    if (Object.keys(animations).length === 0) animations["idle"] = { name:"idle", fps:24, frames:[], loop:true };
-
-    for (const key of Object.keys(animations)){
-      const entryNames = groups[key] || [];
-      if (!entryNames.length) continue;
-      const loaded = await loadTexturesFromZipEntries(zip, entryNames);
-      animations[key].frames = loaded.map(o => o.tex);
-      loaded.forEach(o => allBlobUrls.push(o.blobUrl));
-    }
-
-    const pkg = { animations, metadata, _allBlobUrls: allBlobUrls };
-    if (cacheKey) window[CACHE_GLOBAL][cacheKey] = pkg;
-    return pkg;
-  }
-
-  // --- APLICAÇÃO E ENGINE ---
-  function computeCenterAndFeet(obj){
-    const size = getObjectSize(obj);
-    const ro = obj.getRendererObject ? obj.getRendererObject() : null;
-    let anchorX = 0.5, anchorY = 0;
-    try {
-      if (ro && ro.anchor) { anchorX=ro.anchor.x; anchorY=ro.anchor.y; }
-      else if (ro && ro.pivot) { anchorX=ro.pivot.x/(ro.width||1); anchorY=ro.pivot.y/(ro.height||1); }
-    } catch(e){}
-    
-    const gx = obj.getX ? obj.getX() : 0;
-    const gy = obj.getY ? obj.getY() : 0;
-    let pixelToScene = 1;
-    try {
-       const tex = ro && (ro.texture || (ro.sprite && ro.sprite.texture));
-       if (tex) {
-         const tPx = getTexturePixelSize(tex);
-         if (tPx.h > 0 && size.h > 0) pixelToScene = size.h / tPx.h;
-       }
-    } catch(e){}
-
-    return {
-      centerX: gx + (0.5 - anchorX) * size.w,
-      feetY: gy + (1 - anchorY) * size.h,
-      anchorX, anchorY, size, pixelToScene,
-      originalScaleX: (ro && ro.scale) ? ro.scale.x : 1
-    };
-  }
-
-  function applyPackageToScene(runtimeScene, packageObj, opts = {}) {
-    const TARGET_NAME = opts.targetName || "BF";
-    const TARGET_ANIM_VAR = opts.targetAnimVar || "BFAnim";
-    const animations = packageObj.animations || {};
-    const targetObjects = runtimeScene.getObjects(TARGET_NAME);
-
-    if (!targetObjects || targetObjects.length === 0) return null;
-
-    const targetInfos = targetObjects.map(obj => {
-      const info = computeCenterAndFeet(obj);
-      return { obj, ...info, baseScaleX: Math.abs(info.originalScaleX) || 1 };
-    });
-
-    // Flip
-    const meta = packageObj.metadata || {};
-    let invertSideGlobal = false;
-    const oppSideBool = String(meta.OPPSide).toLowerCase() === "true" || meta.OPPSide === true;
-    if (TARGET_NAME === "BFPixel") invertSideGlobal = !oppSideBool;
-    else invertSideGlobal = oppSideBool;
-
-    // Estado da Animação
-    const state = {
-      current: "idle",
-      frameIndex: 0,
-      elapsed: 0,
-      lastTick: performance.now(),
-      lastAnimValue: "",
-      _idleBeatTimeout: null, // Timer do "Wait" do idle
-      _returnToIdleTimeout: null,
-      _idleTimerRunning: false,
-      _isPlayingSing: false
-    };
-
-    function mapAnim(raw){
-      if (!raw) return "";
-      const v = raw.toLowerCase();
-      if (invertSideGlobal) {
-        if (v.includes("left")) return "singRIGHT";
-        if (v.includes("right")) return "singLEFT";
-      } else {
-        if (v.includes("left")) return "singLEFT";
-        if (v.includes("right")) return "singRIGHT";
+        return window.JSZipLoadingPromise;
       }
-      if (v.includes("up")) return "singUP";
-      if (v.includes("down")) return "singDOWN";
-      return raw;
-    }
 
-    function updateObjectFrame(tex){
-      const tPx = getTexturePixelSize(tex);
-      for (const info of targetInfos){
-        const obj = info.obj;
-        const ro = obj.getRendererObject ? obj.getRendererObject() : null;
-        if (!ro) continue;
-        if (ro.texture !== undefined) ro.texture = tex;
-        else if (ro.sprite) ro.sprite.texture = tex;
+      function safeParseJson(s){ try { return JSON.parse(s); } catch(e){ return null; } }
+      function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
+      function buildCdnUrl(owner, repo, branch, path){ if(!owner||!repo) return null; const br = branch||"main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
 
-        const scaleFactor = info.pixelToScene; 
-        const w = tPx.w * scaleFactor;
-        const h = tPx.h * scaleFactor;
-
-        const destX = info.centerX - (0.5 - info.anchorX) * w;
-        const destY = info.feetY - (1 - info.anchorY) * h;
-        obj.setX(destX);
-        obj.setY(destY);
-
-        const finalScaleX = invertSideGlobal ? -info.baseScaleX : info.baseScaleX;
-        if (ro.scale) ro.scale.x = finalScaleX;
-        else if (typeof ro.scaleX !== 'undefined') ro.scaleX = finalScaleX;
-      }
-    }
-
-    // --- LOOP DE ANIMAÇÃO (TICK) ---
-    function tick(now){
-      const dt = Math.min(100, now - (state.lastTick||now));
-      state.lastTick = now;
-
-      let animVar = "";
-      try {
-        const sv = runtimeScene.getVariables();
-        if (sv.has(TARGET_ANIM_VAR)) animVar = sv.get(TARGET_ANIM_VAR).getAsString();
-        else {
-            const gv = runtimeScene.getGame().getVariables();
-            if (gv.has(TARGET_ANIM_VAR)) animVar = gv.get(TARGET_ANIM_VAR).getAsString();
-        }
-      } catch(e){}
-
-      const isEmpty = (!animVar || animVar === "" || animVar === "idle");
-
-      // Mudança de Animação
-      if (!isEmpty && animVar !== state.lastAnimValue) {
-        const key = mapAnim(animVar);
-        if (animations[key] && animations[key].frames.length > 0) {
-          state.current = key;
-          state.frameIndex = 0;
-          state.elapsed = 0;
-          state._isPlayingSing = true;
-          if (state._returnToIdleTimeout) { clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout = null; }
-          // Cancela qualquer "wait" do idle que estivesse pendente
-          if (state._idleBeatTimeout) { clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout = null; }
-          updateObjectFrame(animations[key].frames[0]);
-        } else {
-          if (!state._returnToIdleTimeout) scheduleIdleReturn(600);
-        }
+      function getObjectSize(obj){
+        try {
+          if (!obj) return {w:0,h:0};
+          if (typeof obj.getWidth === "function" && typeof obj.getHeight === "function") return { w: obj.getWidth(), h: obj.getHeight() };
+          const ro = obj.getRendererObject && obj.getRendererObject();
+          if (ro) {
+            if (typeof ro.width === "number" && typeof ro.height === "number") return { w: ro.width, h: ro.height };
+            if (ro.getBounds && typeof ro.getBounds === "function") { const b = ro.getBounds(); return { w: b.width || 0, h: b.height || 0 }; }
+          }
+          return { w: 0, h: 0 };
+        } catch(e){ return {w:0,h:0}; }
       }
       
-      if (isEmpty && state.current !== "idle" && !state._returnToIdleTimeout && !state._idleTimerRunning){
-         scheduleIdleReturn(600);
+      function getTexturePixelSize(tex){
+        try {
+          if (!tex) return {w:0,h:0};
+          if (tex.frame) {
+            if (tex.frame.width && tex.frame.height) return { w: tex.frame.width, h: tex.frame.height };
+            if (tex.frame.realWidth && tex.frame.realHeight) return { w: tex.frame.realWidth, h: tex.frame.realHeight };
+          }
+          if (tex.baseTexture) {
+            if (tex.baseTexture.realWidth && tex.baseTexture.realHeight) return { w: tex.baseTexture.realWidth, h: tex.baseTexture.realHeight };
+            if (tex.baseTexture.width && tex.baseTexture.height) return { w: tex.baseTexture.width, h: tex.baseTexture.height };
+          }
+          if (typeof tex.width === "number" && typeof tex.height === "number") return { w: tex.width, h: tex.height };
+          return {w:0,h:0};
+        } catch(e){ return {w:0,h:0}; }
       }
-      state.lastAnimValue = animVar;
 
-      // Processamento de Quadros
-      const animData = animations[state.current];
-      if (animData && animData.frames.length > 0) {
-        const msPerFrame = 1000 / animData.fps;
-        state.elapsed += dt;
-        
-        if (state.elapsed >= msPerFrame) {
-           const framesToAdv = Math.floor(state.elapsed / msPerFrame);
-           state.elapsed %= msPerFrame;
-           
-           let nextIdx = state.frameIndex + framesToAdv;
-           
-           // Lógica de Fim de Animação
-           if (nextIdx >= animData.frames.length) {
-             if (animData.loop) {
-               // --- RESTAURADO: COMPORTAMENTO "BOP" DO IDLE --- [cite: 166-170]
-               // Em vez de voltar pro 0 imediatamente, trava no último frame...
-               nextIdx = animData.frames.length - 1;
-
-               // ...e espera um tempo (beat) antes de reiniciar
-               if (!state._idleBeatTimeout) {
-                   state._idleBeatTimeout = setTimeout(() => {
-                       state._idleBeatTimeout = null;
-                       // Reinicia o loop
-                       state.frameIndex = 0;
-                       state.elapsed = 0;
-                       if (animData.frames[0]) updateObjectFrame(animData.frames[0]);
-                       // log("Idle bop reset");
-                   }, 750); // Delay padrão para o ritmo (ajuste se quiser mais rápido/lento)
-               }
-             } else {
-               // Animações "Sing" (não loop): trava no final
-               nextIdx = animData.frames.length - 1;
-               state._isPlayingSing = false;
-               if (!state._returnToIdleTimeout) scheduleIdleReturn(700);
-             }
-           }
-           
-           // Só atualiza visualmente se o frame mudou efetivamente
-           if (nextIdx !== state.frameIndex) {
-             state.frameIndex = nextIdx;
-             updateObjectFrame(animData.frames[state.frameIndex]);
-           }
+      function findJsonAndBasePath(zip){
+        const entries = Object.keys(zip.files);
+        const candidates = [];
+        for (const name of entries) {
+          if (name.toLowerCase().endsWith(".json")) {
+            const f = zip.files[name];
+            const ts = (f && f.date && f.date instanceof Date) ? f.date.getTime() : 0;
+            candidates.push({ name, ts });
+          }
         }
+        if (candidates.length === 0) throw new Error("Metadata JSON not found in ZIP");
+        const metaMatches = candidates.filter(c => { const n = c.name.toLowerCase(); return n.endsWith("/metadata.json") || n.endsWith("metadata.json") || n.includes("metadata"); });
+        let chosen;
+        if (metaMatches.length) { metaMatches.sort((a,b) => b.ts - a.ts); chosen = metaMatches[0]; } 
+        else { candidates.sort((a,b) => b.ts - a.ts); chosen = candidates[0]; }
+        const parts = chosen.name.split("/");
+        const baseFolderPrefix = parts.slice(0, parts.length - 1).join("/");
+        return { jsonEntryName: chosen.name, baseFolderPrefix };
       }
 
-      instance.rafId = requestAnimationFrame(tick);
-    }
+      function groupImageEntries(entries, baseFolderPrefix, metadata){
+        const groups = {};
+        const animNames = (metadata && Array.isArray(metadata.animations)) ? metadata.animations.map(a=>a.anim) : [];
+        if (animNames.length === 0) groups["idle"] = [];
+        for (const anim of animNames) groups[anim] = [];
+        for (const e of entries){
+          let rel = e;
+          if (baseFolderPrefix && e.startsWith(baseFolderPrefix + "/")) rel = e.slice(baseFolderPrefix.length + 1);
+          for (const anim of animNames){
+            const folderCheck1 = rel.startsWith(anim + "/");
+            const folderCheck2 = metadata && metadata.image && rel.startsWith(metadata.image + "/" + anim + "/");
+            const filename = rel.split("/").pop();
+            const nameCheck = filename.toLowerCase().startsWith(anim.toLowerCase() + "_");
+            if ((folderCheck1 || folderCheck2 || nameCheck) && /\.(png|jpg|jpeg|gif)$/i.test(filename)){
+              groups[anim].push(e);
+            }
+          }
+          if (animNames.length === 0 && /\.(png|jpg|jpeg|gif)$/i.test(e.split("/").pop())){ groups["idle"].push(e); }
+        }
+        for (const k of Object.keys(groups)) groups[k].sort((a,b)=>a.localeCompare(b, undefined, { numeric: true }));
+        return groups;
+      }
 
-    function scheduleIdleReturn(ms){
-      if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
-      state._idleTimerRunning = true;
-      state._returnToIdleTimeout = setTimeout(() => {
-         state._returnToIdleTimeout = null;
-         state._idleTimerRunning = false;
-         state.current = "idle";
-         state.frameIndex = 0;
-         state.elapsed = 0;
-         state._isPlayingSing = false;
-         // Cancela beat timeout pendente ao forçar volta ao idle
-         if (state._idleBeatTimeout) { clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout = null; }
-         if (animations.idle && animations.idle.frames.length) updateObjectFrame(animations.idle.frames[0]);
-      }, ms);
-    }
+      async function loadTexturesFromZipEntries(zip, entryNames){
+        const textures = [];
+        for (const n of entryNames){
+          try {
+            const file = zip.file(n);
+            if (!file) continue;
+            const blob = await file.async("blob");
+            const url = URL.createObjectURL(blob);
+            const tex = PIXI.Texture.from(url);
+            
+            if(window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.textures) window.GD_SKIN_CACHE.textures.push({ tex, url });
 
-    if (animations.idle && animations.idle.frames.length) updateObjectFrame(animations.idle.frames[0]);
+            await new Promise((resolve, reject) => {
+              if (tex.baseTexture && tex.baseTexture.valid) return resolve();
+              const checkValid = () => {
+                if (tex.baseTexture && tex.baseTexture.valid) resolve();
+                else setTimeout(checkValid, 10);
+              };
+              setTimeout(() => { if (tex.baseTexture && tex.baseTexture.valid) resolve(); else reject(new Error("Timeout texture")); }, 3000);
+              checkValid();
+            });
+            textures.push({ tex, blobUrl: url, entryName: n });
+          } catch(e){ warn("Failed load entry", n, e); }
+        }
+        return textures;
+      }
 
-    function cleanup(){
-      if (instance.rafId) cancelAnimationFrame(instance.rafId);
-      if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
-      if (state._idleBeatTimeout) clearTimeout(state._idleBeatTimeout);
-    }
+      async function loadFromArrayBuffer(runtimeScene, arrayBuffer, opts = {}) {
+        await ensureJSZip();
+        const zip = await window.JSZip().loadAsync(arrayBuffer);
+        let jsonEntryName, baseFolderPrefix;
+        try { 
+            const found = findJsonAndBasePath(zip); 
+            jsonEntryName = found.jsonEntryName; baseFolderPrefix = found.baseFolderPrefix;
+        } catch(e){ throw new Error("Metadata JSON not found: " + (e && e.message)); }
 
-    const instance = { cleanup, rafId: null };
-    instance.rafId = requestAnimationFrame(tick);
-    
-    if (!window[PLAYER_GLOBAL]) window[PLAYER_GLOBAL] = {};
-    if (!window[PLAYER_GLOBAL].activeInstances) window[PLAYER_GLOBAL].activeInstances = [];
-    window[PLAYER_GLOBAL].activeInstances.push(instance);
-    
-    window[PLAYER_GLOBAL].cleanup = function(){
-       if (window[PLAYER_GLOBAL].activeInstances){
-         window[PLAYER_GLOBAL].activeInstances.forEach(i => i.cleanup());
-       }
-       window[PLAYER_GLOBAL].activeInstances = [];
-    };
+        let metadata;
+        try { metadata = JSON.parse(await zip.file(jsonEntryName).async("string")); } 
+        catch(e){ throw new Error("Failed reading metadata: " + (e && e.message)); }
 
-    return instance;
+        if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
+        window.GD_SKIN_PLAYER.lastDownloadedMetadata = metadata;
+
+        const allEntries = Object.keys(zip.files);
+        const groups = groupImageEntries(allEntries, baseFolderPrefix, metadata);
+        const animations = {};
+        
+        for (const am of (metadata.animations || [])){
+          animations[am.anim] = { name: am.anim, fps: am.fps||24, frames: [], loaded: false, loop: am.anim === "idle" };
+        }
+        if (Object.keys(animations).length === 0) animations["idle"] = { name:"idle", fps:24, frames:[], loaded:false, loop:true };
+        
+        for (const key of Object.keys(animations)){
+          const entryNames = groups[key] || [];
+          if (!entryNames.length) { animations[key].loaded = true; animations[key].frames = []; continue; }
+          
+          const loaded = await loadTexturesFromZipEntries(zip, entryNames);
+          animations[key].frames = loaded.map(o => o.tex);
+          animations[key].loaded = true;
+          animations[key]._blobUrls = loaded.map(o => o.blobUrl);
+        }
+        
+        return { 
+          animations, metadata, 
+          _createdBlobUrls: (function collect(){ const arr=[]; for(const k of Object.keys(animations)){ const a=animations[k]; if (a._blobUrls) arr.push(...a._blobUrls); } return arr; })() 
+        };
+      }
+
+      function computeCenterAndFeetForObject(obj){
+        const size = getObjectSize(obj);
+        const ro = (obj.getRendererObject && obj.getRendererObject()) || null;
+        let anchorX = 0.5, anchorY = 0;
+        try {
+          if (ro) {
+            if (ro.anchor && typeof ro.anchor.x === "number") { anchorX = ro.anchor.x; anchorY = ro.anchor.y; }
+            else if (ro.pivot && typeof ro.pivot.x === "number" && typeof ro.width === "number") { anchorX = ro.pivot.x / (ro.width || 1); anchorY = ro.pivot.y / (ro.height || 1); }
+          }
+        } catch(e){}
+        const gx = (typeof obj.getX === "function") ? obj.getX() : 0;
+        const gy = (typeof obj.getY === "function") ? obj.getY() : 0;
+        const centerX = gx + (0.5 - anchorX) * (size.w || 0);
+        const feetY = gy + (1 - (typeof anchorY === "number" ? anchorY : 0)) * (size.h || 0);
+        let pixelToSceneOriginal = 1;
+        try {
+          const tex = ro && (ro.texture || (ro.sprite && ro.sprite.texture));
+          if (tex) { const texPx = getTexturePixelSize(tex); if (texPx && texPx.h > 0 && size.h > 0) pixelToSceneOriginal = size.h / texPx.h; }
+        } catch(e){ }
+        return { centerX, feetY, anchorX, anchorY, size, originalX: gx, originalY: gy, pixelToSceneOriginal };
+      }
+
+      async function applyPackageToScene(runtimeScene, packageObj, opts = {}) {
+        const TARGET_NAME = (opts && opts.targetName) ? opts.targetName : "BF";
+        
+        if (window[PLAYER_GLOBAL] && window[PLAYER_GLOBAL][TARGET_NAME]) {
+            try { window[PLAYER_GLOBAL][TARGET_NAME].cleanup(); } catch(e){}
+            window[PLAYER_GLOBAL][TARGET_NAME] = null;
+        }
+
+        const TARGET_ANIM_VAR = (opts && opts.targetAnimVar) ? opts.targetAnimVar : "BFAnim";
+        const invertOffsetY = (typeof opts.invertOffsetY === "boolean") ? opts.invertOffsetY : false;
+        const coordinateMode = (opts.coordinateMode === "raw") ? "raw" : "psych";
+
+        const animations = packageObj.animations || {};
+        const targetObjects = runtimeScene.getObjects(TARGET_NAME);
+        if (!targetObjects || targetObjects.length === 0) { warn(TARGET_NAME + " not found."); return null; }
+
+        const targetInfos = [];
+        for (const obj of targetObjects) {
+          try {
+            const info = computeCenterAndFeetForObject(obj);
+            let originalScaleX = 1;
+            try {
+              const ro = obj.getRendererObject && obj.getRendererObject();
+              if (ro) {
+                if (ro.scale && typeof ro.scale.x === "number") originalScaleX = ro.scale.x;
+                else if (typeof ro.scaleX === "number") originalScaleX = ro.scaleX;
+              }
+            } catch(e){}
+            const originalAbsScaleX = Math.abs(typeof originalScaleX === "number" && isFinite(originalScaleX) ? originalScaleX : 1) || 1;
+            targetInfos.push({ 
+              obj, centerX: info.centerX, feetY: info.feetY, anchorX: info.anchorX, anchorY: info.anchorY, 
+              originalScaleX, originalAbsScaleX, pixelToSceneOriginal: (typeof info.pixelToSceneOriginal === "number" && isFinite(info.pixelToSceneOriginal)) ? info.pixelToSceneOriginal : 1
+            });
+          } catch(e){ }
+        }
+
+        const state = {
+          current: "idle", frameIndex: 0, elapsed: 0, lastAnimValue: "", lastTick: performance.now(),
+          _idleBeatTimeout: null, _returnToIdleTimeout: null, _idleTimerRunning: false, _isPlayingSingAnimation: false
+        };
+        const meta = packageObj.metadata || {};
+        
+        let invertSideGlobal = false;
+        const parseBoolean = (v) => {
+          if (typeof v === "boolean") return v;
+          if (typeof v === "number") return v !== 0;
+          if (typeof v === "string") {
+             const s = v.trim().toLowerCase();
+             return (s === "true" || s === "1" || s === "yes");
+          }
+          return Boolean(v);
+        };
+        const oppSideBool = parseBoolean(meta.OPPSide);
+        invertSideGlobal = (TARGET_NAME === "BFPixel") ? !oppSideBool : oppSideBool;
+
+        function mapAnimToKey(rawAnim, invertSide){
+          if (!rawAnim) return "";
+          const v = rawAnim.toLowerCase();
+          if (invertSide) {
+            if (v.includes("left")) return "singRIGHT";
+            if (v.includes("right")) return "singLEFT";
+          } else {
+            if (v.includes("left")) return "singLEFT";
+            if (v.includes("right")) return "singRIGHT";
+          }
+          if (v.includes("down")) return "singDOWN";
+          if (v.includes("up")) return "singUP";
+          return rawAnim;
+        }
+
+        function updateObjectFrame(tex){
+          if (!targetInfos || targetInfos.length === 0) return;
+          const texPixel = getTexturePixelSize(tex);
+          for (const info of targetInfos) {
+            const obj = info.obj;
+            try {
+              const ro = obj.getRendererObject && obj.getRendererObject();
+              if (ro && ro.texture !== undefined) ro.texture = tex;
+              else { try { obj.getRendererObject().texture = tex; } catch(e){} }
+
+              const pixelToScene = (coordinateMode === "psych") ? ((typeof info.pixelToSceneOriginal === "number" && info.pixelToSceneOriginal > 0) ? info.pixelToSceneOriginal : 1) : 1;
+              const scaledTexWidth = (texPixel.w || 0) * pixelToScene;
+              const scaledTexHeight = (texPixel.h || 0) * pixelToScene;
+              const targetFeetY = info.feetY;
+              const targetCenterX = info.centerX;
+              const anchorX = (typeof info.anchorX === "number") ? info.anchorX : 0.5;
+              const anchorY = (typeof info.anchorY === "number") ? info.anchorY : 0;
+              
+              const targetObjX = targetCenterX - (0.5 - anchorX) * scaledTexWidth;
+              const targetObjY = targetFeetY - (1 - anchorY) * scaledTexHeight;
+              
+              if (typeof obj.setX === "function") obj.setX(targetObjX);
+              if (typeof obj.setY === "function") obj.setY(targetObjY);
+
+              if (ro) {
+                  const baseScale = (typeof info.originalAbsScaleX === "number" && info.originalAbsScaleX > 0) ? info.originalAbsScaleX : 1;
+                  const wantScaleX = invertSideGlobal ? -baseScale : baseScale;
+                  if (ro.scale && typeof ro.scale.x === "number") ro.scale.x = wantScaleX;
+                  else if (typeof ro.scaleX === "number") ro.scaleX = wantScaleX;
+              }
+            } catch(e){ console.error("Error applying frame:", e); }
+          }
+        }
+
+        // Aplica idle inicial
+        if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
+          updateObjectFrame(animations.idle.frames[0]);
+        }
+
+        let rafHandle = null;
+        function clearAllTimeouts(){ 
+          if (state._idleBeatTimeout){ clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout=null; } 
+          if (state._returnToIdleTimeout){ clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout=null; } 
+          state._idleTimerRunning = false;
+        }
+        
+        function animValueIsEmpty(s){
+          if (s === null || s === undefined) return true;
+          try { const st = String(s).trim().toLowerCase(); return st === "" || st === "idle"; } catch(e){ return true; }
+        }
+
+        function scheduleReturnToIdle(delayMs = 600){
+          if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
+          state._idleTimerRunning = true;
+          state._returnToIdleTimeout = setTimeout(()=>{
+            state._returnToIdleTimeout = null;
+            state._idleTimerRunning = false;
+            state.current = "idle";
+            state.frameIndex = 0;
+            state.elapsed = 0;
+            state._isPlayingSingAnimation = false;
+            if (state._idleBeatTimeout) { clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout = null; }
+            if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
+              updateObjectFrame(animations.idle.frames[0]);
+            }
+          }, delayMs);
+        }
+
+        function tick(now){
+          const dt = Math.min(100, now - (state.lastTick || now));
+          state.lastTick = now;
+          
+          let currentAnim = "";
+          try {
+            const sv = runtimeScene.getVariables();
+            const gv = runtimeScene.getGame().getVariables();
+            if (sv && sv.has && sv.has(TARGET_ANIM_VAR)) currentAnim = sv.get(TARGET_ANIM_VAR).getAsString();
+            else if (gv && gv.has && gv.has(TARGET_ANIM_VAR)) currentAnim = gv.get(TARGET_ANIM_VAR).getAsString();
+          } catch(e){ currentAnim = ""; }
+          
+          const isEmpty = (!currentAnim || currentAnim === "" || currentAnim === "idle");
+
+          if (!isEmpty && currentAnim !== state.lastAnimValue){
+            const key = mapAnimToKey(currentAnim, invertSideGlobal);
+            if (animations[key] && animations[key].frames && animations[key].frames.length > 0){
+              state.current = key; 
+              state.frameIndex = 0; 
+              state.elapsed = 0; 
+              state._isPlayingSingAnimation = true; 
+              if (state._returnToIdleTimeout) { clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout = null; }
+              if (state._idleBeatTimeout) { clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout = null; }
+              updateObjectFrame(animations[key].frames[0]); 
+            } else { 
+                if (!state._returnToIdleTimeout) scheduleReturnToIdle(600); 
+            }
+          } 
+          
+          if (isEmpty && state.current !== "idle" && !state._returnToIdleTimeout && !state._idleTimerRunning){
+            scheduleReturnToIdle(600);
+          }
+          
+          state.lastAnimValue = currentAnim;
+          
+          const animData = animations[state.current];
+          if (animData && animData.frames && animData.frames.length > 0){
+            const msPerFrame = 1000 / (animData.fps || 24);
+            state.elapsed += dt;
+            
+            if (state.elapsed >= msPerFrame) {
+                const framesToAdv = Math.floor(state.elapsed / msPerFrame);
+                state.elapsed %= msPerFrame;
+                
+                let nextIdx = state.frameIndex + framesToAdv;
+                
+                if (nextIdx >= animData.frames.length){
+                    if (animData.loop){
+                        nextIdx = animData.frames.length - 1;
+                        if (!state._idleBeatTimeout) {
+                           state._idleBeatTimeout = setTimeout(() => {
+                               state._idleBeatTimeout = null;
+                               state.frameIndex = 0;
+                               state.elapsed = 0;
+                               if(animData.frames[0]) updateObjectFrame(animData.frames[0]);
+                           }, 750);
+                        }
+                    } else {
+                        nextIdx = animData.frames.length - 1;
+                        state._isPlayingSingAnimation = false;
+                        if (!state._returnToIdleTimeout) scheduleReturnToIdle(700);
+                    }
+                }
+                
+                if (nextIdx !== state.frameIndex) {
+                    state.frameIndex = nextIdx;
+                    updateObjectFrame(animData.frames[state.frameIndex]);
+                }
+            }
+          }
+
+          rafHandle = requestAnimationFrame(tick);
+        }
+        rafHandle = requestAnimationFrame(tick);
+
+        function cleanup(){
+          if (rafHandle) cancelAnimationFrame(rafHandle);
+          clearAllTimeouts();
+          try { for (const b of state._createdBlobUrls){ try{ URL.revokeObjectURL(b); }catch(e){} } } catch(e){}
+        }
+
+        const instance = { animations, state, cleanup, target: TARGET_NAME };
+        if (!window[PLAYER_GLOBAL]) window[PLAYER_GLOBAL] = {};
+        window[PLAYER_GLOBAL][TARGET_NAME] = instance; 
+        
+        // --- SEQUENCE WARMUP (Corrected) ---
+        (async function runWarmup() {
+            try {
+                const setAnimVar = (val) => {
+                    try {
+                        const gv = runtimeScene.getVariables();
+                        if (gv.has(TARGET_ANIM_VAR)) gv.get(TARGET_ANIM_VAR).setString(val);
+                        else {
+                            const gg = runtimeScene.getGame().getVariables();
+                            if (gg.has(TARGET_ANIM_VAR)) gg.get(TARGET_ANIM_VAR).setString(val);
+                        }
+                    } catch(e){}
+                };
+
+                const keys = Object.keys(animations).filter(k => k !== "idle");
+                for (const animName of keys) {
+                    const anim = animations[animName];
+                    if (!anim || !anim.frames.length) continue;
+                    setAnimVar(animName);
+                    const durationMs = (anim.frames.length / (anim.fps || 24)) * 1000;
+                    await sleep(durationMs + 30);
+                }
+                setAnimVar("idle");
+                log(`Warmup completo para ${TARGET_NAME}`);
+            } catch(e) {}
+        })();
+
+        return instance;
+      }
+
+      function clearCache(){
+          if(window.GD_SKIN_CACHE){
+              window.GD_SKIN_CACHE.textures.forEach(item => {
+                  try { if(item.tex) item.tex.destroy(true); if(item.url) URL.revokeObjectURL(item.url); } catch(e){}
+              });
+              window.GD_SKIN_CACHE.textures = [];
+              window.GD_SKIN_CACHE.zips = {};
+              window.GD_SKIN_CACHE.packages = {};
+          }
+          if(window[PLAYER_GLOBAL]){
+             Object.keys(window[PLAYER_GLOBAL]).forEach(key => {
+                 try{ if(window[PLAYER_GLOBAL][key]) window[PLAYER_GLOBAL][key].cleanup(); }catch(e){}
+             });
+          }
+      }
+
+      async function fetchAndCacheZip(url){
+        if (window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.zips[url]) return window.GD_SKIN_CACHE.zips[url];
+        const r = await fetch(url);
+        if (!r.ok) throw new Error("Fetch failed " + r.status);
+        const arr = await r.arrayBuffer();
+        if (window.GD_SKIN_CACHE) window.GD_SKIN_CACHE.zips[url] = arr;
+        return arr;
+      }
+
+      async function autoApplySelectedSkin(runtimeScene, opts = {}) {
+        let selStr = null;
+        try { const gv = runtimeScene.getGame().getVariables(); if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString(); } catch(e){}
+        if ((!selStr || selStr.trim() === "") && window.localStorage) try { selStr = localStorage.getItem("gd_selected_skin"); } catch(e){}
+        if (!selStr) return null;
+        const parsed = safeParseJson(selStr); if (!parsed) return null;
+
+        const candidates = [];
+        if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
+        if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); }
+        
+        for (const c of candidates) {
+          try {
+            // Check pre-processed packages cache first
+            if (window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.packages && window.GD_SKIN_CACHE.packages[c]) {
+                const pkg = window.GD_SKIN_CACHE.packages[c];
+                return await applyPackageToScene(runtimeScene, pkg, opts);
+            }
+            // Fallback download
+            const arr = await fetchAndCacheZip(c);
+            const pkg = await loadFromArrayBuffer(runtimeScene, arr);
+            return await applyPackageToScene(runtimeScene, pkg, opts);
+          } catch(err){}
+        }
+        return null;
+      }
+
+      async function autoApplySelectedDadSkin(runtimeScene, opts = {}) {
+        let selStr = null;
+        try { const gv = runtimeScene.getGame().getVariables(); if (gv.has("SelectedDadSkin")) selStr = gv.get("SelectedDadSkin").getAsString(); } catch(e){}
+        if ((!selStr || selStr.trim() === "") && window.localStorage) try { selStr = localStorage.getItem("gd_selected_dad_skin"); } catch(e){}
+        if (!selStr) return null;
+        const parsed = safeParseJson(selStr); if (!parsed) return null;
+
+        const candidates = [];
+        if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
+        if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); }
+        
+        for (const c of candidates) {
+          try {
+            if (window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.packages && window.GD_SKIN_CACHE.packages[c]) {
+                const pkg = window.GD_SKIN_CACHE.packages[c];
+                return await applyPackageToScene(runtimeScene, pkg, { ...opts, targetName: "BFPixel", targetAnimVar: "OPPAnim" });
+            }
+            const arr = await fetchAndCacheZip(c);
+            const pkg = await loadFromArrayBuffer(runtimeScene, arr);
+            return await applyPackageToScene(runtimeScene, pkg, { ...opts, targetName: "BFPixel", targetAnimVar: "OPPAnim" });
+          } catch(err){}
+        }
+        return null;
+      }
+
+      window.GD_SKIN_PLAYER = Object.assign(window.GD_SKIN_PLAYER || {}, { 
+        autoApplySelectedSkin, autoApplySelectedDadSkin, loadFromArrayBuffer, applyPackageToScene, clearCache, cleanup: clearCache 
+      });
+      window.GD_SKIN_PLAYER_DEFINED = true;
   }
 
-  // --- AUTO-APPLY ---
-  async function resolveAndApply(runtimeScene, varName, storageKey, targetName, targetAnimVar, defaultRepo){
-    let configStr = null;
-    try {
-       const gv = runtimeScene.getGame().getVariables();
-       if (gv.has(varName)) configStr = gv.get(varName).getAsString();
-       if ((!configStr || configStr === "") && localStorage) configStr = localStorage.getItem(storageKey);
-    } catch(e){}
-
-    if (!configStr) return; 
-
-    const conf = safeParseJson(configStr);
-    if (!conf) return;
-
-    let url = conf.zip_cdn || conf.zip;
-    if (!url) return;
-    
-    if (!url.startsWith("http") && !url.startsWith("blob:") && conf.zip && !conf.zip_cdn) {
-         url = `https://cdn.jsdelivr.net/gh/${defaultRepo.owner}/${defaultRepo.repo}@${defaultRepo.branch}/${conf.zip}`;
-    }
-
-    try {
-       let pkg = null;
-       if (window[CACHE_GLOBAL][url]) {
-          pkg = window[CACHE_GLOBAL][url];
-       } else {
-          log("Downloading:", url);
-          const r = await fetch(url);
-          if (!r.ok) throw new Error("Fetch 404");
-          const buf = await r.arrayBuffer();
-          pkg = await processZipToPackage(buf, url); 
-       }
-       applyPackageToScene(runtimeScene, pkg, { targetName, targetAnimVar });
-       log(`Skin applied to ${targetName}`);
-    } catch(e){ warn(`Failed ${targetName}`, e); }
-  }
-
-  // --- INICIALIZAÇÃO ---
-  window[PLAYER_GLOBAL] = Object.assign(window[PLAYER_GLOBAL] || {}, {
-    cleanup: function(){},
-    loadAndCache: async (url, buf) => await processZipToPackage(buf, url) 
-  });
-
+  // --- AUTO EXECUÇÃO ---
   (async ()=>{
-    let rs = (typeof runtimeScene !== "undefined") ? runtimeScene : window._gd_runtimeScene;
-    if (!rs && window.gdjs && window.gdjs.runtimeGame && window.gdjs.runtimeGame._currentScene) {
-        rs = window.gdjs.runtimeGame._currentScene;
-    }
-    if (!rs) return;
+    try {
+      let rs = null;
+      try { if (typeof runtimeScene !== "undefined") rs = runtimeScene; } catch(e){}
+      if (!rs && window.__gd_runtimeScene_for_skin) rs = window.__gd_runtimeScene_for_skin;
+      if (!rs) return;
 
-    const def = { owner: "LucyYuih", repo: "gdev-custom-skins", branch: "main" };
-    await resolveAndApply(rs, "SelectedSkin", "gd_selected_skin", "BF", "BFAnim", def);
-    await resolveAndApply(rs, "SelectedDadSkin", "gd_selected_dad_skin", "BFPixel", "OPPAnim", def);
+      await window.GD_SKIN_PLAYER.autoApplySelectedSkin(rs, { extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } });
+      await window.GD_SKIN_PLAYER.autoApplySelectedDadSkin(rs, { extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } });
+    } catch(e){}
   })();
-
 })();
 };
 gdjs.PlayCode.eventsList277 = function(runtimeScene) {
@@ -24158,7 +24258,7 @@ gdjs.PlayCode.eventsList277 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x2abb630(runtimeScene);
+gdjs.PlayCode.userFunc0x1344bb8(runtimeScene);
 
 }
 
@@ -24238,7 +24338,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x2c53088 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x13d5d18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — LOADER OTIMIZADO (Singleton, Memory Fixes, Blobs Cleanup)
 // Mantém compatibilidade total com o original, mas previne redefinição e memory leaks.
@@ -24867,7 +24967,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x2c53088(runtimeScene);
+gdjs.PlayCode.userFunc0x13d5d18(runtimeScene);
 
 }
 

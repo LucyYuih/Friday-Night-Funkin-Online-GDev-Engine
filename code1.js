@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x18a7f40 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0xaa3430 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,7 +848,7 @@ gdjs.InicioCode.userFunc0x18a7f40 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.userFunc0x18971b0 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1c0cac0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   // --- GESTÃO DE UI E CENA (AUTO-CLEANUP) ---
@@ -1449,178 +1449,6 @@ createAuthOverlayAndBind();
 
 })(runtimeScene);
 };
-gdjs.InicioCode.userFunc0x1993b08 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-(function(runtimeScene) {
-    // --- SINGLETON ---
-    if (window.GDJS_ULTIMATE_INSPECTOR) return;
-    window.GDJS_ULTIMATE_INSPECTOR = true;
-
-    // --- CONFIG ---
-    const DOM_SELECTORS = [
-        "#gdjs-mod-list-ui-final", ".skin-modal", "#skin-download-loading", 
-        "#gdjs-debug-overlay", "#gdjs-ui-inspector-panel"
-    ];
-
-    // --- CRIAR UI ---
-    const panel = document.createElement("div");
-    panel.id = "gdjs-ultimate-inspector";
-    Object.assign(panel.style, {
-        position: "fixed", top: "10px", left: "10px", width: "340px", maxHeight: "90vh",
-        backgroundColor: "rgba(10, 10, 12, 0.90)", backdropFilter: "blur(6px)",
-        border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "8px",
-        color: "#eee", fontFamily: "Consolas, monospace", fontSize: "11px",
-        padding: "0", zIndex: "2147483647", display: "none", overflowY: "auto",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.6)"
-    });
-
-    const header = document.createElement("div");
-    header.innerHTML = "<strong>GDEVELOP PROCESS INSPECTOR</strong><span style='float:right;opacity:0.5'>[G] to Close</span>";
-    Object.assign(header.style, { padding: "10px", background: "rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.1)" });
-    panel.appendChild(header);
-
-    const content = document.createElement("div");
-    content.style.padding = "10px";
-    panel.appendChild(content);
-
-    document.body.appendChild(panel);
-
-    // --- HELPERS DE ESTILO ---
-    function createSection(title) {
-        const d = document.createElement("div");
-        d.innerHTML = `__ ${title.toUpperCase()} __`;
-        d.style.color = "#88efff"; d.style.margin = "12px 0 6px 0"; d.style.fontWeight = "bold";
-        return d;
-    }
-
-    function createRow(label, status, actionBtn = null) {
-        const row = document.createElement("div");
-        Object.assign(row.style, { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid rgba(255,255,255,0.05)" });
-        
-        const txt = document.createElement("span");
-        txt.innerHTML = `<span style="color:#aaa">${label}:</span> <span style="color:${status.includes('OFF')?'#f55':'#5f5'}">${status}</span>`;
-        row.appendChild(txt);
-
-        if (actionBtn) {
-            const btn = document.createElement("button");
-            btn.textContent = actionBtn.text;
-            Object.assign(btn.style, { background: "#333", border: "1px solid #555", color: "#fff", borderRadius: "3px", cursor: "pointer", fontSize: "10px", padding: "2px 6px" });
-            btn.onclick = () => { actionBtn.onClick(); refreshAll(); };
-            row.appendChild(btn);
-        }
-        return row;
-    }
-
-    // --- SCANNER LOGIC ---
-    function refreshAll() {
-        content.innerHTML = "";
-
-        // 1. SEÇÃO DOM (INTERFACES VISUAIS)
-        content.appendChild(createSection("Interface Gráfica (DOM)"));
-        let foundUI = false;
-        
-        // Scan específico
-        DOM_SELECTORS.forEach(sel => {
-            const el = document.querySelector(sel);
-            if (el && el.id !== "gdjs-ultimate-inspector") {
-                foundUI = true;
-                const isVis = el.style.display !== 'none';
-                content.appendChild(createRow(
-                    sel, 
-                    isVis ? "VISIBLE" : "HIDDEN", 
-                    { text: "DESTROY", onClick: () => el.remove() }
-                ));
-            }
-        });
-
-        // Scan genérico (Z-Index alto)
-        document.querySelectorAll('div').forEach(div => {
-            if(DOM_SELECTORS.includes("#"+div.id) || DOM_SELECTORS.includes("."+div.className) || div.id === "gdjs-ultimate-inspector") return;
-            const z = parseInt(window.getComputedStyle(div).zIndex);
-            if (z > 5000 && div.innerHTML.trim() !== "") {
-                foundUI = true;
-                content.appendChild(createRow(
-                    div.id ? "#"+div.id : "Unknown Div", 
-                    "Z-IDX "+z, 
-                    { text: "KILL", onClick: () => div.remove() }
-                ));
-            }
-        });
-
-        if(!foundUI) content.innerHTML += "<div style='color:#777'>No active UIs found.</div>";
-
-        // 2. SEÇÃO SCRIPTS & PROCESSOS (JS GLOBALS)
-        content.appendChild(createSection("Scripts & Background Tasks"));
-
-        // -> Script A (Chart Loader)
-        // Detectamos se o cache de manifesto existe
-        const scriptA_Active = !!localStorage.getItem("gdjs_active_repo_id_v1"); // Indício de uso
-        content.appendChild(createRow("Script A (Repo)", scriptA_Active ? "DATA STORED" : "CLEAN"));
-
-        // -> Script B (Music Loader)
-        const scriptB_Ready = !!window.GDJS_SCRIPT_B_READY;
-        const scriptB_Chans = Object.keys(window.gdjsChannels || {}).length;
-        const scriptB_Cache = Object.keys(window.gdjsCustomAudio || {}).length;
-        
-        content.appendChild(createRow("Script B (Core)", scriptB_Ready ? "RUNNING" : "OFF"));
-        
-        if (scriptB_Ready || scriptB_Chans > 0) {
-            content.appendChild(createRow("Audio Channels", scriptB_Chans + " active", {
-                text: "STOP ALL", 
-                onClick: () => {
-                    if(window._gdjs_stopAndCleanupAll) window._gdjs_stopAndCleanupAll(true); // Chama limpeza do Script B
-                    else { // Fallback manual
-                        if(window.gdjsChannels) Object.values(window.gdjsChannels).forEach(a=>a.pause());
-                        window.gdjsChannels = {};
-                    }
-                }
-            }));
-            content.appendChild(createRow("Song Cache (RAM)", scriptB_Cache + " folders", {
-                text: "PURGE RAM", 
-                onClick: () => {
-                    if(window._gdjs_stopAndCleanupAll) window._gdjs_stopAndCleanupAll(true);
-                    window.gdjsCustomAudio = {};
-                }
-            }));
-        }
-
-        // -> Script C (FPS Monitor)
-        const scriptC_Active = !!window.GDJS_FPS_MONITOR_ACTIVE;
-        content.appendChild(createRow("Script C (Monitor)", scriptC_Active ? "LOOPING" : "OFF"));
-
-        // -> Skin Loader
-        const skinUI = !!window.GDSkinLoaderUI;
-        content.appendChild(createRow("Skin Loader System", skinUI ? "LOADED" : "OFF"));
-
-        // 3. SEÇÃO MEMÓRIA (Estimativa)
-        content.appendChild(createSection("Memória (JS Heap)"));
-        let mem = "N/A";
-        if (performance && performance.memory) {
-            mem = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + " MB";
-        }
-        const memRow = document.createElement("div");
-        memRow.textContent = "JS Heap Used: " + mem;
-        memRow.style.color = "#fe8";
-        content.appendChild(memRow);
-        
-        const reloadBtn = document.createElement("button");
-        reloadBtn.textContent = "FORCE PAGE RELOAD (Panic)";
-        Object.assign(reloadBtn.style, { width:"100%", marginTop:"15px", padding:"8px", background:"#d22", color:"white", border:"none", borderRadius:"4px", cursor:"pointer" });
-        reloadBtn.onclick = () => location.reload();
-        content.appendChild(reloadBtn);
-    }
-
-    // --- LOOP DE INPUT ---
-    window.addEventListener("keydown", (e) => {
-        if ((e.key === "g" || e.key === "G") && !["INPUT","TEXTAREA"].includes(e.target.tagName)) {
-            const isHidden = panel.style.display === "none";
-            panel.style.display = isHidden ? "block" : "none";
-            if (isHidden) refreshAll();
-        }
-    });
-
-})(runtimeScene);
-};
 gdjs.InicioCode.asyncCallback34895236 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.InicioCode.localVariables.length = 0;
@@ -1671,7 +1499,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x18a7f40(runtimeScene);
+gdjs.InicioCode.userFunc0xaa3430(runtimeScene);
 
 }
 
@@ -1697,7 +1525,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.InicioCode.userFunc0x18971b0(runtimeScene);
+gdjs.InicioCode.userFunc0x1c0cac0(runtimeScene);
 
 }
 
@@ -1705,7 +1533,6 @@ gdjs.InicioCode.userFunc0x18971b0(runtimeScene);
 {
 
 
-gdjs.InicioCode.userFunc0x1993b08(runtimeScene);
 
 }
 
@@ -1751,7 +1578,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0x19b4be8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xaa5418 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A (ORIGINAL) — OTIMIZADO + AUTO-CLEANUP (Scene Watcher)
 (function () {
@@ -2544,18 +2371,17 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x19b4be8(runtimeScene);
+gdjs.InicioCode.userFunc0xaa5418(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x19b4ca0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1931f58 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (async function(runtimeScene) {
   // --- 1. CONFIGURAÇÃO DE CLEANUP (Scene Watcher) ---
   const originSceneName = runtimeScene.getName();
   
-  // Se já existe a UI, apenas mostra (Singleton intra-cena)
   if (document.querySelector(".skin-modal")) {
     const existingModal = document.querySelector(".skin-modal");
     existingModal.style.display = "flex";
@@ -2626,7 +2452,7 @@ gdjs.InicioCode.userFunc0x19b4be8(runtimeScene);
   function createLoadingModal() {
     const modal = document.createElement("div"); modal.id = "skin-download-loading";
     modal.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100000; color: white; font-family: Arial, sans-serif; flex-direction: column; gap: 16px;`;
-    modal.innerHTML = `<div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #1976d2; animation: spin 1s linear infinite;"></div><div style="font-size:16px;">Baixando skin...</div>`;
+    modal.innerHTML = `<div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #1976d2; animation: spin 1s linear infinite;"></div><div style="font-size:16px;">Baixando e Processando...</div>`;
     const style = document.createElement("style"); style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`; document.head.appendChild(style);
     return modal;
   }
@@ -2694,6 +2520,23 @@ gdjs.InicioCode.userFunc0x19b4be8(runtimeScene);
     const arr = manifest[modName] || [];
     for (const s of arr) { if (getSkinName(s) === skinName.toString()) return s; }
     return null;
+  }
+
+  // --- HELPER: Pre-Processar Skin ---
+  // Chama o Player para descompactar o ZIP agora, antes de aplicar
+  async function preProcessSkin(zipBuffer, cacheKey) {
+      if (window.GD_SKIN_PLAYER && window.GD_SKIN_PLAYER.loadFromArrayBuffer) {
+          log("Descompactando skin no Modal...");
+          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, zipBuffer);
+          
+          // Salva no cache de PACOTES (Skin pronta)
+          if (!window.GD_SKIN_CACHE) window.GD_SKIN_CACHE = {};
+          if (!window.GD_SKIN_CACHE.packages) window.GD_SKIN_CACHE.packages = {};
+          
+          window.GD_SKIN_CACHE.packages[cacheKey] = pkg;
+          return pkg;
+      }
+      return null;
   }
 
   async function openSkinSelector(manifest){
@@ -2799,7 +2642,13 @@ gdjs.InicioCode.userFunc0x19b4be8(runtimeScene);
       try {
         const cdnBase = { owner: ownerIn.value, repo: repoIn.value, branch: branchIn.value };
         const cdnCandidate = (zipPath.startsWith("http")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-        await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+        
+        // 1. Baixa
+        const buf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+        
+        // 2. Pre-Processa (Unzip) aqui no Modal
+        await preProcessSkin(buf, cdnCandidate || zipPath);
+
         const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath, zip_cdn: cdnCandidate };
         const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
         const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
@@ -2807,6 +2656,8 @@ gdjs.InicioCode.userFunc0x19b4be8(runtimeScene);
         if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
         else gv.pushNew(varName).setString(JSON.stringify(sel));
         localStorage.setItem(storageKey, JSON.stringify(sel));
+        
+        log("Skin baixada e descompactada para cache.");
       } catch(e){ console.error(e); } finally { hideLoadingModal(); downloading = false; }
     }
 
@@ -2819,7 +2670,13 @@ gdjs.InicioCode.userFunc0x19b4be8(runtimeScene);
       try {
         const cdnBase = { owner: ownerIn.value, repo: repoIn.value, branch: branchIn.value };
         const cdnCandidate = (zipPath.startsWith("http")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+        
+        // 1. Baixa
         const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
+        
+        // 2. Pre-Processa
+        const pkg = await preProcessSkin(arrbuf, cdnCandidate || zipPath);
+
         const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath, zip_cdn: cdnCandidate };
         const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
         const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
@@ -2828,8 +2685,9 @@ gdjs.InicioCode.userFunc0x19b4be8(runtimeScene);
         if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
         else gv.pushNew(varName).setString(JSON.stringify(sel));
         localStorage.setItem(storageKey, JSON.stringify(sel));
-        if (window.GD_SKIN_PLAYER) {
-          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel" });
+        
+        // 3. Aplica (Player só pega o pacote pronto)
+        if (window.GD_SKIN_PLAYER && pkg) {
           await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: target === "BF" ? "BF" : "BFPixel", targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim" });
         }
       } catch(e){ console.error(e); } finally { hideLoadingModal(); downloading = false; }
@@ -2859,17 +2717,16 @@ gdjs.InicioCode.userFunc0x19b4be8(runtimeScene);
     window.GDSkinLoaderUI = true;
     await openSkinSelector(manifest);
 
-    // VIGILANTE DE CENA (A Mágica)
+    // VIGILANTE DE CENA
     const watcher = setInterval(() => {
         let currentSceneName = "";
         try { currentSceneName = runtimeScene.getGame().getSceneStack().getCurrentScene().getName(); } catch(e) {}
         
-        // Se a cena mudou, matar tudo
         if (currentSceneName && originSceneName && currentSceneName !== originSceneName) {
             const m = document.querySelector(".skin-modal");
-            if (m) m.remove(); // Remove do DOM
-            window.GDSkinLoaderUI = false; // Permite recriar na próxima cena
-            clearInterval(watcher); // Para de vigiar
+            if (m) m.remove();
+            window.GDSkinLoaderUI = false;
+            clearInterval(watcher);
         }
     }, 1000);
 
@@ -2882,12 +2739,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x19b4ca0(runtimeScene);
+gdjs.InicioCode.userFunc0x1931f58(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x1e8f228 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1932268 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
@@ -2896,12 +2753,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x1e8f228(runtimeScene);
+gdjs.InicioCode.userFunc0x1932268(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0x19b70a0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1932598 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveImportUI(runtimeScene);
 };
@@ -2910,7 +2767,7 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0x19b70a0(runtimeScene);
+gdjs.InicioCode.userFunc0x1932598(runtimeScene);
 
 }
 
