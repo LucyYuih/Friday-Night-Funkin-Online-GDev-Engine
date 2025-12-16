@@ -77,7 +77,7 @@ gdjs.PRELOADMUSICSCode.GDStatistics2Objects1= [];
 gdjs.PRELOADMUSICSCode.GDStatistics2Objects2= [];
 
 
-gdjs.PRELOADMUSICSCode.userFunc0x28e4fd8 = function GDJSInlineCode(runtimeScene) {
+gdjs.PRELOADMUSICSCode.userFunc0x1afeb20 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // Evitar múltiplos overlays
 if (window.__htmlOverlayOpened) return;
@@ -160,7 +160,7 @@ gdjs.PRELOADMUSICSCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PRELOADMUSICSCode.userFunc0x28e4fd8(runtimeScene);
+gdjs.PRELOADMUSICSCode.userFunc0x1afeb20(runtimeScene);
 
 }
 
