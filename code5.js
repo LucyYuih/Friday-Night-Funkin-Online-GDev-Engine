@@ -1819,7 +1819,7 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
 }
 
 
-};gdjs.PlayCode.userFunc0x1a2aac0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1ac6588 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   // Atualiza a referência da cena imediatamente
@@ -2856,7 +2856,7 @@ gdjs.copyArray(runtimeScene.getObjects("OppSideLifeBar"), gdjs.PlayCode.GDOppSid
 {
 
 
-gdjs.PlayCode.userFunc0x1a2aac0(runtimeScene);
+gdjs.PlayCode.userFunc0x1ac6588(runtimeScene);
 
 }
 
@@ -18916,7 +18916,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x18470e0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x197b040 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19099,7 +19099,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x19ceaf0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x197c680 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19110,7 +19110,7 @@ gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x18470e0(runtimeScene);
+gdjs.PlayCode.userFunc0x197b040(runtimeScene);
 
 }
 
@@ -19186,7 +19186,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0x19ceaf0(runtimeScene);
+gdjs.PlayCode.userFunc0x197c680(runtimeScene);
 
 }
 
@@ -19286,7 +19286,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x18f0290 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1298d98 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -19469,7 +19469,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xedb460 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x13345d0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -19480,7 +19480,7 @@ gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x18f0290(runtimeScene);
+gdjs.PlayCode.userFunc0x1298d98(runtimeScene);
 
 }
 
@@ -19556,7 +19556,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xedb460(runtimeScene);
+gdjs.PlayCode.userFunc0x13345d0(runtimeScene);
 
 }
 
@@ -23329,7 +23329,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x1a18ed8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2c55988 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -23348,7 +23348,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x19cf6e8 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0x2c55a28 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT C — MONITOR (Correção "Instant Find" na primeira carga)
 (function(runtimeScene){
@@ -23502,7 +23502,7 @@ gdjs.PlayCode.eventsList270 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x19cf6e8(runtimeScene);
+gdjs.PlayCode.userFunc0x2c55a28(runtimeScene);
 
 }
 
@@ -23566,7 +23566,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x1a18ed8(runtimeScene);
+gdjs.PlayCode.userFunc0x2c55988(runtimeScene);
 
 }
 
@@ -23701,7 +23701,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1918598 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2abb630 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin_player.js
 (function(){
@@ -24158,7 +24158,7 @@ gdjs.PlayCode.eventsList277 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x1918598(runtimeScene);
+gdjs.PlayCode.userFunc0x2abb630(runtimeScene);
 
 }
 
@@ -24238,7 +24238,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1917d90 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x2c53088 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — LOADER OTIMIZADO (Singleton, Memory Fixes, Blobs Cleanup)
 // Mantém compatibilidade total com o original, mas previne redefinição e memory leaks.
@@ -24867,7 +24867,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x1917d90(runtimeScene);
+gdjs.PlayCode.userFunc0x2c53088(runtimeScene);
 
 }
 
