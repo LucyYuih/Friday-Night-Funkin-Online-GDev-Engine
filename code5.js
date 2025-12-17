@@ -1819,31 +1819,29 @@ gdjs.copyArray(runtimeScene.getObjects("timerBar2"), gdjs.PlayCode.GDtimerBar2Ob
 }
 
 
-};gdjs.PlayCode.userFunc0x905c90 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xa44ab8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
-  // --- GESTÃO DE REINICIALIZAÇÃO (Evita duplicidade) ---
-  window._gd_runtimeScene = runtimeScene; // Atualiza referência global
-
-  const SCRIPT_ID = 'gd-autosave-users-v2-script';
-  const existingScript = document.getElementById(SCRIPT_ID);
-  if (existingScript) {
-      existingScript.remove();
-      console.log('gdAutoSaveUsers: Script anterior removido para reinicialização limpa.');
+  // --- PREVENÇÃO DE REINICIALIZAÇÃO (TRAVAMENTO) ---
+  if (window.gdAutoSaveUsers_Loaded) {
+      console.log("gdAutoSaveUsers: Já carregado. Ignorando reinicialização.");
+      return;
   }
+  window.gdAutoSaveUsers_Loaded = true;
+  window._gd_runtimeScene = runtimeScene;
 
   const moduleCode = `
-/* gdAutoSaveUsers - LOCAL FIRST VERSION (COMPLETE)
-   - Salva progresso no dispositivo instantaneamente.
-   - Sincroniza com a nuvem apenas sob comando (botões) ou em background leve.
-   - Compatível com o sistema de Update UI.
+/* gdAutoSaveUsers - LOCAL FIRST VERSION (CORRIGIDO)
+   - Salva scores e progresso localmente.
+   - Sincroniza com nuvem sob demanda.
+   - Define PlayerOnSave = 1 ao terminar.
 */
 
 import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js';
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
 
-/* ---------- 1. Configuração Firebase ---------- */
+// --- CONFIGURAÇÃO ---
 function _obfDecode(b64xor) {
   const raw = atob(b64xor);
   let out = '';
@@ -1861,14 +1859,12 @@ const firebaseConfig = {
   measurementId: "G-MD2E4G1195"
 };
 
-// Singleton App Check
 const app = (getApps().length > 0) ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* ---------- 2. Criptografia (PBKDF2/AES) ---------- */
+// --- CRIPTOGRAFIA ---
 const PBKDF2_ITERATIONS = 150000; const SALT_BYTES = 16; const IV_BYTES = 12; const DERIVED_BITS = 512;
-
 function strToU8(s){ return new TextEncoder().encode(String(s)); }
 function u8ToStr(u){ return new TextDecoder().decode(u); }
 function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
@@ -1886,7 +1882,6 @@ async function deriveKeys(password, saltU8){
   return { aesKey, hmacKey };
 }
 async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8); return new Uint8Array(sig); }
-
 async function encryptFilePayload(secret, jsonText){
   const salt = randomBytes(SALT_BYTES); const iv = randomBytes(IV_BYTES);
   const { aesKey, hmacKey } = await deriveKeys(secret, salt);
@@ -1912,7 +1907,7 @@ async function sha256Hex(text){
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-/* ---------- 3. Helpers GDevelop & Game Data ---------- */
+// --- HELPERS GDEVELOP ---
 function getUsername(){
   try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication) return gdjs.playerAuthentication.getUsername(); }catch(e){}
   try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : ''); } catch(e){}
@@ -1932,238 +1927,160 @@ function parseToNumberOrZero(v){
   return 0;
 }
 
+// Leitura de Dados (Universal + Músicas Individuais)
 const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
 
-function readNumericChildrenOrdered(runtimeScene){
-  try {
-    const pu = runtimeScene.getGame().getVariables().get('PlayerUniversal');
-    if (!pu) throw new Error('PlayerUniversal missing');
+function getGameDataPayload(runtimeScene) {
     const payload = {};
+    const gameVars = runtimeScene.getGame().getVariables();
     
-    // Tenta método rápido (objeto JS)
-    if (typeof pu.toJSObject === 'function') {
-        const obj = pu.toJSObject();
-        for (const k of EXPORT_FIELDS) payload[k] = parseToNumberOrZero(obj[k]);
-        return payload;
-    }
-    // Fallback: iteração manual
-    for (const k of EXPORT_FIELDS){
-        const child = pu.getChild(k);
-        payload[k] = child ? parseToNumberOrZero(child.getAsNumber ? child.getAsNumber() : child.value) : 0;
-    }
-    return payload;
-  } catch(e){
-    const p = {}; EXPORT_FIELDS.forEach(k => p[k]=0); return p;
-  }
-}
-
-function buildPlaintextSaveJson(runtimeScene){
-  const payload = readNumericChildrenOrdered(runtimeScene);
-  const ordered = {};
-  for (const k of EXPORT_FIELDS) ordered[k] = payload[k];
-  return JSON.stringify({ version: 1, payload: ordered });
-}
-
-/* ---------- 4. Lógica Local-First (LocalStorage) ---------- */
-const LOCAL_SAVE_KEY = "GD_FNF_LOCAL_SAVE_V1";
-const SONG_QUEUE_PREFIX = 'SongQueue_';
-const MAX_QUEUE_ITEMS = 200;
-
-// Save Local Instantâneo
-function saveToLocalStorage(uid, encSave, hashHex) {
-    const data = {
-        encSave,
-        hash: hashHex,
-        uid: uid,
-        ts: Date.now(),
-        synced: false 
-    };
-    localStorage.setItem(LOCAL_SAVE_KEY, JSON.stringify(data));
-    console.log("[Local-First] Save gravado localmente.");
-    return true;
-}
-
-// Helpers da Fila de Músicas (Local Queue)
-function _songQueueKey(uid){ return SONG_QUEUE_PREFIX + String(uid); }
-function getLocalSongQueue(uid){
-  try { return JSON.parse(localStorage.getItem(_songQueueKey(uid)) || "[]"); } catch(e){ return []; }
-}
-function addSongToLocalQueue(uid, compactStr){
-  try {
-    const arr = getLocalSongQueue(uid);
-    arr.push(compactStr);
-    while (arr.length > MAX_QUEUE_ITEMS) arr.shift();
-    localStorage.setItem(_songQueueKey(uid), JSON.stringify(arr));
-  } catch(e){}
-}
-function removeSongFromLocalQueueByIndex(uid, idx){
-    const arr = getLocalSongQueue(uid);
-    arr.splice(idx,1);
-    localStorage.setItem(_songQueueKey(uid), JSON.stringify(arr));
-}
-
-/* ---------- 5. Helpers de Música e Strings Compactas ---------- */
-function compactSongPlayString(playInfo, playerName){
-   // Implementação simplificada para compatibilidade
-   const safe = (s) => String(s||'__').replace(/\\|/g, '_');
-   return \`\${safe(playInfo.songName)}|\${safe(playInfo.songDifficulty)}|\${safe(playerName)}|\${playInfo.sceneScore}|\${playInfo.lastPoints}|\${playInfo.accuracyNum}|\${playInfo.customPitch}|\${playInfo.side}\`;
-}
-
-// Coleta básica de dados da música
-function collectSongPlayInfo(runtimeScene){
-    try {
-        const gv = runtimeScene.getGame().getVariables();
-        const sv = runtimeScene.getVariables();
-        
-        const getVal = (name) => {
-            let v = gv.get(name);
-            if(!v) v = sv.get(name);
-            if(v && v.getAsString) return v.getAsString();
-            if(v && v.getAsNumber) return v.getAsNumber();
-            return v ? String(v) : null;
-        };
-
-        const score = Number(getVal('Score') || 0);
-        const pitch = Number(getVal('CustomPitch') || 1);
-        
-        return {
-            songName: getVal('SongName'),
-            songDifficulty: getVal('SongDifficulty'),
-            sceneScore: score,
-            customPitch: pitch,
-            lastPoints: Math.floor((score / 20000) * pitch),
-            accuracyNum: Number(getVal('Accuracy') || 0), // Assumindo var simples para brevidade
-            side: 'BF' // Simplificado
-        };
-    } catch(e){ return {}; }
-}
-
-/* ---------- 6. Funções de Sincronização (Nuvem) ---------- */
-
-// Envia músicas pendentes para o Firestore
-async function flushSongQueueForUid(uid){
-    if(!uid) return;
-    const arr = getLocalSongQueue(uid);
-    if(arr.length === 0) return;
-    
-    console.log("[Sync] Enviando " + arr.length + " músicas...");
-    
-    // Processa uma por uma (simplificado para robustez)
-    for(let i=0; i<arr.length; i++){
-        try {
-            const parts = arr[i].split('|');
-            if(parts.length >= 8){
-                const songId = parts[0];
-                const diffKey = parts[1];
-                // Lógica de update no Firestore (resumida)
-                const ref = doc(db, 'songs', songId);
-                // Aqui entraria a lógica complexa de updateSongsDocEntry
-                // Para manter Local-First e breve, apenas removemos da fila se "sucesso" simulado
-                // Na versão completa, você usaria o updateSongsDocEntry original.
+    // 1. Dados Universais (Pontos Totais)
+    const pu = gameVars.get('PlayerUniversal');
+    if (pu) {
+        payload.universal = {};
+        if (typeof pu.toJSObject === 'function') {
+            const obj = pu.toJSObject();
+            for (const k of EXPORT_FIELDS) payload.universal[k] = parseToNumberOrZero(obj[k]);
+        } else {
+            for (const k of EXPORT_FIELDS) {
+                const child = pu.getChild(k);
+                payload.universal[k] = child ? parseToNumberOrZero(child.getAsNumber ? child.getAsNumber() : child.value) : 0;
             }
-            removeSongFromLocalQueueByIndex(uid, i);
-            i--; 
-        } catch(e) { console.warn("Erro ao enviar musica", e); }
+        }
+    }
+
+    // 2. Dados de Músicas (Salvos individualmente)
+    // Assume que existe uma estrutura "SongScores" ou similar
+    const songVars = gameVars.get('SongScores');
+    if (songVars) {
+        payload.songs = typeof songVars.toJSObject === 'function' ? songVars.toJSObject() : {};
+    }
+
+    return payload;
+}
+
+function applyGameDataPayload(runtimeScene, payload) {
+    const gameVars = runtimeScene.getGame().getVariables();
+
+    // 1. Aplica Universal
+    if (payload.universal) {
+        const pu = gameVars.get('PlayerUniversal');
+        for (const k of EXPORT_FIELDS) {
+            const val = payload.universal[k] || 0;
+            try { pu.getChild(k).setNumber(val); } catch(e){}
+        }
+    }
+
+    // 2. Aplica Músicas (Se houver estrutura para isso)
+    // Isso é complexo pois depende da estrutura exata do seu jogo.
+    // O código abaixo é genérico para estruturas de dicionário.
+    if (payload.songs) {
+        // Se o GDevelop suportar fromJSObject diretamente na variável raiz:
+        // gameVars.get('SongScores').fromJSObject(payload.songs);
+        // Caso contrário, iterar manualmente seria necessário, mas complexo sem saber a estrutura exata.
+        // Assumindo que SongScores é uma estrutura que pode ser reconstruída:
+        const sv = gameVars.get('SongScores');
+        if (sv && typeof sv.fromJSObject === 'function') {
+            sv.fromJSObject(payload.songs);
+        }
     }
 }
 
-/* ---------- 7. Public API (Compatível com Botões) ---------- */
+// --- LÓGICA LOCAL-FIRST ---
+const LOCAL_SAVE_KEY = "GD_FNF_LOCAL_SAVE_V1";
+
+function saveToLocalStorage(uid, encSave, hashHex) {
+    const data = { encSave, hash: hashHex, uid: uid, ts: Date.now(), synced: false };
+    localStorage.setItem(LOCAL_SAVE_KEY, JSON.stringify(data));
+    console.log("[AutoSave] Salvo localmente.");
+}
+
+// --- API PÚBLICA ---
 window.gdAutoSaveUsers = window.gdAutoSaveUsers || {};
 
-// A. AUTO-SAVE (Fim da Música) -> Apenas Local + Fila
+// FUNÇÃO PRINCIPAL: Chamada pelo jogo ao terminar a música
 window.gdAutoSaveUsers.createAndSaveEncryptedSave = async function(maybeRuntimeScene){
-  const runtimeSceneLocal = maybeRuntimeScene || window._gd_runtimeScene;
+  const rs = maybeRuntimeScene || window._gd_runtimeScene;
   const user = auth.currentUser;
   
-  if (!user) return { ok: false, reason: 'guest' };
-
-  // 1. Prepara dados
-  const plain = buildPlaintextSaveJson(runtimeSceneLocal);
-  const hashHex = await sha256Hex(plain);
-  const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-  const enc = await encryptFilePayload(secret, plain);
-
-  // 2. Salva LOCALMENTE (Instantâneo)
-  saveToLocalStorage(user.uid, enc, hashHex);
-
-  // 3. Adiciona música à fila local (sem enviar rede ainda)
-  const playInfo = collectSongPlayInfo(runtimeSceneLocal);
-  if(playInfo.songName) {
-      const compact = compactSongPlayString(playInfo, getUsername());
-      addSongToLocalQueue(user.uid, compact);
+  if (!user) {
+      console.warn("[AutoSave] Usuário não logado. Save ignorado.");
+      return { ok: false, reason: 'guest' };
   }
 
-  // 4. Tenta enviar músicas em background (sem bloquear)
-  setTimeout(() => flushSongQueueForUid(user.uid), 500);
+  try {
+      // 1. Prepara dados (Universal + Songs)
+      const rawPayload = getGameDataPayload(rs);
+      const plain = JSON.stringify({ version: 2, payload: rawPayload });
+      
+      // 2. Criptografa
+      const hashHex = await sha256Hex(plain);
+      const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+      const enc = await encryptFilePayload(secret, plain);
 
-  return { ok: true, local: true };
+      // 3. Salva LOCALMENTE
+      saveToLocalStorage(user.uid, enc, hashHex);
+
+      // 4. Sinaliza Sucesso para o Jogo (PlayerOnSave = 1)
+      const pos = rs.getGame().getVariables().get('PlayerOnSave');
+      if (pos) pos.setNumber(1);
+
+      return { ok: true, local: true };
+
+  } catch (e) {
+      console.error("[AutoSave] Erro Fatal:", e);
+      return { ok: false, error: e.message };
+  }
 };
 
-// B. FORÇAR UPLOAD (Botão "Enviar Save")
+// BOTÃO: Enviar para Nuvem
 window.gdAutoSaveUsers.forceCloudSync = async function() {
     const user = auth.currentUser;
     if(!user) throw new Error("Não conectado.");
 
-    // Lê do LocalStorage
     const raw = localStorage.getItem(LOCAL_SAVE_KEY);
-    if (!raw) throw new Error("Nenhum save local para enviar.");
+    if (!raw) throw new Error("Sem save local.");
     const data = JSON.parse(raw);
-    
-    if (data.uid !== user.uid) throw new Error("Save local pertence a outro usuário.");
+    if (data.uid !== user.uid) throw new Error("Save de outro usuário.");
 
-    // Envia para Firestore
-    const ref = doc(db, 'users', user.uid);
-    await setDoc(ref, { 
-        playerSave: { 
-            save: data.encSave, 
-            hash: data.hash, 
-            updatedAt: serverTimestamp() 
-        } 
+    await setDoc(doc(db, 'users', user.uid), { 
+        playerSave: { save: data.encSave, hash: data.hash, updatedAt: serverTimestamp() } 
     }, { merge: true });
-
-    // Envia fila de músicas pendentes tbm
-    await flushSongQueueForUid(user.uid);
 
     return { ok: true };
 };
 
-// C. FORÇAR DOWNLOAD (Botão "Carregar da Nuvem")
+// BOTÃO: Carregar da Nuvem
 window.gdAutoSaveUsers.forceCloudLoad = async function(runtimeScene) {
     const user = auth.currentUser;
     if(!user) throw new Error("Não conectado.");
-    const rs = runtimeScene || window._gd_runtimeScene;
-
-    const ref = doc(db, 'users', user.uid);
-    const snap = await getDoc(ref);
     
-    if (!snap.exists()) throw new Error("Nenhum save na nuvem.");
+    const rs = runtimeScene || window._gd_runtimeScene;
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    
+    if (!snap.exists()) throw new Error("Sem save na nuvem.");
     const d = snap.data();
-    if (!d.playerSave || !d.playerSave.save) throw new Error("Save nuvem inválido.");
+    if (!d.playerSave || !d.playerSave.save) throw new Error("Save inválido.");
 
-    // Descriptografa e aplica
     const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
     const plain = await decryptFilePayload(secret, d.playerSave.save);
     const parsed = JSON.parse(plain);
     
-    const pu = rs.getGame().getVariables().get('PlayerUniversal');
-    const payload = parsed.payload || parsed;
-    for (const k of EXPORT_FIELDS){
-        const val = payload[k] || 0;
-        try { pu.getChild(k).setNumber(val); } catch(e){}
-    }
+    // Aplica no jogo
+    applyGameDataPayload(rs, parsed.payload || parsed);
 
-    // Atualiza local para refletir nuvem
+    // Atualiza local
     saveToLocalStorage(user.uid, d.playerSave.save, d.playerSave.hash);
-
+    
     return { ok: true };
 };
 
-console.log('gdAutoSaveUsers (LOCAL-FIRST V2) Carregado com sucesso.');
+console.log('gdAutoSaveUsers (FIXED) Carregado.');
 `;
 
   const s = document.createElement('script');
   s.type = 'module';
-  s.id = SCRIPT_ID;
+  s.id = 'gd-autosave-users-v2-script'; // ID fixo para evitar duplicatas
   s.textContent = moduleCode;
   document.head.appendChild(s);
 
@@ -2232,7 +2149,7 @@ gdjs.copyArray(runtimeScene.getObjects("OppSideLifeBar"), gdjs.PlayCode.GDOppSid
 {
 
 
-gdjs.PlayCode.userFunc0x905c90(runtimeScene);
+gdjs.PlayCode.userFunc0xa44ab8(runtimeScene);
 
 }
 
@@ -18292,7 +18209,7 @@ gdjs.PlayCode.eventsList215(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xa62308 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x887e90 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18475,7 +18392,7 @@ gdjs.PlayCode.eventsList219(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xa63088 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x170f460 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -18486,7 +18403,7 @@ gdjs.PlayCode.eventsList221 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0xa62308(runtimeScene);
+gdjs.PlayCode.userFunc0x887e90(runtimeScene);
 
 }
 
@@ -18562,7 +18479,7 @@ gdjs.PlayCode.eventsList220(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xa63088(runtimeScene);
+gdjs.PlayCode.userFunc0x170f460(runtimeScene);
 
 }
 
@@ -18662,7 +18579,7 @@ gdjs.PlayCode.eventsList223(runtimeScene);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0x133d270 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1dc8e38 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // leitura segura de Variable (usa getAsString se disponível)
 function readVarSafe(varObj) {
@@ -18845,7 +18762,7 @@ gdjs.PlayCode.eventsList227(runtimeScene, asyncObjectsList);} //End of subevents
 }
 
 
-};gdjs.PlayCode.userFunc0xed9fa8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1dd78c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.gdAutoSaveUsers.createAndSaveEncryptedSave(runtimeScene)
   .then(r => console.log('save scheduled/result', r))
@@ -18856,7 +18773,7 @@ gdjs.PlayCode.eventsList229 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x133d270(runtimeScene);
+gdjs.PlayCode.userFunc0x1dc8e38(runtimeScene);
 
 }
 
@@ -18932,7 +18849,7 @@ gdjs.PlayCode.eventsList228(runtimeScene, asyncObjectsList);} //End of subevents
 {
 
 
-gdjs.PlayCode.userFunc0xed9fa8(runtimeScene);
+gdjs.PlayCode.userFunc0x1dd78c8(runtimeScene);
 
 }
 
@@ -22705,7 +22622,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 }
 
 
-};gdjs.PlayCode.userFunc0x1837d08 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0xd24990 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // RESET_OFFSETS_ONCE — zera currentTime de todos os canais sem pausar, roda apenas uma vez
 (function resetOffsetsOnce(){
@@ -22724,7 +22641,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.04
 
 
 };
-gdjs.PlayCode.userFunc0x1dda388 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayCode.userFunc0xb381c8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT C — MONITOR (Correção "Instant Find" na primeira carga)
 (function(runtimeScene){
@@ -22878,7 +22795,7 @@ gdjs.PlayCode.eventsList270 = function(runtimeScene, asyncObjectsList) {
 {
 
 
-gdjs.PlayCode.userFunc0x1dda388(runtimeScene);
+gdjs.PlayCode.userFunc0xb381c8(runtimeScene);
 
 }
 
@@ -22942,7 +22859,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.PlayCode.userFunc0x1837d08(runtimeScene);
+gdjs.PlayCode.userFunc0xd24990(runtimeScene);
 
 }
 
@@ -23077,7 +22994,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1cead40 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x1d27390 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(){
   // --- CONFIGURAÇÃO GLOBAL E CACHE ---
@@ -23533,7 +23450,7 @@ gdjs.PlayCode.eventsList277 = function(runtimeScene) {
 {
 
 
-gdjs.PlayCode.userFunc0x1cead40(runtimeScene);
+gdjs.PlayCode.userFunc0x1d27390(runtimeScene);
 
 }
 
@@ -23613,7 +23530,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(2), 
 }
 
 
-};gdjs.PlayCode.userFunc0x1256b98 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayCode.userFunc0x979758 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT B — LOADER OTIMIZADO (Singleton, Memory Fixes, Blobs Cleanup)
 // Mantém compatibilidade total com o original, mas previne redefinição e memory leaks.
@@ -24242,7 +24159,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.PlayCode.userFunc0x1256b98(runtimeScene);
+gdjs.PlayCode.userFunc0x979758(runtimeScene);
 
 }
 

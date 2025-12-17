@@ -528,7 +528,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3)
 }
 
 
-};gdjs.MenuCode.userFunc0xd20158 = function GDJSInlineCode(runtimeScene) {
+};gdjs.MenuCode.userFunc0xb3c9a0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   // --- GESTÃO DE UI E REFERÊNCIAS ---
@@ -540,14 +540,14 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3)
   if (existingUI) existingUI.remove();
 
   // SINGLETON CHECK
-  if (window._gd_firebase_auth_standalone) {
+  if (window._gd_firebase_auth_standalone_v9) {
       if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.rebuildUI) {
           window.gdFirebaseAuthUI.rebuildUI();
           if(window.gdFirebaseAuthUI.checkAuth) window.gdFirebaseAuthUI.checkAuth();
       }
       return;
   }
-  window._gd_firebase_auth_standalone = true;
+  window._gd_firebase_auth_standalone_v9 = true;
 
   const moduleCode = `
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
@@ -589,8 +589,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* ---------- 2. Criptografia & Helpers (EMBUTIDOS) ---------- */
-// Isso torna o script autossuficiente para salvar/carregar
+/* ---------- 2. Criptografia & Helpers ---------- */
 const PBKDF2_ITERATIONS = 150000; const SALT_BYTES = 16; const IV_BYTES = 12; const DERIVED_BITS = 512;
 function strToU8(s){ return new TextEncoder().encode(String(s)); }
 function u8ToStr(u){ return new TextDecoder().decode(u); }
@@ -622,12 +621,12 @@ async function encryptFilePayload(secret, jsonText){
 
 async function decryptFilePayload(secret, fileText){
   const parts = fileText.trim().split('.');
-  if (parts.length !== 4) throw new Error("Save corrompido ou formato inválido");
+  if (parts.length !== 4) throw new Error("Save corrompido");
   const salt = b64ToU8(parts[0]); const iv = b64ToU8(parts[1]); const cipher = b64ToU8(parts[2]); const hmac = b64ToU8(parts[3]);
   const { aesKey, hmacKey } = await deriveKeys(secret, salt);
   const macData = concatU8(salt, iv, cipher);
   const expected = await computeHmac(hmacKey, macData);
-  let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("Senha incorreta ou arquivo modificado");
+  let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("Senha incorreta");
   const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv: iv}, aesKey, cipher);
   return u8ToStr(new Uint8Array(plainBuf));
 }
@@ -637,10 +636,9 @@ async function sha256Hex(text){
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-/* ---------- 3. Helpers GDevelop & User ---------- */
 function getUsername(){
-  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication) return gdjs.playerAuthentication.getUsername(); }catch(e){}
-  try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : ''); } catch(e){}
+  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && gdjs.playerAuthentication.getUsername()) return gdjs.playerAuthentication.getUsername(); }catch(e){}
+  try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'guest'); } catch(e){}
   return 'guest';
 }
 function getToken(){
@@ -648,75 +646,105 @@ function getToken(){
   return '';
 }
 
-// Helpers de Variáveis
+// --- LEITURA E ESCRITA DE DADOS (UNIVERSAL + SONGS) ---
 const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
+
+function parseToNumberOrZero(v){
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  if (typeof v === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v)) return Number(v);
+  if (v && typeof v === 'object') { if (v.getAsNumber) return v.getAsNumber(); if ('value' in v) return Number(v.value) || 0; }
+  return 0;
+}
+
 function readGameData(scene) {
+    const payload = {};
     try {
-        const pu = scene.getGame().getVariables().get('PlayerUniversal');
-        if (!pu) return {};
-        const payload = {};
-        if (typeof pu.toJSObject === 'function') {
-            const obj = pu.toJSObject();
-            for (const k of EXPORT_FIELDS) payload[k] = Number(obj[k]) || 0;
-        } else {
-            for (const k of EXPORT_FIELDS) {
-                const child = pu.getChild(k);
-                payload[k] = child ? (Number(child.getAsNumber()) || 0) : 0;
+        const gameVars = scene.getGame().getVariables();
+        
+        // 1. PlayerUniversal
+        const pu = gameVars.get('PlayerUniversal');
+        if (pu) {
+            payload.universal = {};
+            if (typeof pu.toJSObject === 'function') {
+                const obj = pu.toJSObject();
+                for (const k of EXPORT_FIELDS) payload.universal[k] = parseToNumberOrZero(obj[k]);
+            } else {
+                for (const k of EXPORT_FIELDS) {
+                    const child = pu.getChild(k);
+                    payload.universal[k] = child ? parseToNumberOrZero(child.getAsNumber ? child.getAsNumber() : child.value) : 0;
+                }
             }
         }
-        return payload;
-    } catch(e) { return {}; }
+
+        // 2. SongScores (NOVO: Salva músicas individuais)
+        const songVars = gameVars.get('SongScores');
+        if (songVars) {
+            payload.songs = typeof songVars.toJSObject === 'function' ? songVars.toJSObject() : {};
+        }
+    } catch(e) { console.warn("Erro lendo vars:", e); }
+    return payload;
 }
+
 function applyGameData(scene, payload) {
-    const pu = scene.getGame().getVariables().get('PlayerUniversal');
-    if(!pu) return;
-    for (const k of EXPORT_FIELDS){
-        const val = payload[k] || 0;
-        try { pu.getChild(k).setNumber(val); } catch(e){}
-    }
+    try {
+        const gameVars = scene.getGame().getVariables();
+
+        // 1. PlayerUniversal
+        if (payload.universal) {
+            const pu = gameVars.get('PlayerUniversal');
+            if (pu) {
+                for (const k of EXPORT_FIELDS) {
+                    const val = payload.universal[k] || 0;
+                    try { pu.getChild(k).setNumber(val); } catch(e){}
+                }
+            }
+        }
+
+        // 2. SongScores (NOVO: Carrega músicas individuais)
+        if (payload.songs) {
+            const sv = gameVars.get('SongScores');
+            if (sv) {
+                // Tenta usar o método nativo se disponível (GDevelop 5 modern)
+                if (typeof sv.fromJSObject === 'function') {
+                    sv.fromJSObject(payload.songs);
+                } else {
+                    console.warn("SongScores: fromJSObject não disponível. Songs não carregadas.");
+                }
+            }
+        }
+        
+        // Sinaliza fim do carregamento
+        if (gameVars.has('PlayerOnSave')) gameVars.get('PlayerOnSave').setNumber(1);
+
+    } catch(e){ console.warn("Erro aplicando vars:", e); }
 }
 
-/* ---------- 4. Lógica Autossuficiente (Save/Load/Profile) ---------- */
+/* ---------- 4. Lógica de Save/Load Autossuficiente ---------- */
 let _userProfileCache = null; 
-
 async function getUserProfile(uid, force = false) {
     if (_userProfileCache && _userProfileCache.uid === uid && !force) return _userProfileCache;
     try {
         const snap = await getDoc(doc(db, 'users', uid));
-        if (snap.exists()) {
-            _userProfileCache = { uid, ...snap.data() };
-        } else {
-            _userProfileCache = { uid };
-        }
+        _userProfileCache = snap.exists() ? { uid, ...snap.data() } : { uid };
         return _userProfileCache;
-    } catch(e) { console.warn(e); return { uid }; }
+    } catch(e) { return { uid }; }
 }
 
 async function internalCloudSave(scene) {
     const user = auth.currentUser;
     if (!user) throw new Error("Não conectado.");
 
-    // 1. Ler dados do jogo
     const rawData = readGameData(scene);
-    const ordered = {}; 
-    for(const k of EXPORT_FIELDS) ordered[k] = rawData[k] || 0;
-    
-    // 2. Criptografar
-    const plainJson = JSON.stringify({ version: 1, payload: ordered });
+    // Usa version 2 para indicar estrutura nova (universal + songs)
+    const plainJson = JSON.stringify({ version: 2, payload: rawData });
     const hash = await sha256Hex(plainJson);
     const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
     const encrypted = await encryptFilePayload(secret, plainJson);
 
-    // 3. Enviar para Firestore
     await setDoc(doc(db, 'users', user.uid), {
-        playerSave: {
-            save: encrypted,
-            hash: hash,
-            updatedAt: serverTimestamp()
-        }
+        playerSave: { save: encrypted, hash: hash, updatedAt: serverTimestamp() }
     }, { merge: true });
 
-    // 4. Salvar Backup Local
     localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({
         encSave: encrypted, hash, uid: user.uid, ts: Date.now(), synced: true
     }));
@@ -728,23 +756,17 @@ async function internalCloudLoad(scene) {
     const user = auth.currentUser;
     if (!user) throw new Error("Não conectado.");
 
-    // 1. Baixar da Nuvem
     const snap = await getDoc(doc(db, 'users', user.uid));
     if (!snap.exists()) throw new Error("Save não encontrado na nuvem.");
-
     const data = snap.data();
     if (!data.playerSave || !data.playerSave.save) throw new Error("Save inválido na nuvem.");
 
-    // 2. Descriptografar e Aplicar
     const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
     const decryptedJson = await decryptFilePayload(secret, data.playerSave.save);
     
     const parsed = JSON.parse(decryptedJson);
-    const payload = parsed.payload || parsed;
+    applyGameData(scene, parsed.payload || parsed);
 
-    applyGameData(scene, payload);
-
-    // 3. Atualizar Local
     localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({
         encSave: data.playerSave.save, 
         hash: data.playerSave.hash, 
@@ -756,100 +778,81 @@ async function internalCloudLoad(scene) {
     return true;
 }
 
-// Lógica de Login: Auto-Load do Save se não tiver local
+// Auto-Load ao Logar
 async function handleProfileAndSaveLogic(user) {
     if(!user) return;
-    
-    // Carregar Perfil (Visual)
     const profile = await getUserProfile(user.uid);
     updateUIWithProfile(user, profile);
 
-    // Verificar Save
-    const hasLocal = localStorage.getItem("GD_FNF_LOCAL_SAVE_V1");
-    if (!hasLocal && profile.playerSave && profile.playerSave.save) {
-        // Tenta baixar silenciosamente
+    // 1. Tenta Local
+    const localRaw = localStorage.getItem("GD_FNF_LOCAL_SAVE_V1");
+    let loadedLocal = false;
+    if (localRaw) {
+        try {
+            const localData = JSON.parse(localRaw);
+            if (localData.uid === user.uid) {
+                const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+                const plain = await decryptFilePayload(secret, localData.encSave);
+                const parsed = JSON.parse(plain);
+                applyGameData(window._gd_runtimeScene, parsed.payload || parsed);
+                console.log("[Auth] Save Local carregado.");
+                loadedLocal = true;
+            }
+        } catch(e) { console.warn("[Auth] Erro local:", e); }
+    }
+
+    // 2. Tenta Nuvem se falhou local
+    if (!loadedLocal && profile.playerSave && profile.playerSave.save) {
         try {
             const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
             const plain = await decryptFilePayload(secret, profile.playerSave.save);
             const parsed = JSON.parse(plain);
             applyGameData(window._gd_runtimeScene, parsed.payload || parsed);
             
-            // Cria local
             localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({
-                encSave: profile.playerSave.save,
-                hash: profile.playerSave.hash,
-                uid: user.uid,
-                ts: Date.now(),
-                synced: true
+                encSave: profile.playerSave.save, hash: profile.playerSave.hash, uid: user.uid, ts: Date.now(), synced: true
             }));
-            if(window.showToast) window.showToast("Progresso restaurado!");
-        } catch(e) { console.warn("Auto-restore failed:", e); }
+            if(window.showToast) window.showToast("Dados recuperados da nuvem!");
+        } catch(e){ console.warn("[Auth] Erro nuvem:", e); }
     }
 }
 
-// CORREÇÃO DO ERRO URL TOO LONG
 async function saveProfileInternal({ displayName, description, avatarURL }) {
     const user = auth.currentUser;
     if (!user) throw new Error("Não conectado.");
-    
     window.showToast("Salvando...");
-
+    
     const updateData = { updatedAt: serverTimestamp() };
     if (displayName !== undefined) updateData.displayName = displayName;
     if (description !== undefined) updateData.description = description;
     if (avatarURL !== undefined) updateData.avatarURL = avatarURL;
 
-    // 1. Firestore recebe TUDO (incluindo Base64 gigante)
     await setDoc(doc(db, 'users', user.uid), updateData, { merge: true });
-
-    // 2. Auth Profile recebe APENAS Nome (Evita erro URL too long)
+    
     const authUpdates = {};
     if (displayName) authUpdates.displayName = displayName;
-    
-    // Se avatarURL for curto (http), salva no Auth. Se for Base64 (data:), ignora no Auth.
-    if (avatarURL && !avatarURL.startsWith("data:")) {
-        authUpdates.photoURL = avatarURL;
-    }
+    if (avatarURL && !avatarURL.startsWith("data:")) authUpdates.photoURL = avatarURL;
+    if (Object.keys(authUpdates).length > 0) await updateProfile(user, authUpdates);
 
-    if (Object.keys(authUpdates).length > 0) {
-        await updateProfile(user, authUpdates);
-    }
-
-    // 3. Cache Update
-    if (_userProfileCache) {
-        Object.assign(_userProfileCache, updateData);
-        delete _userProfileCache.updatedAt;
-    }
-    
+    if (_userProfileCache) { Object.assign(_userProfileCache, updateData); delete _userProfileCache.updatedAt; }
     updateUIWithProfile(user, _userProfileCache || {});
     window.showToast("Perfil salvo!");
     return true;
 }
 
-/* ---------- 5. UI Creation & Image Logic ---------- */
-function resizeAndOptimizeImage(file, maxWidth, maxHeight, callback) {
+/* ---------- 5. UI ---------- */
+function resizeAndOptimizeImage(file, w, h, cb) {
     const reader = new FileReader();
     reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-            let width = img.width;
-            let height = img.height;
-            if (width > maxWidth || height > maxHeight) {
-                const ratio = Math.min(maxWidth / width, maxHeight / height);
-                width = Math.round(width * ratio);
-                height = Math.round(height * ratio);
-            }
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            callback(dataUrl);
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+            let width = img.width, height = img.height;
+            if (width > w || height > h) { const r = Math.min(w/width, h/height); width*=r; height*=r; }
+            const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+            cb(canvas.toDataURL('image/jpeg', 0.85));
+        }; img.src = e.target.result;
+    }; reader.readAsDataURL(file);
 }
 
 function createAuthOverlayAndBind(){
@@ -858,20 +861,15 @@ function createAuthOverlayAndBind(){
   const css = \`
     #gd-firebase-auth-overlay { position: fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:999999; background: rgba(0,0,0,0.75); font-family: 'Segoe UI', sans-serif; backdrop-filter: blur(5px); }
     #gd-firebase-auth-card { width: 480px; max-width: 90%; background: #0f1219; color: #fff; border-radius: 16px; box-shadow: 0 0 40px rgba(0,0,0,0.8); padding: 25px; position:relative; border: 1px solid #2a303c; }
-    
     .gd-input { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #374151; background: #1f2937; color:#fff; box-sizing:border-box; outline:none; font-size:14px; }
-    .gd-input:focus { border-color: #6366f1; }
-    
-    .gd-btn { padding:12px; border-radius:8px; border:none; cursor:pointer; font-weight:bold; font-size:14px; transition: 0.2s; width: 100%; margin-top: 5px; }
-    .gd-btn:hover { opacity: 0.9; transform: translateY(-1px); }
-    .gd-btn-primary { background: #6366f1; color: white; }
-    .gd-btn-sec { background: #374151; color: #d1d5db; }
-    .gd-btn-danger { background: #ef4444; color: white; width: auto; padding: 8px 16px; font-size: 12px;}
+    .gd-btn { padding:12px; border-radius:8px; border:none; cursor:pointer; font-weight:bold; font-size:14px; width:100%; margin-top:5px; transition:0.2s; }
+    .gd-btn:hover { opacity:0.9; transform:translateY(-1px); }
+    .gd-btn-primary { background:#6366f1; color:white; }
+    .gd-btn-sec { background:#374151; color:#d1d5db; }
+    .gd-btn-danger { background:#ef4444; color:white; width:auto; padding:8px 16px; font-size:12px; }
     .gd-link { cursor:pointer; color:#818cf8; text-decoration:none; font-size:13px; margin-top:10px; display:inline-block; }
-    
     #gd-auth-close { position:absolute; right:20px; top:20px; cursor:pointer; color:#9ca3af; font-size: 20px; }
     #gd-auth-title { margin: 0 0 20px 0; font-size: 22px; font-weight: 700; color: #f3f4f6; }
-
     .user-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
     .user-info-text { flex: 1; }
     .user-name { font-size: 20px; font-weight: bold; color: #fff; display: block; }
@@ -879,33 +877,24 @@ function createAuthOverlayAndBind(){
     .user-email { font-size: 13px; color: #9ca3af; opacity: 0; transition: opacity 0.2s; }
     .user-desc { font-size: 13px; color: #d1d5db; margin-top: 8px; font-style: italic; background: #1f2937; padding: 8px; border-radius: 6px; display:none; }
     #gd-pfp-display { width: 80px; height: 80px; border-radius: 12px; object-fit: cover; border: 2px solid #374151; background: #111; }
-    
     #gd-settings-view { display: none; }
     .settings-row { display: flex; gap: 15px; margin-bottom: 10px; }
     .pfp-preview-container { width: 80px; text-align: center; }
     #gd-pfp-preview { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; border: 1px solid #4b5563; margin-bottom: 5px; }
-    
     .cloud-area { margin-top: 20px; padding-top: 15px; border-top: 1px solid #2a303c; }
     .cloud-warn { font-size: 11px; color: #fbbf24; text-align: center; margin-bottom: 10px; }
     .btn-cloud-up { background: #8b5cf6; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .btn-cloud-down { background: #0ea5e9; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
-
     #gd-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 10px 20px; border-radius: 30px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 1000000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); border: 1px solid #374151; }
   \`;
   
-  const style = document.createElement('style');
-  style.textContent = css;
-  document.head.appendChild(style);
-
-  const overlay = document.createElement('div');
-  overlay.id = 'gd-firebase-auth-overlay';
-  overlay.style.display = 'none';
+  const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
+  const overlay = document.createElement('div'); overlay.id = 'gd-firebase-auth-overlay'; overlay.style.display = 'none';
   
   overlay.innerHTML = \`
     <div id="gd-firebase-auth-card">
       <div id="gd-auth-close">✕</div>
       <h2 id="gd-auth-title">Entrar</h2>
-
       <div id="gd-login-form">
         <input id="gd-email" class="gd-input" type="email" placeholder="Email" />
         <input id="gd-password" class="gd-input" type="password" placeholder="Senha" />
@@ -916,7 +905,6 @@ function createAuthOverlayAndBind(){
         <div id="gd-msg" style="color:#f87171; font-size:13px; margin-top:10px; min-height:18px;"></div>
         <div class="gd-link" id="gd-forgot-btn">Esqueci a senha</div>
       </div>
-
       <div id="gd-register-form" style="display:none;">
         <input id="gd-reg-name" class="gd-input" type="text" placeholder="Nome de Usuário" />
         <input id="gd-reg-email" class="gd-input" type="email" placeholder="Email" />
@@ -927,7 +915,6 @@ function createAuthOverlayAndBind(){
         </div>
         <div id="gd-reg-msg" style="color:#f87171; font-size:13px; margin-top:10px;"></div>
       </div>
-
       <div id="gd-profile-view" style="display:none;">
         <div class="user-header">
            <div class="user-info-text">
@@ -950,7 +937,6 @@ function createAuthOverlayAndBind(){
              <button id="gd-cloud-down" class="gd-btn btn-cloud-down">☁ Baixar Save da Nuvem</button>
         </div>
       </div>
-
       <div id="gd-settings-view">
         <div class="settings-row">
             <div class="pfp-preview-container">
@@ -964,13 +950,11 @@ function createAuthOverlayAndBind(){
             </div>
         </div>
         <textarea id="gd-set-desc" class="gd-input" placeholder="Descrição do Perfil" style="resize:vertical; height:80px;"></textarea>
-        
         <div style="display:flex; gap:10px; margin-top:10px;">
             <button id="gd-save-settings" class="gd-btn gd-btn-primary">Salvar Alterações</button>
             <button id="gd-cancel-settings" class="gd-btn gd-btn-sec">Voltar</button>
         </div>
       </div>
-
     </div>
     <div id="gd-toast"><span>Msg</span></div>
   \`;
@@ -984,148 +968,62 @@ function createAuthOverlayAndBind(){
   $('gd-go-login-btn').onclick = () => switchView('login');
 
   function switchView(viewName) {
-      $('gd-login-form').style.display = 'none';
-      $('gd-register-form').style.display = 'none';
-      $('gd-profile-view').style.display = 'none';
-      $('gd-settings-view').style.display = 'none';
-      
+      $('gd-login-form').style.display = 'none'; $('gd-register-form').style.display = 'none'; $('gd-profile-view').style.display = 'none'; $('gd-settings-view').style.display = 'none';
       if(viewName === 'login') { $('gd-login-form').style.display = 'block'; $('gd-auth-title').textContent = 'Entrar'; }
       else if (viewName === 'register') { $('gd-register-form').style.display = 'block'; $('gd-auth-title').textContent = 'Criar Conta'; }
       else if (viewName === 'profile') { $('gd-profile-view').style.display = 'block'; $('gd-auth-title').textContent = 'Perfil'; }
       else if (viewName === 'settings') { $('gd-settings-view').style.display = 'block'; $('gd-auth-title').textContent = 'Editar Perfil'; }
   }
 
-  $('gd-login-btn').onclick = async () => {
-      try { await signInWithEmailAndPassword(auth, $('gd-email').value, $('gd-password').value); } 
-      catch(e) { $('gd-msg').textContent = "Erro: " + e.message; }
-  };
+  $('gd-login-btn').onclick = async () => { try { await signInWithEmailAndPassword(auth, $('gd-email').value, $('gd-password').value); } catch(e) { $('gd-msg').textContent = "Erro: " + e.message; } };
   $('gd-register-btn').onclick = async () => {
-      const name = $('gd-reg-name').value;
-      if(!name) return $('gd-reg-msg').textContent = "Nome obrigatório.";
-      try {
-          const cred = await createUserWithEmailAndPassword(auth, $('gd-reg-email').value, $('gd-reg-pass').value);
-          await saveProfileInternal({ displayName: name });
-      } catch(e) { $('gd-reg-msg').textContent = e.message; }
+      const name = $('gd-reg-name').value; if(!name) return $('gd-reg-msg').textContent = "Nome obrigatório.";
+      try { const cred = await createUserWithEmailAndPassword(auth, $('gd-reg-email').value, $('gd-reg-pass').value); await saveProfileInternal({ displayName: name }); } catch(e) { $('gd-reg-msg').textContent = e.message; }
   };
   $('gd-logout-btn').onclick = async () => { await signOut(auth); overlay.style.display='none'; };
 
-  let emailVis = false;
-  $('gd-eye-btn').onclick = () => { emailVis=!emailVis; $('gd-display-email').style.opacity = emailVis ? 1 : 0; };
+  let emailVis = false; $('gd-eye-btn').onclick = () => { emailVis=!emailVis; $('gd-display-email').style.opacity = emailVis ? 1 : 0; };
 
   $('gd-open-settings').onclick = () => {
-      const u = auth.currentUser;
-      const cached = _userProfileCache || {};
-      $('gd-set-name').value = cached.displayName || u.displayName || "";
-      $('gd-set-desc').value = cached.description || "";
-      $('gd-set-url').value = cached.avatarURL || u.photoURL || "";
-      $('gd-pfp-preview').src = cached.avatarURL || u.photoURL || "";
+      const u = auth.currentUser; const cached = _userProfileCache || {};
+      $('gd-set-name').value = cached.displayName || u.displayName || ""; $('gd-set-desc').value = cached.description || ""; $('gd-set-url').value = cached.avatarURL || u.photoURL || ""; $('gd-pfp-preview').src = cached.avatarURL || u.photoURL || "";
       switchView('settings');
   };
-
   $('gd-cancel-settings').onclick = () => switchView('profile');
-
   $('gd-save-settings').onclick = async () => {
-      try {
-          await saveProfileInternal({
-              displayName: $('gd-set-name').value,
-              description: $('gd-set-desc').value,
-              avatarURL: $('gd-set-url').value || null
-          });
-          switchView('profile');
-      } catch(e) { window.showToast("Erro: " + e.message); }
+      try { await saveProfileInternal({ displayName: $('gd-set-name').value, description: $('gd-set-desc').value, avatarURL: $('gd-set-url').value || null }); switchView('profile'); } catch(e) { window.showToast("Erro: " + e.message); }
   };
+  $('gd-file-input').onchange = (e) => { const f = e.target.files[0]; if(f) resizeAndOptimizeImage(f, 240, 240, (b64) => { $('gd-set-url').value = b64; $('gd-pfp-preview').src = b64; }); };
 
-  $('gd-file-input').onchange = (e) => {
-      const file = e.target.files[0];
-      if(!file) return;
-      resizeAndOptimizeImage(file, 240, 240, (base64) => {
-          $('gd-set-url').value = base64;
-          $('gd-pfp-preview').src = base64;
-      });
-  };
-
-  /* --- BOTÕES AUTOSSUFICIENTES --- */
-  $('gd-cloud-up').onclick = async () => {
-     window.showToast("Enviando...");
-     try { 
-         await internalCloudSave(window._gd_runtimeScene);
-         window.showToast("Backup Enviado!"); 
-     } catch(e) { window.showToast("Erro: " + e.message); }
-  };
-
-  $('gd-cloud-down').onclick = async () => {
-     window.showToast("Baixando...");
-     try { 
-         await internalCloudLoad(window._gd_runtimeScene);
-         window.showToast("Progresso restaurado!"); 
-     } catch(e) { window.showToast("Erro: " + e.message); }
-  };
+  $('gd-cloud-up').onclick = async () => { window.showToast("Enviando..."); try { await internalCloudSave(window._gd_runtimeScene); window.showToast("Backup Enviado!"); } catch(e) { window.showToast("Erro: " + e.message); } };
+  $('gd-cloud-down').onclick = async () => { window.showToast("Baixando..."); try { await internalCloudLoad(window._gd_runtimeScene); window.showToast("Progresso restaurado!"); } catch(e) { window.showToast("Erro: " + e.message); } };
 
   if(auth.currentUser) handleProfileAndSaveLogic(auth.currentUser);
 }
 
-// UI UPDATE
 function updateUIWithProfile(user, profile) {
-    const $ = id => document.getElementById(id);
-    if(!$('gd-firebase-auth-overlay')) return;
-
-    if($('gd-login-form').style.display !== 'none' || $('gd-register-form').style.display !== 'none') {
-        $('gd-login-form').style.display = 'none';
-        $('gd-register-form').style.display = 'none';
-        $('gd-profile-view').style.display = 'block';
-        $('gd-auth-title').textContent = 'Perfil';
-    }
-
-    const name = profile.displayName || user.displayName || "Usuário";
-    $('gd-display-name').textContent = name;
-    $('gd-display-email').textContent = user.email;
-    
-    if(profile.description) {
-        $('gd-display-desc').textContent = profile.description;
-        $('gd-display-desc').style.display = 'block';
-    } else {
-        $('gd-display-desc').style.display = 'none';
-    }
-
-    // Prioriza Avatar do Firestore (profile) sobre o do Auth (user)
-    const pfp = profile.avatarURL || user.photoURL || "https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/firebase_28dp.png";
-    $('gd-pfp-display').src = pfp;
-    
-    if(window._gd_runtimeScene) {
-        try {
-            const vars = window._gd_runtimeScene.getGame().getVariables();
-            vars.get('auth_name').setString(name);
-            vars.get('auth_uid').setString(user.uid);
-        } catch(e){}
-    }
+    const $ = id => document.getElementById(id); if(!$('gd-firebase-auth-overlay')) return;
+    if($('gd-login-form').style.display !== 'none' || $('gd-register-form').style.display !== 'none') { $('gd-login-form').style.display = 'none'; $('gd-register-form').style.display = 'none'; $('gd-profile-view').style.display = 'block'; $('gd-auth-title').textContent = 'Perfil'; }
+    const name = profile.displayName || user.displayName || "Usuário"; $('gd-display-name').textContent = name; $('gd-display-email').textContent = user.email;
+    if(profile.description) { $('gd-display-desc').textContent = profile.description; $('gd-display-desc').style.display = 'block'; } else { $('gd-display-desc').style.display = 'none'; }
+    const pfp = profile.avatarURL || user.photoURL || "https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/firebase_28dp.png"; $('gd-pfp-display').src = pfp;
+    if(window._gd_runtimeScene) { try { const vars = window._gd_runtimeScene.getGame().getVariables(); vars.get('auth_name').setString(name); vars.get('auth_uid').setString(user.uid); } catch(e){} }
 }
 
 onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        await handleProfileAndSaveLogic(user);
-    } else {
+    if (user) { await handleProfileAndSaveLogic(user); }
+    else {
         _userProfileCache = null;
         const ui = document.getElementById('gd-firebase-auth-overlay');
-        if(ui && ui.style.display !== 'none') {
-            document.getElementById('gd-login-form').style.display = 'block';
-            document.getElementById('gd-profile-view').style.display = 'none';
-            document.getElementById('gd-settings-view').style.display = 'none';
-            document.getElementById('gd-auth-title').textContent = 'Entrar';
-        }
+        if(ui && ui.style.display !== 'none') { document.getElementById('gd-login-form').style.display = 'block'; document.getElementById('gd-profile-view').style.display = 'none'; document.getElementById('gd-settings-view').style.display = 'none'; document.getElementById('gd-auth-title').textContent = 'Entrar'; }
     }
 });
 
-// PUBLIC API
 window.gdFirebaseAuthUI = window.gdFirebaseAuthUI || {};
-window.gdFirebaseAuthUI.show = () => {
-    createAuthOverlayAndBind();
-    document.getElementById('gd-firebase-auth-overlay').style.display = 'flex';
-};
+window.gdFirebaseAuthUI.show = () => { createAuthOverlayAndBind(); document.getElementById('gd-firebase-auth-overlay').style.display = 'flex'; };
 window.gdFirebaseAuthUI.rebuildUI = createAuthOverlayAndBind;
 window.gdFirebaseAuthUI.checkAuth = () => { if(auth.currentUser) handleProfileAndSaveLogic(auth.currentUser); };
-window.gdFirebaseAuthUI.savePlayerNow = async (scene) => {
-    return await internalCloudSave(scene);
-};
+window.gdFirebaseAuthUI.savePlayerNow = async (scene) => { return await internalCloudSave(scene); };
 
 createAuthOverlayAndBind();
 `;
@@ -1192,7 +1090,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.MenuCode.userFunc0xd20158(runtimeScene);
+gdjs.MenuCode.userFunc0xb3c9a0(runtimeScene);
 
 }
 
