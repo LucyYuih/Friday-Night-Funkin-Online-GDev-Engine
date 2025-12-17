@@ -528,47 +528,26 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3)
 }
 
 
-};gdjs.MenuCode.userFunc0x16bbf48 = function GDJSInlineCode(runtimeScene) {
+};gdjs.MenuCode.userFunc0xd20158 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
-  // --- GESTÃO DE UI E CENA (AUTO-CLEANUP) ---
-  // ID da interface gráfica
+  // --- GESTÃO DE UI E REFERÊNCIAS ---
   const UI_ID = "gd-firebase-auth-overlay";
-  
-  // 1. Atualizar referência da cena global para que a lógica saiba quem é a cena atual
   window._gd_runtimeScene = runtimeScene;
 
-  // 2. Limpeza Inteligente de UI "Zumbi"
-  // Se a UI existe, mas pertence a uma cena anterior (ou foi duplicada), removemos.
-  // Como o Firebase é global, podemos recriar a UI a qualquer momento sem perder o login.
+  // Remove UI antiga
   const existingUI = document.getElementById(UI_ID);
-  if (existingUI) {
-      // Se já existe, verificamos se precisamos reiniciar os listeners (opcional)
-      // Para garantir limpeza, vamos remover e deixar o módulo recriar (soft reset da UI)
-      // OU se preferir performance absoluta, mantemos:
-      // existingUI.style.display = 'none'; // Esconde ao iniciar a cena
-      // return; 
-      
-      // Decisão: Vamos destruir a UI antiga para garantir que os inputs/eventos
-      // estejam limpos e vinculados ao contexto atual se necessário.
-      // O módulo abaixo tem uma checagem "if (document.getElementById... return"
-      // Então se removermos aqui, ele recria limpo.
-      existingUI.remove();
-  }
+  if (existingUI) existingUI.remove();
 
-  // --- SINGLETON DA LÓGICA (FIREBASE) ---
-  // A lógica de conexão e autenticação NÃO deve ser destruída ou recriada.
-  if (window._gd_firebase_users_combined_v1) {
-    // Apenas sinalizamos para o módulo global que a cena mudou e ele deve
-    // re-injetar a UI se ela foi removida acima.
-    if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.rebuildUI) {
-        window.gdFirebaseAuthUI.rebuildUI();
-    }
-    return;
+  // SINGLETON CHECK
+  if (window._gd_firebase_auth_standalone) {
+      if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.rebuildUI) {
+          window.gdFirebaseAuthUI.rebuildUI();
+          if(window.gdFirebaseAuthUI.checkAuth) window.gdFirebaseAuthUI.checkAuth();
+      }
+      return;
   }
-  
-  // Marca como inicializado
-  window._gd_firebase_users_combined_v1 = true;
+  window._gd_firebase_auth_standalone = true;
 
   const moduleCode = `
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
@@ -578,21 +557,17 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  updateProfile,
-  sendPasswordResetEmail
+  updateProfile
 } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js';
 import {
   getFirestore,
   doc,
   setDoc,
   getDoc,
-  updateDoc,
-  serverTimestamp,
-  arrayUnion,
-  arrayRemove
+  serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
 
-/* ---------- Light obfuscation / API key ---------- */
+/* ---------- 1. Configuração Firebase ---------- */
 function _obfDecode(b64xor) {
   const raw = atob(b64xor);
   let out = '';
@@ -610,17 +585,13 @@ const firebaseConfig = {
   measurementId: "G-MD2E4G1195"
 };
 
-// Inicialização ÚNICA do Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* ---------- Crypto primitives ---------- */
-const PBKDF2_ITERATIONS = 150000;
-const SALT_BYTES = 16;
-const IV_BYTES = 12;
-const DERIVED_BITS = 512;
-
+/* ---------- 2. Criptografia & Helpers (EMBUTIDOS) ---------- */
+// Isso torna o script autossuficiente para salvar/carregar
+const PBKDF2_ITERATIONS = 150000; const SALT_BYTES = 16; const IV_BYTES = 12; const DERIVED_BITS = 512;
 function strToU8(s){ return new TextEncoder().encode(String(s)); }
 function u8ToStr(u){ return new TextDecoder().decode(u); }
 function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
@@ -632,18 +603,15 @@ async function deriveKeys(password, saltU8){
   const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
   const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
   const dbuf = new Uint8Array(derived);
-  const aesBytes = dbuf.slice(0,32);
-  const hmacBytes = dbuf.slice(32,64);
+  const aesBytes = dbuf.slice(0,32); const hmacBytes = dbuf.slice(32,64);
   const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
   const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
   return { aesKey, hmacKey };
 }
-
 async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8); return new Uint8Array(sig); }
 
 async function encryptFilePayload(secret, jsonText){
-  const salt = randomBytes(SALT_BYTES);
-  const iv = randomBytes(IV_BYTES);
+  const salt = randomBytes(SALT_BYTES); const iv = randomBytes(IV_BYTES);
   const { aesKey, hmacKey } = await deriveKeys(secret, salt);
   const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(jsonText));
   const cipher = new Uint8Array(cipherBuf);
@@ -654,472 +622,512 @@ async function encryptFilePayload(secret, jsonText){
 
 async function decryptFilePayload(secret, fileText){
   const parts = fileText.trim().split('.');
-  if (parts.length !== 4) throw new Error("Invalid file format");
-  const salt = b64ToU8(parts[0]);
-  const iv = b64ToU8(parts[1]);
-  const cipher = b64ToU8(parts[2]);
-  const hmac = b64ToU8(parts[3]);
+  if (parts.length !== 4) throw new Error("Save corrompido ou formato inválido");
+  const salt = b64ToU8(parts[0]); const iv = b64ToU8(parts[1]); const cipher = b64ToU8(parts[2]); const hmac = b64ToU8(parts[3]);
   const { aesKey, hmacKey } = await deriveKeys(secret, salt);
   const macData = concatU8(salt, iv, cipher);
   const expected = await computeHmac(hmacKey, macData);
-  if (expected.length !== hmac.length) throw new Error("HMAC mismatch");
-  let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("HMAC mismatch");
+  let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("Senha incorreta ou arquivo modificado");
   const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv: iv}, aesKey, cipher);
   return u8ToStr(new Uint8Array(plainBuf));
 }
 
 async function sha256Hex(text){
   const buf = await crypto.subtle.digest('SHA-256', strToU8(text));
-  const u8 = new Uint8Array(buf);
-  return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-/* ---------- GDevelop helpers ---------- */
+/* ---------- 3. Helpers GDevelop & User ---------- */
 function getUsername(){
-  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') return gdjs.playerAuthentication.getUsername(); }catch(e){}
+  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication) return gdjs.playerAuthentication.getUsername(); }catch(e){}
   try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : ''); } catch(e){}
   return 'guest';
 }
 function getToken(){
-  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') return gdjs.playerAuthentication.getUserToken() || ''; } catch(e) {}
+  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication) return gdjs.playerAuthentication.getUserToken() || ''; } catch(e) {}
   return '';
 }
-function parseToNumberOrZero(v){
-  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
-  if (typeof v === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v)) return Number(v);
-  if (v && typeof v === 'object') {
-    try { if ('getAsNumber' in v && typeof v.getAsNumber === 'function') return v.getAsNumber();
-    if ('value' in v && typeof v.value === 'number') return v.value;
-    if ('value' in v && typeof v.value === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v.value)) return Number(v.value); } catch(e){}
-  }
-  return 0;
-}
 
+// Helpers de Variáveis
 const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
-function readNumericChildrenOrdered(runtimeScene){
-  try {
-    const gameVars = runtimeScene.getGame().getVariables();
-    const pu = gameVars.get('PlayerUniversal');
-    if (!pu) throw new Error('PlayerUniversal not found');
-    const payload = {};
+function readGameData(scene) {
     try {
-      if (typeof pu.toJSObject === 'function') {
-        const obj = pu.toJSObject();
-        for (const k of EXPORT_FIELDS) payload[k] = parseToNumberOrZero(obj[k]);
-        return payload;
-      }
-    } catch(e){}
-    for (const k of EXPORT_FIELDS){
-      try {
-        const child = pu.getChild(k);
-        let val = null;
-        if (child) {
-          if (typeof child.getAsNumber === 'function') val = child.getAsNumber();
-          else if (typeof child.getAsString === 'function') val = child.getAsString();
-          else if ('value' in child) val = child.value;
+        const pu = scene.getGame().getVariables().get('PlayerUniversal');
+        if (!pu) return {};
+        const payload = {};
+        if (typeof pu.toJSObject === 'function') {
+            const obj = pu.toJSObject();
+            for (const k of EXPORT_FIELDS) payload[k] = Number(obj[k]) || 0;
+        } else {
+            for (const k of EXPORT_FIELDS) {
+                const child = pu.getChild(k);
+                payload[k] = child ? (Number(child.getAsNumber()) || 0) : 0;
+            }
         }
-        payload[k] = parseToNumberOrZero(val);
-      } catch(e){ payload[k] = 0; }
-    }
-    return payload;
-  } catch(e){
-    const payload = {}; for (const k of EXPORT_FIELDS) payload[k] = 0; return payload;
-  }
+        return payload;
+    } catch(e) { return {}; }
 }
-function buildPlaintextSaveJson(runtimeScene){
-  const ordered = {};
-  const payload = readNumericChildrenOrdered(runtimeScene);
-  for (const k of EXPORT_FIELDS) ordered[k] = payload[k];
-  return JSON.stringify({ version: 1, payload: ordered });
-}
-
-/* ---------- Firestore helpers ---------- */
-const _gd_userDocCache = {};
-
-async function readUsersDoc(uid, opts = { force:false }){
-  if (!uid) return null;
-  if (!opts.force && _gd_userDocCache[uid] && _gd_userDocCache[uid].data) return _gd_userDocCache[uid].data;
-  try {
-    const snap = await getDoc(doc(db, 'users', uid));
-    if (!snap.exists()) { _gd_userDocCache[uid] = { data: null, ts: Date.now() }; return null; }
-    const data = snap.data();
-    _gd_userDocCache[uid] = { data, ts: Date.now() };
-    return data;
-  } catch(e){ console.warn('readUsersDoc failed', e); return null; }
-}
-
-async function writeUsersDocPartial(uid, partial){
-  if (!uid) throw new Error('uid required');
-  const ref = doc(db, 'users', uid);
-  await setDoc(ref, partial, { merge: true });
-  _gd_userDocCache[uid] = _gd_userDocCache[uid] || { data: {}, ts: 0 };
-  _gd_userDocCache[uid].data = Object.assign({}, _gd_userDocCache[uid].data || {}, partial);
-  _gd_userDocCache[uid].ts = Date.now();
-  return true;
-}
-
-async function applyDecryptedSaveToGame(runtimeScene, decryptedJsonText){
-  const parsed = JSON.parse(decryptedJsonText);
-  const payload = parsed.payload || parsed;
-  const gvars = runtimeScene.getGame().getVariables();
-  const pu = gvars.get('PlayerUniversal');
-  if (!pu) throw new Error('PlayerUniversal missing');
-  try {
-    try { pu.getChild('Encpt'); } catch(e){}
+function applyGameData(scene, payload) {
+    const pu = scene.getGame().getVariables().get('PlayerUniversal');
+    if(!pu) return;
     for (const k of EXPORT_FIELDS){
-      const v = (payload && (k in payload)) ? payload[k] : 0;
-      const num = parseToNumberOrZero(v);
-      try { pu.getChild(k).setNumber(num); } catch(e){ try { pu.getChild(k).setNumber(Number(num) || 0); } catch(e2){} }
-      try {
-        const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-        const ctxt = await encryptFilePayload(secret, String(num));
-        pu.getChild('Encpt').getChild(k).setString(ctxt);
-      } catch(e){ console.warn('Per-field encrypt failed for', k, e); }
+        const val = payload[k] || 0;
+        try { pu.getChild(k).setNumber(val); } catch(e){}
     }
-    try { const pv = gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber === 'function') pv.setNumber(1); } catch(e){}
-  } catch(e){ console.warn('applyDecryptedSaveToGame error', e); }
 }
 
-async function reconcilePlayerSave_ReadOnly(runtimeScene, opts = { forceRead:false }){
-  const user = auth.currentUser;
-  if (!user) return;
-  const uid = user.uid;
-  window._gd_reconcile_ran = window._gd_reconcile_ran || {};
-  if (window._gd_reconcile_ran[uid] && !opts.forceRead) return;
+/* ---------- 4. Lógica Autossuficiente (Save/Load/Profile) ---------- */
+let _userProfileCache = null; 
 
-  try {
-    const docData = await readUsersDoc(uid, { force: !!opts.forceRead });
-    if (docData && docData.playerSave && docData.playerSave.save) {
-      const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-      try {
-        const remotePlain = await decryptFilePayload(secret, docData.playerSave.save);
-        await applyDecryptedSaveToGame(runtimeScene || window._gd_runtimeScene, remotePlain);
-        console.log('Applied remote playerSave');
-      } catch(e){ console.warn('Failed to decrypt remote save', e); }
+async function getUserProfile(uid, force = false) {
+    if (_userProfileCache && _userProfileCache.uid === uid && !force) return _userProfileCache;
+    try {
+        const snap = await getDoc(doc(db, 'users', uid));
+        if (snap.exists()) {
+            _userProfileCache = { uid, ...snap.data() };
+        } else {
+            _userProfileCache = { uid };
+        }
+        return _userProfileCache;
+    } catch(e) { console.warn(e); return { uid }; }
+}
+
+async function internalCloudSave(scene) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Não conectado.");
+
+    // 1. Ler dados do jogo
+    const rawData = readGameData(scene);
+    const ordered = {}; 
+    for(const k of EXPORT_FIELDS) ordered[k] = rawData[k] || 0;
+    
+    // 2. Criptografar
+    const plainJson = JSON.stringify({ version: 1, payload: ordered });
+    const hash = await sha256Hex(plainJson);
+    const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+    const encrypted = await encryptFilePayload(secret, plainJson);
+
+    // 3. Enviar para Firestore
+    await setDoc(doc(db, 'users', user.uid), {
+        playerSave: {
+            save: encrypted,
+            hash: hash,
+            updatedAt: serverTimestamp()
+        }
+    }, { merge: true });
+
+    // 4. Salvar Backup Local
+    localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({
+        encSave: encrypted, hash, uid: user.uid, ts: Date.now(), synced: true
+    }));
+
+    return true;
+}
+
+async function internalCloudLoad(scene) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Não conectado.");
+
+    // 1. Baixar da Nuvem
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    if (!snap.exists()) throw new Error("Save não encontrado na nuvem.");
+
+    const data = snap.data();
+    if (!data.playerSave || !data.playerSave.save) throw new Error("Save inválido na nuvem.");
+
+    // 2. Descriptografar e Aplicar
+    const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+    const decryptedJson = await decryptFilePayload(secret, data.playerSave.save);
+    
+    const parsed = JSON.parse(decryptedJson);
+    const payload = parsed.payload || parsed;
+
+    applyGameData(scene, payload);
+
+    // 3. Atualizar Local
+    localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({
+        encSave: data.playerSave.save, 
+        hash: data.playerSave.hash, 
+        uid: user.uid, 
+        ts: Date.now(), 
+        synced: true
+    }));
+
+    return true;
+}
+
+// Lógica de Login: Auto-Load do Save se não tiver local
+async function handleProfileAndSaveLogic(user) {
+    if(!user) return;
+    
+    // Carregar Perfil (Visual)
+    const profile = await getUserProfile(user.uid);
+    updateUIWithProfile(user, profile);
+
+    // Verificar Save
+    const hasLocal = localStorage.getItem("GD_FNF_LOCAL_SAVE_V1");
+    if (!hasLocal && profile.playerSave && profile.playerSave.save) {
+        // Tenta baixar silenciosamente
+        try {
+            const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+            const plain = await decryptFilePayload(secret, profile.playerSave.save);
+            const parsed = JSON.parse(plain);
+            applyGameData(window._gd_runtimeScene, parsed.payload || parsed);
+            
+            // Cria local
+            localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({
+                encSave: profile.playerSave.save,
+                hash: profile.playerSave.hash,
+                uid: user.uid,
+                ts: Date.now(),
+                synced: true
+            }));
+            if(window.showToast) window.showToast("Progresso restaurado!");
+        } catch(e) { console.warn("Auto-restore failed:", e); }
     }
-    window._gd_reconcile_ran[uid] = true;
-  } catch(e){ console.error('reconcile error', e); }
 }
 
-async function createAndSaveEncryptedSaveInternal(runtimeScene){
-  runtimeScene = runtimeScene || window._gd_runtimeScene;
-  if (!runtimeScene) throw new Error('runtimeScene required');
-  const user = auth.currentUser;
-  if (!user) throw new Error('User not authenticated');
-  const uid = user.uid;
-  const plain = buildPlaintextSaveJson(runtimeScene);
-  const hashHex = await sha256Hex(plain);
-  const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-  const enc = await encryptFilePayload(secret, plain);
-  await writeUsersDocPartial(uid, { playerSave: { save: enc, hash: hashHex, updatedAt: serverTimestamp() } });
-  try {
-    const gs = runtimeScene.getGame().getVariables();
-    const v = gs.get('PlayerOnSave');
-    if (v && typeof v.setNumber === 'function') v.setNumber(1);
-  } catch(e){}
-  return { uid, hash: hashHex };
+// CORREÇÃO DO ERRO URL TOO LONG
+async function saveProfileInternal({ displayName, description, avatarURL }) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Não conectado.");
+    
+    window.showToast("Salvando...");
+
+    const updateData = { updatedAt: serverTimestamp() };
+    if (displayName !== undefined) updateData.displayName = displayName;
+    if (description !== undefined) updateData.description = description;
+    if (avatarURL !== undefined) updateData.avatarURL = avatarURL;
+
+    // 1. Firestore recebe TUDO (incluindo Base64 gigante)
+    await setDoc(doc(db, 'users', user.uid), updateData, { merge: true });
+
+    // 2. Auth Profile recebe APENAS Nome (Evita erro URL too long)
+    const authUpdates = {};
+    if (displayName) authUpdates.displayName = displayName;
+    
+    // Se avatarURL for curto (http), salva no Auth. Se for Base64 (data:), ignora no Auth.
+    if (avatarURL && !avatarURL.startsWith("data:")) {
+        authUpdates.photoURL = avatarURL;
+    }
+
+    if (Object.keys(authUpdates).length > 0) {
+        await updateProfile(user, authUpdates);
+    }
+
+    // 3. Cache Update
+    if (_userProfileCache) {
+        Object.assign(_userProfileCache, updateData);
+        delete _userProfileCache.updatedAt;
+    }
+    
+    updateUIWithProfile(user, _userProfileCache || {});
+    window.showToast("Perfil salvo!");
+    return true;
 }
 
-async function saveProfileInternal({ name, avatarURL, description }){
-  const user = auth.currentUser;
-  if (!user) throw new Error('User not authenticated');
-  const uid = user.uid;
-  const toWrite = {};
-  if (name !== undefined) toWrite.displayName = name;
-  if (avatarURL !== undefined) toWrite.avatarURL = avatarURL;
-  if (description !== undefined) toWrite.description = description;
-  toWrite.updatedAt = serverTimestamp();
-  await writeUsersDocPartial(uid, toWrite);
-  try { await updateProfile(user, { displayName: name || user.displayName, photoURL: avatarURL || user.photoURL }); } catch(e){}
-  return true;
+/* ---------- 5. UI Creation & Image Logic ---------- */
+function resizeAndOptimizeImage(file, maxWidth, maxHeight, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = Math.round(width * ratio);
+                height = Math.round(height * ratio);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            callback(dataUrl);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
 }
 
-/* ---------- UI CREATION (Pode ser chamada múltiplas vezes para recriar o DOM) ---------- */
 function createAuthOverlayAndBind(){
-  // Se já existe, não recria
   if (document.getElementById('gd-firebase-auth-overlay')) return;
 
   const css = \`
-#gd-firebase-auth-overlay { position: fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:999999; background: rgba(0,0,0,0.45); font-family: system-ui, -apple-system, sans-serif; }
-#gd-firebase-auth-card { width: 520px; max-width: calc(100% - 32px); background: #0f1724; color: #e6eef8; border-radius: 12px; box-shadow: 0 10px 30px rgba(2,6,23,0.6); padding: 18px; position:relative; min-height:120px; }
-.gd-input { width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color:inherit; box-sizing:border-box; }
-.gd-btn { padding:10px 12px; border-radius:8px; border:none; background:#2563eb; color:white; cursor:pointer; font-weight:600; }
-.gd-link { cursor:pointer; color:#60a5fa; text-decoration:underline; margin-top:8px; display:inline-block; }
-.gd-small { font-size:13px; color:#bcd7ff; margin-top:6px; }
-#gd-auth-error { color:#ffd1d1; min-height:18px; margin-top:6px; font-size:13px; }
-#gd-auth-close { position:absolute; right:14px; top:10px; cursor:pointer; color:#9fb8ff; font-weight:700; }
-#gd-pfp-preview { width:96px; height:96px; border-radius:10px; object-fit:cover; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); }
-#gd-pfp-mini { width:64px; height:64px; border-radius:8px; object-fit:cover; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); }
-#gd-settings-actions { display:flex; gap:8px; margin-top:10px; }
-#gd-auth-title { margin-bottom:6px; }
-#gd-eye-btn { background: transparent; color: #9fb8ff; border: none; cursor: pointer; font-size: 14px; }
-\`;
+    #gd-firebase-auth-overlay { position: fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:999999; background: rgba(0,0,0,0.75); font-family: 'Segoe UI', sans-serif; backdrop-filter: blur(5px); }
+    #gd-firebase-auth-card { width: 480px; max-width: 90%; background: #0f1219; color: #fff; border-radius: 16px; box-shadow: 0 0 40px rgba(0,0,0,0.8); padding: 25px; position:relative; border: 1px solid #2a303c; }
+    
+    .gd-input { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #374151; background: #1f2937; color:#fff; box-sizing:border-box; outline:none; font-size:14px; }
+    .gd-input:focus { border-color: #6366f1; }
+    
+    .gd-btn { padding:12px; border-radius:8px; border:none; cursor:pointer; font-weight:bold; font-size:14px; transition: 0.2s; width: 100%; margin-top: 5px; }
+    .gd-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .gd-btn-primary { background: #6366f1; color: white; }
+    .gd-btn-sec { background: #374151; color: #d1d5db; }
+    .gd-btn-danger { background: #ef4444; color: white; width: auto; padding: 8px 16px; font-size: 12px;}
+    .gd-link { cursor:pointer; color:#818cf8; text-decoration:none; font-size:13px; margin-top:10px; display:inline-block; }
+    
+    #gd-auth-close { position:absolute; right:20px; top:20px; cursor:pointer; color:#9ca3af; font-size: 20px; }
+    #gd-auth-title { margin: 0 0 20px 0; font-size: 22px; font-weight: 700; color: #f3f4f6; }
+
+    .user-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
+    .user-info-text { flex: 1; }
+    .user-name { font-size: 20px; font-weight: bold; color: #fff; display: block; }
+    .user-email-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .user-email { font-size: 13px; color: #9ca3af; opacity: 0; transition: opacity 0.2s; }
+    .user-desc { font-size: 13px; color: #d1d5db; margin-top: 8px; font-style: italic; background: #1f2937; padding: 8px; border-radius: 6px; display:none; }
+    #gd-pfp-display { width: 80px; height: 80px; border-radius: 12px; object-fit: cover; border: 2px solid #374151; background: #111; }
+    
+    #gd-settings-view { display: none; }
+    .settings-row { display: flex; gap: 15px; margin-bottom: 10px; }
+    .pfp-preview-container { width: 80px; text-align: center; }
+    #gd-pfp-preview { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; border: 1px solid #4b5563; margin-bottom: 5px; }
+    
+    .cloud-area { margin-top: 20px; padding-top: 15px; border-top: 1px solid #2a303c; }
+    .cloud-warn { font-size: 11px; color: #fbbf24; text-align: center; margin-bottom: 10px; }
+    .btn-cloud-up { background: #8b5cf6; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-cloud-down { background: #0ea5e9; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+    #gd-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 10px 20px; border-radius: 30px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 1000000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); border: 1px solid #374151; }
+  \`;
   
-  if(!document.getElementById('gd-firebase-auth-style')) {
-      const style = document.createElement('style');
-      style.id = 'gd-firebase-auth-style';
-      style.textContent = css;
-      document.head.appendChild(style);
-  }
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
 
   const overlay = document.createElement('div');
   overlay.id = 'gd-firebase-auth-overlay';
   overlay.style.display = 'none';
+  
   overlay.innerHTML = \`
-    <div id="gd-firebase-auth-card" role="dialog" aria-modal="true">
-      <div id="gd-auth-close" title="Fechar">✕</div>
+    <div id="gd-firebase-auth-card">
+      <div id="gd-auth-close">✕</div>
       <h2 id="gd-auth-title">Entrar</h2>
-      <div id="gd-auth-forms">
-        <div id="gd-login-form">
-          <input id="gd-email" class="gd-input" type="email" placeholder="Email" autocomplete="email" />
-          <input id="gd-password" class="gd-input" type="password" placeholder="Senha" autocomplete="current-password" />
-          <div style="display:flex; gap:8px; margin-top:8px;">
-            <button id="gd-login-btn" class="gd-btn" style="flex:1;">Entrar</button>
-            <button id="gd-show-register-btn" class="gd-btn" style="flex:1; background:#10B981;">Criar</button>
-          </div>
-          <div id="gd-auth-error"></div>
-          <div id="gd-auth-footer"> <span class="gd-link" id="gd-forgot">Esqueci a senha</span> </div>
+
+      <div id="gd-login-form">
+        <input id="gd-email" class="gd-input" type="email" placeholder="Email" />
+        <input id="gd-password" class="gd-input" type="password" placeholder="Senha" />
+        <div style="display:flex; gap:10px; margin-top:10px;">
+           <button id="gd-login-btn" class="gd-btn gd-btn-primary">Entrar</button>
+           <button id="gd-go-reg-btn" class="gd-btn gd-btn-sec">Criar Conta</button>
         </div>
-        <div id="gd-register-form" style="display:none;">
-          <input id="gd-reg-name" class="gd-input" type="text" placeholder="Nome (obrigatório)" />
-          <input id="gd-reg-email" class="gd-input" type="email" placeholder="Email" autocomplete="email" />
-          <input id="gd-reg-password" class="gd-input" type="password" placeholder="Senha (6+ caracteres)" />
-          <div style="display:flex; gap:8px; margin-top:8px;">
-            <button id="gd-register-btn" class="gd-btn" style="flex:1; background:#10B981;">Criar Conta</button>
-            <button id="gd-show-login-btn" class="gd-btn" style="flex:1; background:#64748b;">Voltar</button>
-          </div>
-          <div id="gd-auth-error-reg" style="color:#ffd1d1; min-height:18px; margin-top:6px; font-size:13px;"></div>
+        <div id="gd-msg" style="color:#f87171; font-size:13px; margin-top:10px; min-height:18px;"></div>
+        <div class="gd-link" id="gd-forgot-btn">Esqueci a senha</div>
+      </div>
+
+      <div id="gd-register-form" style="display:none;">
+        <input id="gd-reg-name" class="gd-input" type="text" placeholder="Nome de Usuário" />
+        <input id="gd-reg-email" class="gd-input" type="email" placeholder="Email" />
+        <input id="gd-reg-pass" class="gd-input" type="password" placeholder="Senha (6+ chars)" />
+        <div style="display:flex; gap:10px; margin-top:10px;">
+           <button id="gd-register-btn" class="gd-btn gd-btn-primary" style="background:#10b981;">Criar Conta</button>
+           <button id="gd-go-login-btn" class="gd-btn gd-btn-sec">Voltar</button>
+        </div>
+        <div id="gd-reg-msg" style="color:#f87171; font-size:13px; margin-top:10px;"></div>
+      </div>
+
+      <div id="gd-profile-view" style="display:none;">
+        <div class="user-header">
+           <div class="user-info-text">
+               <span id="gd-display-name" class="user-name">...</span>
+               <div class="user-email-row">
+                   <button id="gd-eye-btn" title="Ver Email" style="background:none;border:none;cursor:pointer;color:#6b7280;">👁</button>
+                   <span id="gd-display-email" class="user-email">email@exemplo.com</span>
+               </div>
+               <div id="gd-display-desc" class="user-desc"></div>
+           </div>
+           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
+               <img id="gd-pfp-display" src="" alt="Avatar" />
+               <button id="gd-logout-btn" class="gd-btn gd-btn-danger">Sair</button>
+           </div>
+        </div>
+        <button id="gd-open-settings" class="gd-btn gd-btn-sec">⚙ Configurações da Conta</button>
+        <div class="cloud-area">
+             <div class="cloud-warn">⚠ Backup na Nuvem ⚠</div>
+             <button id="gd-cloud-up" class="gd-btn btn-cloud-up">☁ Enviar Save (Backup)</button>
+             <button id="gd-cloud-down" class="gd-btn btn-cloud-down">☁ Baixar Save da Nuvem</button>
         </div>
       </div>
-      <div id="gd-auth-user" style="display:none;">
-        <div id="gd-user-info">
-          <div id="gd-user-display" class="gd-small">Conectado</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-            <button id="gd-eye-btn" title="Mostrar/Ocultar email">👁️</button>
-            <div id="gd-user-email" class="gd-small" style="opacity:0.9;"></div>
-          </div>
-          <div id="gd-user-avatar-url" class="gd-small" style="opacity:0.8; margin-top:8px; word-break:break-all;"></div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
-          <img id="gd-pfp-mini" src="" alt="PFP" />
-          <div style="display:flex; gap:8px;">
-            <button id="gd-settings-btn" class="gd-btn" style="background:#0ea5a4;">Configurar</button>
-            <button id="gd-logout-btn" class="gd-btn" style="background:#ef4444;">Sair</button>
-          </div>
-        </div>
-      </div>
-      <div id="gd-settings-panel" style="display:none;">
-        <h3 style="margin:0 0 8px 0;font-size:15px;color:#cbe7ff;">Configurações da Conta</h3>
-        <input id="gd-settings-name" class="gd-input" type="text" placeholder="Nome (obrigatório)" />
-        <textarea id="gd-settings-desc" class="gd-input" placeholder="Descrição (visível ao público)" style="height:80px; resize:vertical;"></textarea>
-        <div id="gd-pfp-row" style="display:flex; gap:12px; align-items:flex-start; margin-top:8px;">
-          <img id="gd-pfp-preview" src="" alt="Preview" />
-          <div style="flex:1;">
-            <input id="gd-pfp-url" class="gd-input" type="text" placeholder="URL da imagem (apenas URL)" />
-            <div style="margin-top:8px;"> <input id="gd-pfp-file" type="file" accept="image/*" /> </div>
-            <div id="gd-settings-actions">
-              <button id="gd-save-settings" class="gd-btn" style="background:#2563eb;">Salvar</button>
-              <button id="gd-remove-pfp" class="gd-btn" style="background:#6b7280;">Remover PFP</button>
-              <button id="gd-settings-back" class="gd-btn" style="background:#94a3b8;">Voltar</button>
+
+      <div id="gd-settings-view">
+        <div class="settings-row">
+            <div class="pfp-preview-container">
+                <img id="gd-pfp-preview" src="" />
+                <label for="gd-file-input" style="font-size:11px; cursor:pointer; color:#818cf8;">Alterar Foto</label>
+                <input type="file" id="gd-file-input" style="display:none;" accept="image/*" />
             </div>
-            <div id="gd-settings-msg" class="gd-small" style="margin-top:6px;"></div>
-          </div>
+            <div style="flex:1;">
+                <input id="gd-set-name" class="gd-input" placeholder="Novo Nome" style="margin-top:0;" />
+                <input id="gd-set-url" class="gd-input" placeholder="URL do Avatar (Opcional)" />
+            </div>
+        </div>
+        <textarea id="gd-set-desc" class="gd-input" placeholder="Descrição do Perfil" style="resize:vertical; height:80px;"></textarea>
+        
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button id="gd-save-settings" class="gd-btn gd-btn-primary">Salvar Alterações</button>
+            <button id="gd-cancel-settings" class="gd-btn gd-btn-sec">Voltar</button>
         </div>
       </div>
+
     </div>
+    <div id="gd-toast"><span>Msg</span></div>
   \`;
   document.body.appendChild(overlay);
 
   const $ = id => document.getElementById(id);
-  function showOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='flex'; }
-  function hideOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='none'; }
-
-  $('gd-auth-close').addEventListener('click', hideOverlay);
-  $('gd-show-register-btn').addEventListener('click', ()=>{ $('gd-login-form').style.display='none'; $('gd-register-form').style.display=''; });
-  $('gd-show-login-btn').addEventListener('click', ()=>{ $('gd-login-form').style.display=''; $('gd-register-form').style.display='none'; });
-  $('gd-forgot').addEventListener('click', async ()=>{
-    const readyEmail = $('gd-email').value.trim(); const email = readyEmail || prompt('Digite seu email para reset de senha:');
-    if (!email) return;
-    try { await sendPasswordResetEmail(auth, email); alert('Email de redefinição enviado!'); } catch(err){ alert('Erro: '+(err.message||err)); }
-  });
-  $('gd-register-btn').addEventListener('click', async ()=>{
-    const name = $('gd-reg-name').value.trim(); const email = $('gd-reg-email').value.trim(); const password = $('gd-reg-password').value;
-    if (!name) { $('gd-auth-error-reg').textContent = 'Nome é obrigatório.'; return; }
-    try {
-      const allRef = doc(db, 'names', 'AllNames'); const allSnap = await getDoc(allRef); const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
-      if (list.includes(name)) { $('gd-auth-error-reg').textContent = 'Nome já em uso.'; return; }
-      const uc = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = uc.user.uid;
-      await setDoc(doc(db, 'users', uid), { displayName: name, avatarURL: null, description: '', playerSave: null, updatedAt: serverTimestamp() });
-      if (allSnap.exists()) await updateDoc(allRef, { list: arrayUnion(name) }); else await setDoc(allRef, { list: [name] });
-      try { await updateProfile(uc.user, { displayName: name }); } catch(e){}
-      await handleUserAfterLogin(uc.user || auth.currentUser);
-    } catch(err){ console.warn('register error', err); $('gd-auth-error-reg').textContent = err && err.message ? err.message : String(err); }
-  });
-  $('gd-login-btn').addEventListener('click', async ()=>{
-    const email = $('gd-email').value.trim(); const password = $('gd-password').value;
-    $('gd-auth-error').textContent = '';
-    try { const cred = await signInWithEmailAndPassword(auth, email, password); await handleUserAfterLogin(cred && cred.user ? cred.user : auth.currentUser); } catch(err){ console.warn('signIn error', err); $('gd-auth-error').textContent = err && err.message ? err.message : String(err); }
-  });
-  $('gd-logout-btn').addEventListener('click', async ()=>{ try { await signOut(auth); hideOverlay(); } catch(err){ alert('Erro ao sair: ' + (err && err.message ? err.message : String(err))); } });
-  let emailVisible = false; $('gd-eye-btn').addEventListener('click', ()=>{ emailVisible = !emailVisible; $('gd-user-email').style.opacity = emailVisible ? '1' : '0'; });
-  $('gd-settings-btn').addEventListener('click', async ()=>{ const u = auth.currentUser; if (!u) { $('gd-login-form').style.display=''; showOverlay(); return; } $('gd-settings-panel').style.display = 'block'; $('gd-auth-user').style.display='none'; showOverlay(); setTimeout(()=> populateSettingsFields(u),60); });
-  $('gd-settings-back').addEventListener('click', ()=>{ $('gd-settings-panel').style.display='none'; $('gd-auth-user').style.display=''; });
-  $('gd-remove-pfp').addEventListener('click', async ()=>{ const u = auth.currentUser; if (!u) { $('gd-settings-msg').textContent = 'Faça login primeiro.'; return; } try { await saveProfileInternal({ avatarURL: null }); $('gd-pfp-preview').src=''; $('gd-pfp-mini').src=''; $('gd-pfp-url').value=''; $('gd-settings-msg').textContent='PFP removida.'; updateGDevelopVarsFromUser(u); } catch(err){ $('gd-settings-msg').textContent = 'Erro: '+(err.message||err); } });
-  $('gd-save-settings').addEventListener('click', async ()=>{
-    const u = auth.currentUser; if (!u) { $('gd-settings-msg').textContent='Faça login primeiro.'; return; }
-    const newName = $('gd-settings-name').value.trim(); const description=$('gd-settings-desc').value||''; const urlCandidate=$('gd-pfp-url').value.trim();
-    if (!newName) { $('gd-settings-msg').textContent='Nome é obrigatório.'; return; }
-    try {
-      const allRef = doc(db, 'names', 'AllNames'); const allSnap = await getDoc(allRef); const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
-      let currentName = null; try { const ud = await readUsersDoc(u.uid); if (ud && ud.displayName) currentName = ud.displayName; } catch(e){}
-      if (list.includes(newName) && newName !== currentName) { $('gd-settings-msg').textContent='Nome já em uso.'; return; }
-      try { if (currentName && currentName !== newName) await updateDoc(allRef, { list: arrayRemove(currentName) }).catch(()=>{}); if (!list.includes(newName)){ if (allSnap.exists()) await updateDoc(allRef, { list: arrayUnion(newName) }); else await setDoc(allRef, { list: [newName] }); } }catch(e){}
-      await saveProfileInternal({ name: newName, avatarURL: urlCandidate || null, description: description || '' }); $('gd-settings-msg').textContent='Configurações salvas.'; updateGDevelopVarsFromUser(u);
-    } catch(err){ console.error('save settings error', err); $('gd-settings-msg').textContent='Erro ao salvar: '+(err&&err.message?err.message:String(err)); }
-  });
-  (function attachFileHandler(){
-    const fileInput = $('gd-pfp-file'); if (!fileInput) return;
-    fileInput.addEventListener('change', async (e)=>{
-      const u = auth.currentUser; if (!u) { alert('Faça login primeiro'); return; }
-      const file = e.target.files && e.target.files[0] ? e.target.files[0] : null; if (!file) return;
-      $('gd-settings-msg').textContent='Convertendo...';
-      try {
-        const dataUrl = await (async (file)=> {
-           return new Promise((res, rej)=>{
-            const img = new Image(); const reader = new FileReader();
-            reader.onload = ()=> { img.src = reader.result; }; reader.onerror = rej;
-            img.onload = ()=> { try {
-                const max = 256; const canvas = document.createElement('canvas'); canvas.width=max; canvas.height=max; const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,max,max);
-                const scale = Math.min(max/img.width, max/img.height); const w = Math.round(img.width*scale); const h=Math.round(img.height*scale); const x = Math.round((max-w)/2); const y = Math.round((max-h)/2);
-                ctx.drawImage(img, x, y, w, h); res(canvas.toDataURL('image/png'));
-              } catch(e){ rej(e); } };
-            reader.readAsDataURL(file);
-          });
-        })(file);
-        await saveProfileInternal({ avatarURL: dataUrl }); $('gd-pfp-preview').src = dataUrl; $('gd-pfp-mini').src = dataUrl; $('gd-pfp-url').value = dataUrl; $('gd-settings-msg').textContent='Avatar salvo.'; updateGDevelopVarsFromUser(u);
-      } catch(err){ console.error('avatar upload failed', err); $('gd-settings-msg').textContent='Erro ao salvar avatar.'; }
-    });
-  })();
+  window.showToast = (msg) => { const t=$('gd-toast'); t.querySelector('span').textContent=msg; t.style.opacity=1; setTimeout(()=>t.style.opacity=0, 3000); };
   
-  // Auto-fill se já estiver logado (para quando recriar UI)
-  if(auth.currentUser) handleUserAfterLogin(auth.currentUser).catch(()=>{});
-}
+  $('gd-auth-close').onclick = () => overlay.style.display='none';
+  $('gd-go-reg-btn').onclick = () => switchView('register');
+  $('gd-go-login-btn').onclick = () => switchView('login');
 
-// Helpers que precisam ser acessíveis globalmente ou internamente pelo módulo
-async function populateSettingsFields(user){
-    try {
-      const nameEl = document.getElementById('gd-settings-name');
-      const urlEl = document.getElementById('gd-pfp-url'); const preview=document.getElementById('gd-pfp-preview'); const mini=document.getElementById('gd-pfp-mini'); const msg=document.getElementById('gd-settings-msg'); const descEl=document.getElementById('gd-settings-desc'); const avatarUrlDisplay=document.getElementById('gd-user-avatar-url');
-      const ud = await readUsersDoc(user.uid, { force:false });
-      if(nameEl) nameEl.value = (ud && ud.displayName) ? ud.displayName : (user.displayName || '');
-      const avatar = (ud && ud.avatarURL) ? ud.avatarURL : (user.photoURL || '');
-      if(urlEl) urlEl.value = avatar || '';
-      if(preview) preview.src = avatar || '';
-      if(mini) mini.src = avatar || '';
-      if (avatarUrlDisplay) avatarUrlDisplay.textContent = avatar ? ('Avatar: ' + (avatar.length>80 ? avatar.slice(0,80)+'…' : avatar)) : '';
-      if(descEl) descEl.value = (ud && ud.description) ? ud.description : (ud && ud.playerDescription ? ud.playerDescription : '');
-      if (msg) msg.textContent = '';
-    } catch(e){ console.warn('populateSettingsFields error', e); }
-}
-
-async function updateGDevelopVarsFromUser(user){
-    try {
-      const rs = window._gd_runtimeScene;
-      if (!rs) return;
-      const vars = rs.getVariables ? rs.getVariables() : (rs.getScene ? rs.getScene().getVariables() : null); if (!vars) return;
-      vars.get('auth_uid').setString(user ? user.uid : ''); vars.get('auth_email').setString(user ? (user.email||'') : ''); vars.get('auth_name').setString(user ? (user.displayName||'') : ''); vars.get('auth_photo').setString(user ? (user.photoURL||'') : '');
-      try {
-        if (user) {
-          const ud = await readUsersDoc(user.uid, { force:false });
-          const url = (ud && ud.avatarURL) ? ud.avatarURL : (user.photoURL || '');
-          vars.get('auth_avatar_url').setString(url || '');
-          const desc = (ud && ud.description) ? ud.description : '';
-          vars.get('auth_description').setString(desc || '');
-          const game = rs.getGame ? rs.getGame() : (typeof runtimeGame !== 'undefined' ? runtimeGame : null);
-          if (game && game.getVariables){ game.getVariables().get('auth_avatar_url').setString(url||''); game.getVariables().get('auth_description').setString(desc||''); }
-        } else { vars.get('auth_avatar_url').setString(''); vars.get('auth_description').setString(''); }
-      } catch(e){ console.warn('updateGDevelopVarsFromUser avatar/desc read failed', e); }
-    } catch(e){ console.warn('updateGDevelopVarsFromUser error', e); }
-}
-
-async function handleUserAfterLogin(user){
-    if (!user) return;
-    try {
-      const title = document.getElementById('gd-auth-title'); if(title) title.textContent = 'Perfil';
-      const login = document.getElementById('gd-login-form'); if(login) login.style.display='none';
-      const reg = document.getElementById('gd-register-form'); if(reg) reg.style.display='none';
-      const panel = document.getElementById('gd-settings-panel'); if(panel) panel.style.display='none';
-      const authUser = document.getElementById('gd-auth-user'); if(authUser) authUser.style.display='';
+  function switchView(viewName) {
+      $('gd-login-form').style.display = 'none';
+      $('gd-register-form').style.display = 'none';
+      $('gd-profile-view').style.display = 'none';
+      $('gd-settings-view').style.display = 'none';
       
-      const disp = document.getElementById('gd-user-display'); if(disp) disp.textContent = user.displayName || user.email || 'Usuário';
-      const emailEl = document.getElementById('gd-user-email'); if(emailEl) { emailEl.textContent = user.email || ''; emailEl.style.opacity='0'; }
-      try { const ud = await readUsersDoc(user.uid, { force:false });
-      const url = (ud && ud.avatarURL) ? ud.avatarURL : (user.photoURL||''); 
-      const mini = document.getElementById('gd-pfp-mini'); if(mini) mini.src = url || ''; 
-      const ad = document.getElementById('gd-user-avatar-url'); if (ad) ad.textContent = url ? ('Avatar: ' + (url.length>80?url.slice(0,80)+'…':url)) : ''; } catch(e){ 
-      const mini = document.getElementById('gd-pfp-mini'); if(mini) mini.src = user.photoURL || ''; }
-      updateGDevelopVarsFromUser(user);
-      try { await reconcilePlayerSave_ReadOnly(window._gd_runtimeScene); } catch(e){ console.warn('reconcile read-only failed', e); }
-    } catch(e){ console.warn('handleUserAfterLogin error', e); }
+      if(viewName === 'login') { $('gd-login-form').style.display = 'block'; $('gd-auth-title').textContent = 'Entrar'; }
+      else if (viewName === 'register') { $('gd-register-form').style.display = 'block'; $('gd-auth-title').textContent = 'Criar Conta'; }
+      else if (viewName === 'profile') { $('gd-profile-view').style.display = 'block'; $('gd-auth-title').textContent = 'Perfil'; }
+      else if (viewName === 'settings') { $('gd-settings-view').style.display = 'block'; $('gd-auth-title').textContent = 'Editar Perfil'; }
+  }
+
+  $('gd-login-btn').onclick = async () => {
+      try { await signInWithEmailAndPassword(auth, $('gd-email').value, $('gd-password').value); } 
+      catch(e) { $('gd-msg').textContent = "Erro: " + e.message; }
+  };
+  $('gd-register-btn').onclick = async () => {
+      const name = $('gd-reg-name').value;
+      if(!name) return $('gd-reg-msg').textContent = "Nome obrigatório.";
+      try {
+          const cred = await createUserWithEmailAndPassword(auth, $('gd-reg-email').value, $('gd-reg-pass').value);
+          await saveProfileInternal({ displayName: name });
+      } catch(e) { $('gd-reg-msg').textContent = e.message; }
+  };
+  $('gd-logout-btn').onclick = async () => { await signOut(auth); overlay.style.display='none'; };
+
+  let emailVis = false;
+  $('gd-eye-btn').onclick = () => { emailVis=!emailVis; $('gd-display-email').style.opacity = emailVis ? 1 : 0; };
+
+  $('gd-open-settings').onclick = () => {
+      const u = auth.currentUser;
+      const cached = _userProfileCache || {};
+      $('gd-set-name').value = cached.displayName || u.displayName || "";
+      $('gd-set-desc').value = cached.description || "";
+      $('gd-set-url').value = cached.avatarURL || u.photoURL || "";
+      $('gd-pfp-preview').src = cached.avatarURL || u.photoURL || "";
+      switchView('settings');
+  };
+
+  $('gd-cancel-settings').onclick = () => switchView('profile');
+
+  $('gd-save-settings').onclick = async () => {
+      try {
+          await saveProfileInternal({
+              displayName: $('gd-set-name').value,
+              description: $('gd-set-desc').value,
+              avatarURL: $('gd-set-url').value || null
+          });
+          switchView('profile');
+      } catch(e) { window.showToast("Erro: " + e.message); }
+  };
+
+  $('gd-file-input').onchange = (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      resizeAndOptimizeImage(file, 240, 240, (base64) => {
+          $('gd-set-url').value = base64;
+          $('gd-pfp-preview').src = base64;
+      });
+  };
+
+  /* --- BOTÕES AUTOSSUFICIENTES --- */
+  $('gd-cloud-up').onclick = async () => {
+     window.showToast("Enviando...");
+     try { 
+         await internalCloudSave(window._gd_runtimeScene);
+         window.showToast("Backup Enviado!"); 
+     } catch(e) { window.showToast("Erro: " + e.message); }
+  };
+
+  $('gd-cloud-down').onclick = async () => {
+     window.showToast("Baixando...");
+     try { 
+         await internalCloudLoad(window._gd_runtimeScene);
+         window.showToast("Progresso restaurado!"); 
+     } catch(e) { window.showToast("Erro: " + e.message); }
+  };
+
+  if(auth.currentUser) handleProfileAndSaveLogic(auth.currentUser);
 }
 
-// Global Auth State Observer
+// UI UPDATE
+function updateUIWithProfile(user, profile) {
+    const $ = id => document.getElementById(id);
+    if(!$('gd-firebase-auth-overlay')) return;
+
+    if($('gd-login-form').style.display !== 'none' || $('gd-register-form').style.display !== 'none') {
+        $('gd-login-form').style.display = 'none';
+        $('gd-register-form').style.display = 'none';
+        $('gd-profile-view').style.display = 'block';
+        $('gd-auth-title').textContent = 'Perfil';
+    }
+
+    const name = profile.displayName || user.displayName || "Usuário";
+    $('gd-display-name').textContent = name;
+    $('gd-display-email').textContent = user.email;
+    
+    if(profile.description) {
+        $('gd-display-desc').textContent = profile.description;
+        $('gd-display-desc').style.display = 'block';
+    } else {
+        $('gd-display-desc').style.display = 'none';
+    }
+
+    // Prioriza Avatar do Firestore (profile) sobre o do Auth (user)
+    const pfp = profile.avatarURL || user.photoURL || "https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/firebase_28dp.png";
+    $('gd-pfp-display').src = pfp;
+    
+    if(window._gd_runtimeScene) {
+        try {
+            const vars = window._gd_runtimeScene.getGame().getVariables();
+            vars.get('auth_name').setString(name);
+            vars.get('auth_uid').setString(user.uid);
+        } catch(e){}
+    }
+}
+
 onAuthStateChanged(auth, async (user) => {
-    // console.log('onAuthStateChanged', user);
-    if (user) { await handleUserAfterLogin(user); }
-    else { 
-        const overlay = document.getElementById('gd-firebase-auth-overlay'); 
-        if (overlay && overlay.style.display === 'flex') { 
-            const l=document.getElementById('gd-login-form'); if(l)l.style.display=''; 
-            const r=document.getElementById('gd-register-form'); if(r)r.style.display='none'; 
-            const a=document.getElementById('gd-auth-user'); if(a)a.style.display='none'; 
-            const s=document.getElementById('gd-settings-panel'); if(s)s.style.display='none'; 
-        } 
-        updateGDevelopVarsFromUser(null); 
+    if (user) {
+        await handleProfileAndSaveLogic(user);
+    } else {
+        _userProfileCache = null;
+        const ui = document.getElementById('gd-firebase-auth-overlay');
+        if(ui && ui.style.display !== 'none') {
+            document.getElementById('gd-login-form').style.display = 'block';
+            document.getElementById('gd-profile-view').style.display = 'none';
+            document.getElementById('gd-settings-view').style.display = 'none';
+            document.getElementById('gd-auth-title').textContent = 'Entrar';
+        }
     }
 });
 
-// EXPOSIÇÃO GLOBAL
+// PUBLIC API
 window.gdFirebaseAuthUI = window.gdFirebaseAuthUI || {};
-window.gdFirebaseAuthUI.show = () => { 
-    // Garante que a UI existe antes de mostrar
+window.gdFirebaseAuthUI.show = () => {
     createAuthOverlayAndBind();
-    const o = document.getElementById('gd-firebase-auth-overlay'); if(o) o.style.display='flex';
-    const user = auth.currentUser; 
-    if (user) { handleUserAfterLogin(user).catch(()=>{}); return; } 
-    const l=document.getElementById('gd-login-form'); if(l)l.style.display=''; 
+    document.getElementById('gd-firebase-auth-overlay').style.display = 'flex';
 };
-window.gdFirebaseAuthUI.hide = () => { const o=document.getElementById('gd-firebase-auth-overlay'); if(o) o.style.display='none'; };
-window.gdFirebaseAuthUI.setRuntimeScene = (rs) => { window._gd_runtimeScene = rs; updateGDevelopVarsFromUser(auth.currentUser); };
-window.gdFirebaseAuthUI.openSettings = () => { 
-    createAuthOverlayAndBind(); // Garante UI
-    const user = auth.currentUser; if (!user) { window.gdFirebaseAuthUI.show(); return; } 
-    const o=document.getElementById('gd-firebase-auth-overlay'); if(o) o.style.display='flex';
-    const title=document.getElementById('gd-auth-title'); if(title) title.textContent='Perfil — Configurações'; 
-    const l=document.getElementById('gd-login-form'); if(l)l.style.display='none';
-    const r=document.getElementById('gd-register-form'); if(r)r.style.display='none'; 
-    const a=document.getElementById('gd-auth-user'); if(a)a.style.display='none'; 
-    const s=document.getElementById('gd-settings-panel'); if(s)s.style.display='block'; 
-    setTimeout(()=> populateSettingsFields(user),60); 
+window.gdFirebaseAuthUI.rebuildUI = createAuthOverlayAndBind;
+window.gdFirebaseAuthUI.checkAuth = () => { if(auth.currentUser) handleProfileAndSaveLogic(auth.currentUser); };
+window.gdFirebaseAuthUI.savePlayerNow = async (scene) => {
+    return await internalCloudSave(scene);
 };
-window.gdFirebaseAuthUI.savePlayerNow = async function(maybeRuntimeScene){ const rs = maybeRuntimeScene || window._gd_runtimeScene; return await createAndSaveEncryptedSaveInternal(rs); };
-window.gdFirebaseAuthUI.saveProfile = async function(profile){ return await saveProfileInternal(profile); };
-window.gdFirebaseAuthUI.readUserDoc = async function(force){ const u = auth.currentUser; if (!u) return null; return await readUsersDoc(u.uid, { force: !!force }); };
-window.gdFirebaseAuthUI.rebuildUI = createAuthOverlayAndBind; // Hook para recriar se deletado
 
-// Criação Inicial
 createAuthOverlayAndBind();
-
-// Check inicial
-(async ()=>{
-  try {
-    if (auth && auth.currentUser && auth.currentUser.uid) {
-      await new Promise(r=>setTimeout(r,120));
-      await reconcilePlayerSave_ReadOnly(window._gd_runtimeScene || null);
-    }
-  } catch(e){ }
-})();
 `;
 
   const s = document.createElement('script');
@@ -1184,7 +1192,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.MenuCode.userFunc0x16bbf48(runtimeScene);
+gdjs.MenuCode.userFunc0xd20158(runtimeScene);
 
 }
 

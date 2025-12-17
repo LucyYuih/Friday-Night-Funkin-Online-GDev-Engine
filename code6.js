@@ -147,7 +147,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0x141e998 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0xb62608 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER AUTOSSUFICIENTE (Skins + Música + UI Própria)
 (async function(runtimeScene){
@@ -466,7 +466,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0x141e998(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xb62608(runtimeScene);
 
 }
 
@@ -615,7 +615,7 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xc2f530 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x184b990 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // skin player
 (function(){
@@ -1148,12 +1148,12 @@ gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xc2f530(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x184b990(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xc63f70 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x184c678 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (async function(runtimeScene) {
   // --- 1. CONFIGURAÇÃO DE CLEANUP ---
@@ -1398,12 +1398,12 @@ gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xc63f70(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x184c678(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xb9c878 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x905458 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A (MULTIPLAYER) — OTIMIZADO + AUTO-CLEANUP (Scene Watcher)
 (function () {
@@ -1551,7 +1551,7 @@ gdjs.PlayonlineCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xb9c878(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x905458(runtimeScene);
 
 }
 
