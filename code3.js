@@ -77,90 +77,78 @@ gdjs.PRELOADMUSICSCode.GDStatistics2Objects1= [];
 gdjs.PRELOADMUSICSCode.GDStatistics2Objects2= [];
 
 
-gdjs.PRELOADMUSICSCode.userFunc0x1c530b0 = function GDJSInlineCode(runtimeScene) {
+gdjs.PRELOADMUSICSCode.userFunc0xa71c18 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-// Evitar múltiplos overlays
+// Evitar múltiplos overlays [cite: 1]
 if (window.__htmlOverlayOpened) return;
 window.__htmlOverlayOpened = true;
 
-// Caminho do arquivo no build HTML
-const jsonPath = "site.json";
+// Define a URL desejada
+const targetUrl = "https://lucyyuih.github.io/GDev-Online-Leaderboard/";
 
-// Carrega o arquivo como texto (sem JSON.parse)
-fetch(jsonPath)
-  .then(response => {
-    if (!response.ok) {
-      throw new Error("Falha ao carregar: " + response.status);
-    }
-    return response.text();
-  })
-  .then(fileText => {
+// CRIA OVERLAY (Fundo escuro)
+const overlay = document.createElement("div");
+overlay.style.position = "fixed";
+overlay.style.left = "0";
+overlay.style.top = "0";
+overlay.style.width = "100%"; // [cite: 3]
+overlay.style.height = "100%";
+overlay.style.zIndex = "999999";
+overlay.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
 
-    // Usa diretamente o texto do arquivo (que contém HTML)
-    const htmlString = fileText;
+// IFRAME COM A URL
+const iframe = document.createElement("iframe");
+iframe.style.width = "100%";
+iframe.style.height = "100%";
+iframe.style.border = "none";
 
-    // CRIA OVERLAY
-    const overlay = document.createElement("div");
-    overlay.style.position = "fixed";
-    overlay.style.left = "0";
-    overlay.style.top = "0";
-    overlay.style.width = "100%";
-    overlay.style.height = "100%";
-    overlay.style.zIndex = "999999";
-    overlay.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+// AQUI ESTÁ A MUDANÇA PRINCIPAL:
+// Usamos .src para links externos (ao invés de .srcdoc para conteúdo local)
+iframe.src = targetUrl; 
 
-    // IFRAME COM O HTML
-    const iframe = document.createElement("iframe");
-    iframe.style.width = "100%";
-    iframe.style.height = "100%";
-    iframe.style.border = "none";
-    iframe.srcdoc = htmlString;
+// BOTÃO X COM 35% OPACIDADE
+const closeBtn = document.createElement("div");
+closeBtn.innerText = "X";
+closeBtn.style.position = "fixed"; // [cite: 4]
+closeBtn.style.right = "20px";
+closeBtn.style.bottom = "20px";
+closeBtn.style.width = "48px";
+closeBtn.style.height = "48px";
+closeBtn.style.backgroundColor = "rgba(255, 0, 0, 0.35)"; // [cite: 5]
+closeBtn.style.color = "#fff";
+closeBtn.style.fontSize = "24px";
+closeBtn.style.fontWeight = "bold";
+closeBtn.style.display = "flex";
+closeBtn.style.alignItems = "center"; // [cite: 6]
+closeBtn.style.justifyContent = "center";
+closeBtn.style.borderRadius = "8px";
+closeBtn.style.cursor = "pointer";
+closeBtn.style.userSelect = "none";
+closeBtn.style.boxShadow = "0 0 8px rgba(0,0,0,0.5)"; // [cite: 7]
 
-    // BOTÃO X COM 35% OPACIDADE
-    const closeBtn = document.createElement("div");
-    closeBtn.innerText = "X";
-    closeBtn.style.position = "fixed";
-    closeBtn.style.right = "20px";
-    closeBtn.style.bottom = "20px";
-    closeBtn.style.width = "48px";
-    closeBtn.style.height = "48px";
-    closeBtn.style.backgroundColor = "rgba(255, 0, 0, 0.35)";
-    closeBtn.style.color = "#fff";
-    closeBtn.style.fontSize = "24px";
-    closeBtn.style.fontWeight = "bold";
-    closeBtn.style.display = "flex";
-    closeBtn.style.alignItems = "center";
-    closeBtn.style.justifyContent = "center";
-    closeBtn.style.borderRadius = "8px";
-    closeBtn.style.cursor = "pointer";
-    closeBtn.style.userSelect = "none";
-    closeBtn.style.boxShadow = "0 0 8px rgba(0,0,0,0.5)";
+closeBtn.onclick = () => {
+  // Remove o overlay
+  overlay.remove();
+  window.__htmlOverlayOpened = false; // [cite: 8]
 
-    closeBtn.onclick = () => {
-      // Remove o overlay
-      overlay.remove();
-      window.__htmlOverlayOpened = false;
-
-      // Define a variável de cena Exit = 1
+  // Define a variável de cena Exit = 1
+  // Verificamos se runtimeScene existe para evitar erros fora do preview
+  if (typeof runtimeScene !== "undefined") {
       runtimeScene.getVariables().get("Exit").setNumber(1);
-    };
+  }
+};
 
-    overlay.appendChild(iframe);
-    overlay.appendChild(closeBtn);
-    document.body.appendChild(overlay);
-
-  })
-  .catch(err => {
-    console.error("Erro ao carregar o arquivo:", err);
-  });
-
+// MONTAGEM DOS ELEMENTOS
+overlay.appendChild(iframe);
+overlay.appendChild(closeBtn); // [cite: 9]
+document.body.appendChild(overlay);
 };
 gdjs.PRELOADMUSICSCode.eventsList0 = function(runtimeScene) {
 
 {
 
 
-gdjs.PRELOADMUSICSCode.userFunc0x1c530b0(runtimeScene);
+gdjs.PRELOADMUSICSCode.userFunc0xa71c18(runtimeScene);
 
 }
 
