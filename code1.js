@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x1f5e878 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1e2a9e0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,7 +848,7 @@ gdjs.InicioCode.userFunc0x1f5e878 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.userFunc0xc0f9a0 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1098c68 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   // --- GESTÃO DE UI E CENA (AUTO-CLEANUP) ---
@@ -1532,7 +1532,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x1f5e878(runtimeScene);
+gdjs.InicioCode.userFunc0x1e2a9e0(runtimeScene);
 
 }
 
@@ -1565,7 +1565,7 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.InicioCode.userFunc0xc0f9a0(runtimeScene);
+gdjs.InicioCode.userFunc0x1098c68(runtimeScene);
 
 }
 
@@ -1618,7 +1618,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0xe25738 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x1e2b430 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A (ORIGINAL) — OTIMIZADO + AUTO-CLEANUP (Scene Watcher)
 (function () {
@@ -2411,12 +2411,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xe25738(runtimeScene);
+gdjs.InicioCode.userFunc0x1e2b430(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xbf5270 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0x9542a8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (async function(runtimeScene) {
   // --- 1. CONFIGURAÇÃO DE CLEANUP (Scene Watcher) ---
@@ -2445,25 +2445,32 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
             }
         }
         for (const key in PIXI.utils.BaseTextureCache) {
-             if (key.includes(skinName)) { try { delete PIXI.utils.BaseTextureCache[key]; } catch(e) {} }           
+             if (key.includes(skinName)) { 
+                try { delete PIXI.utils.BaseTextureCache[key]; } catch(e) {} 
+             }           
         }
         log(`Cache PIXI limpo para "${skinName}". Texturas removidas: ${count}`);
     } catch (e) { warn("Erro ao limpar cache PIXI:", e); }
   }
 
   function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
-  function buildCdnUrl(owner, repo, branch, path){ if (!owner || !repo) return null; const br = branch || "main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
+  
+  function buildCdnUrl(owner, repo, branch, path){ if (!owner || !repo) return null; const br = branch || "main";
+    return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; 
+  }
 
   async function fetchCdnFirst(pathOrUrl, as="json", cdnBase=null){
     const isAbs = typeof pathOrUrl === "string" && (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://"));
     const tries = [];
     if (isAbs) tries.push(pathOrUrl);
-    if (!isAbs && cdnBase && cdnBase.owner && cdnBase.repo) { const c = buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, pathOrUrl); if (c) tries.push(c); }
+    if (!isAbs && cdnBase && cdnBase.owner && cdnBase.repo) { const c = buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, pathOrUrl);
+        if (c) tries.push(c); 
+    }
     tries.push(pathOrUrl); tries.push("resources/" + pathOrUrl); tries.push("./" + pathOrUrl);
-    
     for (const u of tries) {
       try {
-        const r = await fetch(u); if (!r.ok) continue;
+        const r = await fetch(u);
+        if (!r.ok) continue;
         if (as === "json") return await r.json();
         if (as === "arraybuffer") return await r.arrayBuffer();
         if (as === "blob") return await r.blob();
@@ -2476,100 +2483,218 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
   function getSkinName(sk) {
     if (!sk) return "";
     if (sk.name && typeof sk.name === "string" && sk.name.trim() !== "") return sk.name;
-    if (sk.path) { const parts = sk.path.replace(/\\/g,'/').split('/'); return parts[parts.length - 1] || ""; }
+    if (sk.path) { const parts = sk.path.replace(/\\/g,'/').split('/');
+    return parts[parts.length - 1] || ""; }
     return "";
   }
 
   function buildFilePathFromSkin(sk, field) {
-    if (!sk) return ""; const v = sk[field] || ""; if (!v) return "";
+    if (!sk) return ""; const v = sk[field] || "";
+    if (!v) return "";
     if (v.startsWith("http")) return v;
     if (v.indexOf('/') !== -1) return v.replace(/\\/g,'/');
     if (sk.path) return sk.path.replace(/\\/g,'/') + "/" + v;
     return v;
   }
 
+  // --- NOVA FUNÇÃO: Helper de Redimensionamento de Imagem ---
+  function resizeImageBlob(blobUrl, scale) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            // Calcula novo tamanho baseado na escala
+            const newW = Math.floor(img.width * scale);
+            const newH = Math.floor(img.height * scale);
+            canvas.width = newW;
+            canvas.height = newH;
+            
+            const ctx = canvas.getContext("2d");
+            // Melhora a qualidade do redimensionamento se necessário, ou deixa padrão para performance
+            ctx.drawImage(img, 0, 0, newW, newH);
+            
+            canvas.toBlob((blob) => {
+                // Remove a URL antiga da memória para liberar RAM
+                URL.revokeObjectURL(blobUrl);
+                // Cria e retorna a nova URL
+                resolve(URL.createObjectURL(blob));
+            }, "image/png");
+        };
+        img.onerror = (e) => { console.warn("Erro ao redimensionar img", e); resolve(blobUrl); }; // Retorna original se falhar
+        img.src = blobUrl;
+    });
+  }
+
   // --- 3. UI BUILDER ---
   function createLoadingModal() {
-    const modal = document.createElement("div"); modal.id = "skin-download-loading";
-    modal.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100000; color: white; font-family: Arial, sans-serif; flex-direction: column; gap: 16px;`;
+    const modal = document.createElement("div");
+    modal.id = "skin-download-loading";
+    modal.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100000;
+    color: white; font-family: Arial, sans-serif; flex-direction: column; gap: 16px;`;
     modal.innerHTML = `<div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #1976d2; animation: spin 1s linear infinite;"></div><div style="font-size:16px;">Baixando e Processando...</div>`;
     const style = document.createElement("style"); style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`; document.head.appendChild(style);
     return modal;
   }
-  function showLoadingModal() { const existing = document.getElementById("skin-download-loading"); if (existing) return existing; const modal = createLoadingModal(); document.body.appendChild(modal); return modal; }
-  function hideLoadingModal() { const modal = document.getElementById("skin-download-loading"); if (modal) modal.remove(); }
+  function showLoadingModal() { const existing = document.getElementById("skin-download-loading"); if (existing) return existing; const modal = createLoadingModal(); document.body.appendChild(modal); return modal;
+  }
+  function hideLoadingModal() { const modal = document.getElementById("skin-download-loading"); if (modal) modal.remove();
+  }
 
   function createModal(defaultOwner, defaultRepo, defaultBranch) {
     if(document.querySelector(".skin-modal")) return;
     const css = `
-      :root { --modal-gap: 12px; --panel-bg: #0f0f11; --panel-radius: 12px; --accent: #1976d2; --muted: #999; }
-      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; box-sizing: border-box; }
-      .skin-panel { width: min(1100px, 98%); max-width: 1100px; height: min(86vh, 820px); background: var(--panel-bg); color:#eee; border-radius:var(--panel-radius); display:grid; grid-template-columns: 300px 1fr; gap: var(--modal-gap); overflow: hidden; font-family: Arial, sans-serif; box-shadow: 0 12px 32px rgba(0,0,0,0.6); }
-      @media (max-width: 720px) { .skin-panel { grid-template-columns: 1fr; height: calc(100vh - 36px); width: 100%; } .skin-left { order: 0; max-height: 160px; overflow:auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.04); display:flex; gap:8px; flex-wrap:wrap; } .skin-right { order: 1; } }
-      .skin-left { padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto; min-width: 180px; }
-      .skin-right { padding:14px; display:flex; flex-direction:column; min-width: 0; overflow:auto; }
-      .skin-left-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px; }
-      .skin-toggle-btn { background:transparent; border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color: #ddd; cursor:pointer; font-size:13px; }
-      .skin-mod { padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; user-select: none; }
+      :root { --modal-gap: 12px; --panel-bg: #0f0f11; --panel-radius: 12px; --accent: #1976d2;
+      --muted: #999; }
+      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999;
+      padding:20px; box-sizing: border-box; }
+      .skin-panel { width: min(1100px, 98%); max-width: 1100px; height: min(86vh, 820px);
+      background: var(--panel-bg); color:#eee; border-radius:var(--panel-radius); display:grid; grid-template-columns: 300px 1fr; gap: var(--modal-gap); overflow: hidden; font-family: Arial, sans-serif; box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      }
+      @media (max-width: 720px) { .skin-panel { grid-template-columns: 1fr; height: calc(100vh - 36px); width: 100%;
+      } .skin-left { order: 0; max-height: 160px; overflow:auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.04); display:flex; gap:8px; flex-wrap:wrap;
+      } .skin-right { order: 1; } }
+      .skin-left { padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto;
+      min-width: 180px; }
+      .skin-right { padding:14px; display:flex; flex-direction:column; min-width: 0; overflow:auto;
+      }
+      .skin-left-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;
+      }
+      .skin-toggle-btn { background:transparent; border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color: #ddd; cursor:pointer; font-size:13px;
+      }
+      .skin-mod { padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; user-select: none;
+      }
       .skin-mod:hover { background: rgba(255,255,255,0.03); }
-      .skin-top { display:flex; flex-direction:column; gap:8px; }
-      .skin-title-row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+      .skin-top { display:flex; flex-direction:column;
+      gap:8px; }
+      .skin-title-row { display:flex; justify-content:space-between; align-items:center; gap:8px;
+      }
       .skin-title { font-weight:700; font-size:1rem; }
-      .skin-controls { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
-      .skin-btn { padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px; }
-      .skin-btn.opponent { background: #d32f2f; } .skin-btn.bf { background: #1976d2; }
-      .cdn-inputs { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
-      .cdn-inputs input { background: #0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px; border-radius:6px; min-width:100px; font-size:13px; }
-      .skin-list { display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start; }
-      .skin-card { width: clamp(110px, 22%, 160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; display:flex; flex-direction:column; gap:8px; user-select: none; }
-      .skin-card img { width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none; transition: opacity 0.3s; opacity: 0; }
-      .skin-card img.loaded { opacity: 1; }
-      .skin-card .label { font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-      .skin-card .card-footer { display:flex; gap:6px; justify-content:center; align-items:center; flex-direction: column; }
+      .skin-controls { display:flex; gap:8px;
+      align-items:center; margin-top:6px; flex-wrap:wrap; }
+      .skin-btn { padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px;
+      }
+      .skin-btn.opponent { background: #d32f2f; } .skin-btn.bf { background: #1976d2;
+      }
+      .cdn-inputs { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;
+      }
+      .cdn-inputs input, .cdn-inputs select { background: #0b0b0b; color:#ddd; border:1px solid rgba(255,255,255,0.04); padding:7px 8px; border-radius:6px; min-width:80px; font-size:13px;
+      }
+      .skin-list { display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start;
+      }
+      .skin-card { width: clamp(110px, 22%, 160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; display:flex;
+      flex-direction:column; gap:8px; user-select: none; }
+      .skin-card img { width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; pointer-events:none;
+      transition: opacity 0.3s; opacity: 0; }
+      .skin-card img.loaded { opacity: 1;
+      }
+      .skin-card .label { font-size:13px; color:#ddd; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;
+      }
+      .skin-card .card-footer { display:flex; gap:6px; justify-content:center; align-items:center; flex-direction: column;
+      }
       .skin-card button.skin-btn { padding:6px 8px; font-size:12px; border-radius:6px; width: 100%; }
     `;
     const style = document.createElement("style"); style.className = "skin-loader-style"; style.textContent = css; document.head.appendChild(style);
     const modal = document.createElement("div"); modal.className = "skin-modal";
     const panel = document.createElement("div"); panel.className = "skin-panel";
     const left = document.createElement("div"); left.className = "skin-left";
-    const leftList = document.createElement("div"); leftList.className = "skin-left-list";
+    const leftList = document.createElement("div");
+    leftList.className = "skin-left-list";
     const right = document.createElement("div"); right.className = "skin-right";
     const leftHeader = document.createElement("div"); leftHeader.className = "skin-left-header";
     const leftTitle = document.createElement("div"); leftTitle.textContent = "Mods"; leftTitle.style.fontWeight="700";
     const toggleBtn = document.createElement("button"); toggleBtn.className = "skin-toggle-btn"; toggleBtn.textContent = "Toggle";
-    leftHeader.append(leftTitle, toggleBtn); left.append(leftHeader, leftList);
+    leftHeader.append(leftTitle, toggleBtn);
+    left.append(leftHeader, leftList);
     const top = document.createElement("div"); top.className = "skin-top";
     const titleRow = document.createElement("div"); titleRow.className = "skin-title-row";
-    const title = document.createElement("div"); title.className = "skin-title"; title.textContent = "Skins";
+    const title = document.createElement("div");
+    title.className = "skin-title"; title.textContent = "Skins";
     const controls = document.createElement("div"); controls.className = "skin-controls";
-    const closeBtn = document.createElement("button"); closeBtn.className = "skin-btn"; closeBtn.textContent = "Fechar";
+    const closeBtn = document.createElement("button"); closeBtn.className = "skin-btn";
+    closeBtn.textContent = "Fechar";
     controls.appendChild(closeBtn); titleRow.append(title, controls);
+    
+    // --- UI INPUTS: Adicionado Selector de Resize ---
     const cdnRow = document.createElement("div"); cdnRow.className = "cdn-inputs";
-    const ownerIn = document.createElement("input"); ownerIn.value = defaultOwner;
-    const repoIn = document.createElement("input"); repoIn.value = defaultRepo;
-    const branchIn = document.createElement("input"); branchIn.value = defaultBranch;
-    cdnRow.append(ownerIn, repoIn, branchIn); top.append(titleRow, cdnRow);
+    const ownerIn = document.createElement("input"); ownerIn.value = defaultOwner; ownerIn.placeholder = "Owner";
+    const repoIn = document.createElement("input"); repoIn.value = defaultRepo; repoIn.placeholder = "Repo";
+    const branchIn = document.createElement("input"); branchIn.value = defaultBranch; branchIn.placeholder = "Branch";
+    
+    // Select de Qualidade
+    const resizeSel = document.createElement("select");
+    resizeSel.id = "skin-resize-select";
+    const opts = [
+        {txt: "100% (Original)", val: "1.0"},
+        {txt: "75% (Leve)", val: "0.75"},
+        {txt: "50% (Rápido)", val: "0.5"},
+        {txt: "25% (Batata)", val: "0.25"}
+    ];
+    opts.forEach(o => {
+        const op = document.createElement("option"); op.value = o.val; op.textContent = o.txt;
+        resizeSel.appendChild(op);
+    });
+    // Tenta recuperar ultima escolha
+    const lastScale = localStorage.getItem("gd_skin_last_scale");
+    if(lastScale) resizeSel.value = lastScale;
+
+    cdnRow.append(ownerIn, repoIn, branchIn, resizeSel); top.append(titleRow, cdnRow);
     const info = document.createElement("div"); info.textContent = "Selecione um mod.";
     const skinListWrap = document.createElement("div"); skinListWrap.style.flex="1"; skinListWrap.style.overflow="auto";
-    right.append(top, info, skinListWrap); panel.append(left, right); modal.appendChild(panel); document.body.appendChild(modal);
-    return { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls };
+    right.append(top, info, skinListWrap); panel.append(left, right);
+    modal.appendChild(panel); document.body.appendChild(modal);
+    return { modal, panel, left, leftList, right, ownerIn, repoIn, branchIn, resizeSel, closeBtn, info, skinListWrap, toggleBtn, styleEl: style, controlsEl: controls };
   }
 
   function findSkinInManifest(manifest, modName, skinName){
     if (!manifest || !modName || !skinName) return null;
     const arr = manifest[modName] || [];
-    for (const s of arr) { if (getSkinName(s) === skinName.toString()) return s; }
+    for (const s of arr) { if (getSkinName(s) === skinName.toString()) return s;
+    }
     return null;
   }
 
-  // --- HELPER: Pre-Processar Skin ---
+  // --- HELPER: Pre-Processar Skin com REDIMENSIONAMENTO ---
+  // Varre recursivamente o pacote para achar blobs de imagem e redimensionar
+  async function processAndResizePkg(pkg, scale) {
+     if (scale >= 1.0) return pkg; // Sem redimensionamento
+     log(`Iniciando redimensionamento para escala: ${scale}`);
+     
+     // Função recursiva para achar strings "blob:"
+     async function recursiveResize(obj) {
+        for (let key in obj) {
+            if (typeof obj[key] === "string" && obj[key].startsWith("blob:")) {
+                // É uma imagem? (Geralmente carregadores retornam blob url)
+                // Vamos tentar redimensionar
+                const newBlob = await resizeImageBlob(obj[key], scale);
+                if (newBlob !== obj[key]) {
+                    obj[key] = newBlob;
+                }
+            } else if (typeof obj[key] === "object" && obj[key] !== null) {
+                await recursiveResize(obj[key]);
+            }
+        }
+     }
+     
+     await recursiveResize(pkg);
+     return pkg;
+  }
+
   // Chama o Player para descompactar o ZIP agora, antes de aplicar
-  async function preProcessSkin(zipBuffer, cacheKey) {
+async function preProcessSkin(zipBuffer, cacheKey) {
       if (window.GD_SKIN_PLAYER && window.GD_SKIN_PLAYER.loadFromArrayBuffer) {
           log("Descompactando skin no Modal...");
-          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, zipBuffer);
           
-          // Salva no cache de PACOTES (Skin pronta)
+          // --- LOGICA DE RESIZE SIMPLIFICADA ---
+          const scaleEl = document.getElementById("skin-resize-select");
+          // Pega o valor do Select OU assume 1.0
+          const scale = scaleEl ? parseFloat(scaleEl.value) : 1.0;
+          if(scaleEl) localStorage.setItem("gd_skin_last_scale", scale.toString());
+          
+          // AGORA PASSAMOS O SCALE PARA O PLAYER FAZER O SERVIÇO SUJO:
+          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, zipBuffer, { scale: scale });
+          // ------------------------------------
+
+          // Salva no cache
           if (!window.GD_SKIN_CACHE) window.GD_SKIN_CACHE = {};
           if (!window.GD_SKIN_CACHE.packages) window.GD_SKIN_CACHE.packages = {};
           
@@ -2581,12 +2706,14 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
 
   async function openSkinSelector(manifest){
     let baseOwner="LucyYuih", baseRepo="gdev-custom-skins", baseBranch="main";
-    if (manifest && manifest._base) { try { const [or, br] = manifest._base.split("@"); const [o, r] = or.split("/"); baseOwner=o; baseRepo=r; baseBranch=br||"main"; } catch(e){} }
+    if (manifest && manifest._base) { try { const [or, br] = manifest._base.split("@"); const [o, r] = or.split("/"); baseOwner=o; baseRepo=r; baseBranch=br||"main";
+    } catch(e){} }
 
     const ui = createModal(baseOwner, baseRepo, baseBranch);
-    if(!ui) return; 
-    const { modal, left, leftList, ownerIn, repoIn, branchIn, closeBtn, info, skinListWrap, toggleBtn, controlsEl } = ui;
-    let currentMod = null; let thumbsCache = {}; let downloading = false;
+    if(!ui) return;
+    const { modal, left, leftList, ownerIn, repoIn, branchIn, resizeSel, closeBtn, info, skinListWrap, toggleBtn, controlsEl } = ui;
+    let currentMod = null;
+    let thumbsCache = {}; let downloading = false;
 
     // LAZY LOAD
     let lazyObserver = new IntersectionObserver((entries, observer) => {
@@ -2611,20 +2738,21 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
     resetSelectedBtn.onclick = async () => {
       try {
         let selStr = null;
-        try { const gv = runtimeScene.getGame().getVariables(); if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString(); } catch(e){}
+        try { const gv = runtimeScene.getGame().getVariables(); if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString();
+        } catch(e){}
         if (!selStr) selStr = localStorage.getItem("gd_selected_skin");
         const parsed = JSON.parse(selStr);
         await resetAndRedownload(parsed.mod, { name: parsed.name, zip: parsed.zip_cdn||parsed.zip }, true);
       } catch(e){}
     };
     controlsEl.insertBefore(resetSelectedBtn, controlsEl.firstChild);
-
     // MODS LIST
     const mods = manifest[""] || [];
     if (!mods.length) leftList.textContent = "No mods";
     else {
       for (const m of mods) {
-        const el=document.createElement("div"); el.className="skin-mod"; el.textContent=m;
+        const el=document.createElement("div");
+        el.className="skin-mod"; el.textContent=m;
         el.onclick=()=>selectMod(m); leftList.appendChild(el);
       }
     }
@@ -2632,10 +2760,9 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
     let leftHidden = false;
     toggleBtn.onclick = ()=> { modal.style.display = 'none'; };
     closeBtn.onclick = () => { modal.style.display = 'none'; };
-
     function unloadModThumbs(modName){ 
         const arr = thumbsCache[modName]; if (!arr) return;
-        for (const it of arr) { if (it.blobUrl) URL.revokeObjectURL(it.blobUrl); } delete thumbsCache[modName]; 
+        for (const it of arr) { if (it.blobUrl) URL.revokeObjectURL(it.blobUrl); } delete thumbsCache[modName];
     }
 
     async function selectMod(modName){
@@ -2643,17 +2770,20 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
       if (currentMod) unloadModThumbs(currentMod);
       currentMod = modName; skinListWrap.innerHTML=""; info.textContent="Carregando...";
       const skins = manifest[modName] || [];
-      if (!skins.length) { info.textContent = "Vazio."; return; }
+      if (!skins.length) { info.textContent = "Vazio.";
+      return; }
       info.textContent=""; const list=document.createElement("div"); list.className="skin-list"; skinListWrap.appendChild(list);
       thumbsCache[modName]=[];
       const cdnBase={ owner: ownerIn.value, repo: repoIn.value, branch: branchIn.value };
       
       for (const sk of skins){
-        const card=document.createElement("div"); card.className="skin-card";
+        const card=document.createElement("div");
+        card.className="skin-card";
         const img=document.createElement("img"); img.alt=getSkinName(sk); img.draggable = false;
         let thumbPath = buildFilePathFromSkin(sk, "thumb");
         if(thumbPath) {
-            const candidate = (thumbPath.startsWith("http")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
+            const candidate = (thumbPath.startsWith("http")) ?
+            thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
             img.dataset.src = candidate || thumbPath; img.dataset.cdnBase = JSON.stringify(cdnBase); img.dataset.modName = modName;
             lazyObserver.observe(img);
         } else { img.style.background = "#333"; }
@@ -2676,20 +2806,22 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
     async function downloadAndSaveOnly(modName, skinObj, auto=false, target="BF"){
       if (downloading) return;
       let zipPath = buildFilePathFromSkin(skinObj, "zip");
-      if (!zipPath) { const found = findSkinInManifest(manifest, modName, getSkinName(skinObj)); if (found) zipPath = buildFilePathFromSkin(found, "zip"); }
+      if (!zipPath) { const found = findSkinInManifest(manifest, modName, getSkinName(skinObj)); if (found) zipPath = buildFilePathFromSkin(found, "zip");
+      }
       if (!zipPath) return;
       downloading = true; showLoadingModal();
       try {
         const cdnBase = { owner: ownerIn.value, repo: repoIn.value, branch: branchIn.value };
         const cdnCandidate = (zipPath.startsWith("http")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-        
         // 1. Baixa
         const buf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-        
-        // 2. Pre-Processa (Unzip) aqui no Modal
+        // 2. Pre-Processa (Unzip + Resize) aqui no Modal
         await preProcessSkin(buf, cdnCandidate || zipPath);
+        
+        // Pega Escala atual para salvar no JSON
+        const scaleVal = parseFloat(resizeSel.value) || 1.0;
 
-        const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath, zip_cdn: cdnCandidate };
+        const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath, zip_cdn: cdnCandidate, scale: scaleVal };
         const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
         const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
         const gv = runtimeScene.getGame().getVariables();
@@ -2697,40 +2829,45 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
         else gv.pushNew(varName).setString(JSON.stringify(sel));
         localStorage.setItem(storageKey, JSON.stringify(sel));
         
-        log("Skin baixada e descompactada para cache.");
-      } catch(e){ console.error(e); } finally { hideLoadingModal(); downloading = false; }
+        log(`Skin baixada, redimensionada (${scaleVal*100}%) e salva.`);
+      } catch(e){ console.error(e); } finally { hideLoadingModal(); downloading = false;
+      }
     }
 
     async function applyNow(modName, skinObj, target){
       if (downloading) return;
       let zipPath = buildFilePathFromSkin(skinObj, "zip");
-      if (!zipPath) { const found = findSkinInManifest(manifest, modName, getSkinName(skinObj)); if (found) zipPath = buildFilePathFromSkin(found, "zip"); }
+      if (!zipPath) { const found = findSkinInManifest(manifest, modName, getSkinName(skinObj)); if (found) zipPath = buildFilePathFromSkin(found, "zip");
+      }
       if (!zipPath) return;
       downloading = true; showLoadingModal();
       try {
         const cdnBase = { owner: ownerIn.value, repo: repoIn.value, branch: branchIn.value };
         const cdnCandidate = (zipPath.startsWith("http")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
-        
         // 1. Baixa
         const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-        
-        // 2. Pre-Processa
+        // 2. Pre-Processa (Unzip + Resize)
         const pkg = await preProcessSkin(arrbuf, cdnCandidate || zipPath);
+        
+        // Pega Escala atual
+        const scaleVal = parseFloat(resizeSel.value) || 1.0;
 
-        const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath, zip_cdn: cdnCandidate };
+        const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath, zip_cdn: cdnCandidate, scale: scaleVal };
         const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
         const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
+        
         clearPixiTextureCache(getSkinName(skinObj));
         const gv = runtimeScene.getGame().getVariables();
         if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel));
         else gv.pushNew(varName).setString(JSON.stringify(sel));
         localStorage.setItem(storageKey, JSON.stringify(sel));
         
-        // 3. Aplica (Player só pega o pacote pronto)
+        // 3. Aplica (Player pega o pacote já redimensionado)
         if (window.GD_SKIN_PLAYER && pkg) {
           await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: target === "BF" ? "BF" : "BFPixel", targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim" });
         }
-      } catch(e){ console.error(e); } finally { hideLoadingModal(); downloading = false; }
+      } catch(e){ console.error(e); } finally { hideLoadingModal(); downloading = false;
+      }
     }
 
     async function resetAndRedownload(modName, skinObj, auto=false){
@@ -2746,7 +2883,8 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
           if (window.GD_SKIN_PLAYER && window.GD_SKIN_PLAYER.clearCache) await window.GD_SKIN_PLAYER.clearCache();
           clearPixiTextureCache(skinName);
           if(!auto) alert("Resetado. Recarregue.");
-      } catch(e){} finally { hideLoadingModal(); downloading = false; }
+      } catch(e){} finally { hideLoadingModal();
+      downloading = false; }
     }
   }
 
@@ -2756,7 +2894,6 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
     if (!manifest) manifest = { "": [] };
     window.GDSkinLoaderUI = true;
     await openSkinSelector(manifest);
-
     // VIGILANTE DE CENA
     const watcher = setInterval(() => {
         let currentSceneName = "";
@@ -2769,7 +2906,6 @@ gdjs.InicioCode.userFunc0xe25738(runtimeScene);
             clearInterval(watcher);
         }
     }, 1000);
-
   } catch(e){ console.error(e); }
 
 })(runtimeScene);
@@ -2779,12 +2915,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xbf5270(runtimeScene);
+gdjs.InicioCode.userFunc0x9542a8(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xe1b248 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xd01ff0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
@@ -2793,12 +2929,12 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xe1b248(runtimeScene);
+gdjs.InicioCode.userFunc0xd01ff0(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xdd8420 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xd6dcc8 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 window.openPlayerSaveExportUI(runtimeScene);
 };
@@ -2807,7 +2943,7 @@ gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xdd8420(runtimeScene);
+gdjs.InicioCode.userFunc0xd6dcc8(runtimeScene);
 
 }
 

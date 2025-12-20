@@ -528,7 +528,7 @@ runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3)
 }
 
 
-};gdjs.MenuCode.userFunc0xbf78f0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.MenuCode.userFunc0x109c150 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
   // --- GESTÃO DE UI E CENA (AUTO-CLEANUP) ---
@@ -1214,7 +1214,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.MenuCode.userFunc0xbf78f0(runtimeScene);
+gdjs.MenuCode.userFunc0x109c150(runtimeScene);
 
 }
 

@@ -147,7 +147,7 @@ gdjs.PlayonlineCode.GDStatistics2Objects2= [];
 gdjs.PlayonlineCode.GDStatistics2Objects3= [];
 
 
-gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
+gdjs.PlayonlineCode.userFunc0xb4e488 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // WATCHER AUTOSSUFICIENTE (Skins + Música + UI Própria)
 (async function(runtimeScene){
@@ -169,6 +169,7 @@ gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
   let isDownloading = false;
 
   // --- 3. HELPERS DE REPOSITÓRIO (Copiados para independência) ---
+  
   function defaultRepo() { return { owner: "LucyYuih", repo: "gdev-custom-charts", branch: "main" }; }
   
   function getActiveRepo() {
@@ -303,7 +304,7 @@ gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
           const repo = getActiveRepo();
           const manifest = await loadManifest(repo);
           const baseUrl = getBaseUrl(manifest, repo);
-          
+
           // 1. Encontrar Arquivos (Manifesto ou GitHub)
           let files = getFilesFromManifest(manifest, folderPath, baseUrl);
           if(!files || files.length === 0) {
@@ -317,7 +318,7 @@ gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
           window.gdjsCustomAudio = {};
           window.gdjsCustomAudio[folderPath] = { audios: {}, rawFiles: {} };
           const dest = window.gdjsCustomAudio[folderPath];
-          
+
           // Variaveis GDevelop
           const gg = runtimeScene.getGame().getVariables();
           if(gg.has("selectedTrackKey")) gg.get("selectedTrackKey").setString(folderPath);
@@ -335,7 +336,6 @@ gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
                   const blobUrl = URL.createObjectURL(blob);
                   const audioEl = new Audio(blobUrl);
                   audioEl.preload = "auto"; audioEl.loop = false;
-                  
                   dest.audios[f.name] = { blobUrl, audioEl };
                   window.gdjsChannels[channelIdx++] = audioEl;
               }
@@ -375,7 +375,7 @@ gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
       }
   }
 
-  // --- 9. LÓGICA DE SKINS (Copiada do original) ---
+  // --- 9. LÓGICA DE SKINS (Modificada para Resize) ---
   async function applySkin(selStr, targetOpts){
       if(!selStr) return;
       try {
@@ -383,13 +383,19 @@ gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
           const url = parsed.zip_cdn || parsed.zip;
           if(!url) return;
           
+          // --- CAPTURA A ESCALA DO JSON (MULTIPLAYER) ---
+          const scaleVal = (typeof parsed.scale === "number") ? parsed.scale : 1.0;
+          // ----------------------------------------------
+
           let buf = null;
           if(window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.zips[url]) buf = window.GD_SKIN_CACHE.zips[url];
           else { const r = await fetch(url); if(r.ok) buf = await r.arrayBuffer(); }
           
           if(window.GD_SKIN_PLAYER && buf) {
-              const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, buf);
-              await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, targetOpts);
+              // Passa a escala para o Load (Resize)
+              const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, buf, { scale: scaleVal });
+              // Passa a escala para o Apply (Compensação Visual)
+              await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { ...targetOpts, scale: scaleVal });
           }
       } catch(e){}
   }
@@ -424,7 +430,7 @@ gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
           const curSkinBF = gv.has("SelectedSkin") ? gv.get("SelectedSkin").getAsString() : "";
           const curSkinDad = gv.has("SelectedDadSkin") ? gv.get("SelectedDadSkin").getAsString() : "";
           const curTrack = gv.has("selectedTrackKey") ? gv.get("selectedTrackKey").getAsString() : "";
-
+          
           // Sync Skins
           if (playerOnline !== 1 && curSkinBF !== lastState.skinBF) {
               if(curSkinBF) await applySkin(curSkinBF, { targetName: "BF", targetAnimVar: "BFAnim" });
@@ -435,11 +441,9 @@ gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
               lastState.skinDad = curSkinDad;
           }
 
-          // Sync Música (A Correção Principal)
+          // Sync Música
           if (curTrack && curTrack !== lastState.trackKey) {
               if(curTrack.trim() !== "") {
-                  // Se a música mudou, o watcher dispara o download interno
-                  // Ele verifica se já não estamos baixando (isDownloading lock)
                   await downloadCompleteSong(curTrack);
               }
               lastState.trackKey = curTrack;
@@ -448,7 +452,7 @@ gdjs.PlayonlineCode.userFunc0xbfbb70 = function GDJSInlineCode(runtimeScene) {
       } catch(e){}
 
   }, CONFIG.watchInterval);
-
+  
   // Inicializar estados para evitar re-download no boot se já estiver definido
   try {
       const gv = runtimeScene.getGame().getVariables();
@@ -466,7 +470,7 @@ gdjs.PlayonlineCode.eventsList0 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xbfbb70(runtimeScene);
+gdjs.PlayonlineCode.userFunc0xb4e488(runtimeScene);
 
 }
 
@@ -615,545 +619,16 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xa8b168 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-// skin player
-(function(){
-  // --- CONFIGURAÇÃO GLOBAL E CACHE ---
-  if (!window.GD_SKIN_CACHE) {
-    window.GD_SKIN_CACHE = {
-        zips: {},     
-        textures: []  
-    };
-  }
-
-  const JSZIP_CDN = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
-  const JSDELIVR_PREFIX = "https://cdn.jsdelivr.net/gh";
-  const PLAYER_GLOBAL = "__gd_skin_player"; 
-
-  function log(...s){ console.log("[gd-skin-player]", ...s); }
-  function warn(...s){ console.warn("[gd-skin-player]", ...s); }
-
-  // --- SINGLETON DEFINITION ---
-  if (!window.GD_SKIN_PLAYER_DEFINED) {
-      
-      async function ensureJSZip(){
-        if (window.JSZip) return window.JSZip;
-        if (window.JSZipLoadingPromise) return window.JSZipLoadingPromise;
-        window.JSZipLoadingPromise = new Promise((res, rej) => {
-          const s = document.createElement("script");
-          s.src = JSZIP_CDN;
-          s.onload = () => { window.JSZipLoadingPromise = null; res(window.JSZip); };
-          s.onerror = () => { window.JSZipLoadingPromise = null; rej(new Error("Failed to load JSZip")); };
-          document.head.appendChild(s);
-        });
-        return window.JSZipLoadingPromise;
-      }
-
-      function safeParseJson(s){ try { return JSON.parse(s); } catch(e){ return null; } }
-      function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
-      function buildCdnUrl(owner, repo, branch, path){ if(!owner||!repo) return null; const br = branch||"main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
-
-      function getObjectSize(obj){
-        try {
-          if (!obj) return {w:0,h:0};
-          if (typeof obj.getWidth === "function" && typeof obj.getHeight === "function") return { w: obj.getWidth(), h: obj.getHeight() };
-          const ro = obj.getRendererObject && obj.getRendererObject();
-          if (ro) {
-            if (typeof ro.width === "number" && typeof ro.height === "number") return { w: ro.width, h: ro.height };
-            if (ro.getBounds && typeof ro.getBounds === "function") { const b = ro.getBounds(); return { w: b.width || 0, h: b.height || 0 }; }
-          }
-          return { w: 0, h: 0 };
-        } catch(e){ return {w:0,h:0}; }
-      }
-      
-      function getTexturePixelSize(tex){
-        try {
-          if (!tex) return {w:0,h:0};
-          if (tex.frame) {
-            if (tex.frame.width && tex.frame.height) return { w: tex.frame.width, h: tex.frame.height };
-            if (tex.frame.realWidth && tex.frame.realHeight) return { w: tex.frame.realWidth, h: tex.frame.realHeight };
-          }
-          if (tex.baseTexture) {
-            if (tex.baseTexture.realWidth && tex.baseTexture.realHeight) return { w: tex.baseTexture.realWidth, h: tex.baseTexture.realHeight };
-            if (tex.baseTexture.width && tex.baseTexture.height) return { w: tex.baseTexture.width, h: tex.baseTexture.height };
-          }
-          if (typeof tex.width === "number" && typeof tex.height === "number") return { w: tex.width, h: tex.height };
-          return {w:0,h:0};
-        } catch(e){ return {w:0,h:0}; }
-      }
-
-      function findJsonAndBasePath(zip){
-        const entries = Object.keys(zip.files);
-        const candidates = [];
-        for (const name of entries) {
-          if (name.toLowerCase().endsWith(".json")) {
-            const f = zip.files[name];
-            const ts = (f && f.date && f.date instanceof Date) ? f.date.getTime() : 0;
-            candidates.push({ name, ts });
-          }
-        }
-        if (candidates.length === 0) throw new Error("Metadata JSON not found in ZIP");
-        const metaMatches = candidates.filter(c => { const n = c.name.toLowerCase(); return n.endsWith("/metadata.json") || n.endsWith("metadata.json") || n.includes("metadata"); });
-        let chosen;
-        if (metaMatches.length) { metaMatches.sort((a,b) => b.ts - a.ts); chosen = metaMatches[0]; } 
-        else { candidates.sort((a,b) => b.ts - a.ts); chosen = candidates[0]; }
-        const parts = chosen.name.split("/");
-        const baseFolderPrefix = parts.slice(0, parts.length - 1).join("/");
-        return { jsonEntryName: chosen.name, baseFolderPrefix };
-      }
-
-      function groupImageEntries(entries, baseFolderPrefix, metadata){
-        const groups = {};
-        const animNames = (metadata && Array.isArray(metadata.animations)) ? metadata.animations.map(a=>a.anim) : [];
-        if (animNames.length === 0) groups["idle"] = [];
-        for (const anim of animNames) groups[anim] = [];
-        for (const e of entries){
-          let rel = e;
-          if (baseFolderPrefix && e.startsWith(baseFolderPrefix + "/")) rel = e.slice(baseFolderPrefix.length + 1);
-          for (const anim of animNames){
-            const folderCheck1 = rel.startsWith(anim + "/");
-            const folderCheck2 = metadata && metadata.image && rel.startsWith(metadata.image + "/" + anim + "/");
-            const filename = rel.split("/").pop();
-            const nameCheck = filename.toLowerCase().startsWith(anim.toLowerCase() + "_");
-            if ((folderCheck1 || folderCheck2 || nameCheck) && /\.(png|jpg|jpeg|gif)$/i.test(filename)){
-              groups[anim].push(e);
-            }
-          }
-          if (animNames.length === 0 && /\.(png|jpg|jpeg|gif)$/i.test(e.split("/").pop())){ groups["idle"].push(e); }
-        }
-        for (const k of Object.keys(groups)) groups[k].sort((a,b)=>a.localeCompare(b, undefined, { numeric: true }));
-        return groups;
-      }
-
-      async function loadTexturesFromZipEntries(zip, entryNames){
-        const textures = [];
-        for (const n of entryNames){
-          try {
-            const file = zip.file(n);
-            if (!file) continue;
-            const blob = await file.async("blob");
-            const url = URL.createObjectURL(blob);
-            const tex = PIXI.Texture.from(url);
-            
-            if(window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.textures) window.GD_SKIN_CACHE.textures.push({ tex, url });
-
-            await new Promise((resolve, reject) => {
-              if (tex.baseTexture && tex.baseTexture.valid) return resolve();
-              const checkValid = () => {
-                if (tex.baseTexture && tex.baseTexture.valid) resolve();
-                else setTimeout(checkValid, 10);
-              };
-              setTimeout(() => { if (tex.baseTexture && tex.baseTexture.valid) resolve(); else reject(new Error("Timeout texture")); }, 3000);
-              checkValid();
-            });
-            textures.push({ tex, blobUrl: url, entryName: n });
-          } catch(e){ warn("Failed load entry", n, e); }
-        }
-        return textures;
-      }
-
-      async function loadFromArrayBuffer(runtimeScene, arrayBuffer, opts = {}) {
-        await ensureJSZip();
-        const zip = await window.JSZip().loadAsync(arrayBuffer);
-        let jsonEntryName, baseFolderPrefix;
-        try { 
-            const found = findJsonAndBasePath(zip); 
-            jsonEntryName = found.jsonEntryName; baseFolderPrefix = found.baseFolderPrefix;
-        } catch(e){ throw new Error("Metadata JSON not found: " + (e && e.message)); }
-
-        let metadata;
-        try { metadata = JSON.parse(await zip.file(jsonEntryName).async("string")); } 
-        catch(e){ throw new Error("Failed reading metadata: " + (e && e.message)); }
-
-        if (!window.GD_SKIN_PLAYER) window.GD_SKIN_PLAYER = {};
-        window.GD_SKIN_PLAYER.lastDownloadedMetadata = metadata;
-
-        const allEntries = Object.keys(zip.files);
-        const groups = groupImageEntries(allEntries, baseFolderPrefix, metadata);
-        const animations = {};
-        
-        for (const am of (metadata.animations || [])){
-          animations[am.anim] = { name: am.anim, fps: am.fps||24, frames: [], loaded: false, loop: am.anim === "idle" };
-        }
-        if (Object.keys(animations).length === 0) animations["idle"] = { name:"idle", fps:24, frames:[], loaded:false, loop:true };
-        
-        // --- PRE-WARM ---
-        for (const key of Object.keys(animations)){
-          const entryNames = groups[key] || [];
-          if (!entryNames.length) { animations[key].loaded = true; animations[key].frames = []; continue; }
-          
-          const loaded = await loadTexturesFromZipEntries(zip, entryNames);
-          animations[key].frames = loaded.map(o => o.tex);
-          animations[key].loaded = true;
-          animations[key]._blobUrls = loaded.map(o => o.blobUrl);
-          
-          loaded.forEach(obj => {
-             if(obj.tex && obj.tex.baseTexture) {
-                 obj.tex.baseTexture.update(); 
-             }
-          });
-        }
-        log("Todas as animações foram pré-carregadas.");
-        return { 
-          animations, metadata, 
-          _createdBlobUrls: (function collect(){ const arr=[]; for(const k of Object.keys(animations)){ const a=animations[k]; if (a._blobUrls) arr.push(...a._blobUrls); } return arr; })() 
-        };
-      }
-
-      function computeCenterAndFeetForObject(obj){
-        const size = getObjectSize(obj);
-        const ro = (obj.getRendererObject && obj.getRendererObject()) || null;
-        let anchorX = 0.5, anchorY = 0;
-        try {
-          if (ro) {
-            if (ro.anchor && typeof ro.anchor.x === "number") { anchorX = ro.anchor.x; anchorY = ro.anchor.y; }
-            else if (ro.pivot && typeof ro.pivot.x === "number" && typeof ro.width === "number") { anchorX = ro.pivot.x / (ro.width || 1); anchorY = ro.pivot.y / (ro.height || 1); }
-          }
-        } catch(e){}
-        const gx = (typeof obj.getX === "function") ? obj.getX() : 0;
-        const gy = (typeof obj.getY === "function") ? obj.getY() : 0;
-        const centerX = gx + (0.5 - anchorX) * (size.w || 0);
-        const feetY = gy + (1 - (typeof anchorY === "number" ? anchorY : 0)) * (size.h || 0);
-        let pixelToSceneOriginal = 1;
-        try {
-          const tex = ro && (ro.texture || (ro.sprite && ro.sprite.texture));
-          if (tex) { const texPx = getTexturePixelSize(tex); if (texPx && texPx.h > 0 && size.h > 0) pixelToSceneOriginal = size.h / texPx.h; }
-        } catch(e){ }
-        return { centerX, feetY, anchorX, anchorY, size, originalX: gx, originalY: gy, pixelToSceneOriginal };
-      }
-
-      async function applyPackageToScene(runtimeScene, packageObj, opts = {}) {
-        const TARGET_NAME = (opts && opts.targetName) ? opts.targetName : "BF";
-        
-        // Anti-Flicker: Mata player anterior
-        if (window[PLAYER_GLOBAL] && window[PLAYER_GLOBAL][TARGET_NAME]) {
-            try { window[PLAYER_GLOBAL][TARGET_NAME].cleanup(); } catch(e){}
-            window[PLAYER_GLOBAL][TARGET_NAME] = null;
-        }
-
-        const TARGET_ANIM_VAR = (opts && opts.targetAnimVar) ? opts.targetAnimVar : "BFAnim";
-        const invertOffsetY = (typeof opts.invertOffsetY === "boolean") ? opts.invertOffsetY : false;
-        const coordinateMode = (opts.coordinateMode === "raw") ? "raw" : "psych";
-
-        const animations = packageObj.animations || {};
-        const targetObjects = runtimeScene.getObjects(TARGET_NAME);
-        if (!targetObjects || targetObjects.length === 0) { warn(TARGET_NAME + " not found."); return null; }
-
-        const targetInfos = [];
-        for (const obj of targetObjects) {
-          try {
-            const info = computeCenterAndFeetForObject(obj);
-            let originalScaleX = 1;
-            try {
-              const ro = obj.getRendererObject && obj.getRendererObject();
-              if (ro) {
-                if (ro.scale && typeof ro.scale.x === "number") originalScaleX = ro.scale.x;
-                else if (typeof ro.scaleX === "number") originalScaleX = ro.scaleX;
-              }
-            } catch(e){}
-            const originalAbsScaleX = Math.abs(typeof originalScaleX === "number" && isFinite(originalScaleX) ? originalScaleX : 1) || 1;
-            targetInfos.push({ 
-              obj, centerX: info.centerX, feetY: info.feetY, anchorX: info.anchorX, anchorY: info.anchorY, 
-              originalScaleX, originalAbsScaleX, pixelToSceneOriginal: (typeof info.pixelToSceneOriginal === "number" && isFinite(info.pixelToSceneOriginal)) ? info.pixelToSceneOriginal : 1
-            });
-          } catch(e){ }
-        }
-
-        const state = {
-          current: "idle", frameIndex: 0, elapsed: 0, lastAnimValue: "", lastTick: performance.now(),
-          _idleBeatTimeout: null, _returnToIdleTimeout: null, _createdBlobUrls: packageObj._createdBlobUrls || [], 
-          _isPlayingSingAnimation: false, _idleTimerRunning: false, _watchdogCounter: 0
-        };
-        const meta = packageObj.metadata || {};
-        
-        let invertSideGlobal = false;
-        const parseBoolean = (v) => {
-          if (typeof v === "boolean") return v;
-          if (typeof v === "number") return v !== 0;
-          if (typeof v === "string") {
-             const s = v.trim().toLowerCase();
-             return (s === "true" || s === "1" || s === "yes");
-          }
-          return Boolean(v);
-        };
-        const oppSideBool = parseBoolean(meta.OPPSide);
-        invertSideGlobal = (TARGET_NAME === "BFPixel") ? !oppSideBool : oppSideBool;
-
-        function mapAnimToKey(rawAnim, invertSide){
-          if (!rawAnim) return "";
-          const v = rawAnim.toLowerCase();
-          if (invertSide) {
-            if (v.includes("left")) return "singRIGHT";
-            if (v.includes("right")) return "singLEFT";
-          } else {
-            if (v.includes("left")) return "singLEFT";
-            if (v.includes("right")) return "singRIGHT";
-          }
-          if (v.includes("down")) return "singDOWN";
-          if (v.includes("up")) return "singUP";
-          return rawAnim;
-        }
-
-        function applyFrameToAllObjects(tex){
-          if (!targetInfos || targetInfos.length === 0) return;
-          const texPixel = getTexturePixelSize(tex);
-          for (const info of targetInfos) {
-            const obj = info.obj;
-            try {
-              const ro = obj.getRendererObject && obj.getRendererObject();
-              if (ro && ro.texture !== undefined) ro.texture = tex;
-              else { try { obj.getRendererObject().texture = tex; } catch(e){} }
-
-              const pixelToScene = (coordinateMode === "psych") ? ((typeof info.pixelToSceneOriginal === "number" && info.pixelToSceneOriginal > 0) ? info.pixelToSceneOriginal : 1) : 1;
-              const scaledTexWidth = (texPixel.w || 0) * pixelToScene;
-              const scaledTexHeight = (texPixel.h || 0) * pixelToScene;
-              const targetFeetY = info.feetY;
-              const targetCenterX = info.centerX;
-              const anchorX = (typeof info.anchorX === "number") ? info.anchorX : 0.5;
-              const anchorY = (typeof info.anchorY === "number") ? info.anchorY : 0;
-              
-              const targetObjX = targetCenterX - (0.5 - anchorX) * scaledTexWidth;
-              const targetObjY = targetFeetY - (1 - anchorY) * scaledTexHeight;
-              
-              if (typeof obj.setX === "function") obj.setX(targetObjX);
-              if (typeof obj.setY === "function") obj.setY(targetObjY);
-
-              if (ro) {
-                  const baseScale = (typeof info.originalAbsScaleX === "number" && info.originalAbsScaleX > 0) ? info.originalAbsScaleX : 1;
-                  const wantScaleX = invertSideGlobal ? -baseScale : baseScale;
-                  if (ro.scale && typeof ro.scale.x === "number") ro.scale.x = wantScaleX;
-                  else if (typeof ro.scaleX === "number") ro.scaleX = wantScaleX;
-              }
-            } catch(e){ console.error("Error applying frame:", e); }
-          }
-        }
-
-        if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
-          applyFrameToAllObjects(animations.idle.frames[0]);
-        }
-
-        let rafHandle = null;
-        function clearAllTimeouts(){ 
-          if (state._idleBeatTimeout){ clearTimeout(state._idleBeatTimeout); state._idleBeatTimeout=null; } 
-          if (state._returnToIdleTimeout){ clearTimeout(state._returnToIdleTimeout); state._returnToIdleTimeout=null; } 
-          state._idleTimerRunning = false;
-        }
-        
-        function animValueIsEmpty(s){
-          if (s === null || s === undefined) return true;
-          try { const st = String(s).trim().toLowerCase(); return st === "" || st === "idle"; } catch(e){ return true; }
-        }
-
-        function scheduleReturnToIdle(delayMs = 150){
-          if (state._returnToIdleTimeout) clearTimeout(state._returnToIdleTimeout);
-          state._idleTimerRunning = true;
-          state._returnToIdleTimeout = setTimeout(()=>{
-            state._returnToIdleTimeout = null;
-            state._idleTimerRunning = false;
-            state.current = "idle";
-            state.frameIndex = 0;
-            state.elapsed = 0;
-            state._isPlayingSingAnimation = false;
-            if (animations.idle && animations.idle.frames && animations.idle.frames[0]) {
-              applyFrameToAllObjects(animations.idle.frames[0]);
-            }
-          }, delayMs);
-        }
-
-        let watchdogLastFrameIndex = null;
-        let watchdogCounter = 0;
-        const WATCHDOG_MAX_TICKS = 40;
-
-        function tick(now){
-          const dt = Math.min(60, now - (state.lastTick || now));
-          state.lastTick = now;
-          let currentAnim = "";
-          try {
-            const sv = runtimeScene.getVariables();
-            const gv = runtimeScene.getGame().getVariables();
-            if (sv && sv.has && sv.has(TARGET_ANIM_VAR)) currentAnim = sv.get(TARGET_ANIM_VAR).getAsString();
-            else if (gv && gv.has && gv.has(TARGET_ANIM_VAR)) currentAnim = gv.get(TARGET_ANIM_VAR).getAsString();
-          } catch(e){ currentAnim = ""; }
-          
-          if (!animValueIsEmpty(currentAnim) && currentAnim !== state.lastAnimValue){
-            clearAllTimeouts();
-            const key = mapAnimToKey(currentAnim, invertSideGlobal);
-            if (animations[key] && animations[key].frames && animations[key].frames.length > 0){
-              state.current = key; state.frameIndex = 0; state.elapsed = 0; 
-              state._isPlayingSingAnimation = true; state._idleTimerRunning = false;
-              watchdogLastFrameIndex = 0; watchdogCounter = 0;
-              applyFrameToAllObjects(animations[key].frames[0]); 
-            } else { scheduleReturnToIdle(120); }
-          } else if (animValueIsEmpty(currentAnim) && state.current !== "idle" && !state._idleTimerRunning){
-            scheduleReturnToIdle(150);
-          }
-          
-          if (state._idleTimerRunning && !animValueIsEmpty(currentAnim)){ clearAllTimeouts(); }
-          
-          state.lastAnimValue = currentAnim;
-          
-          const anim = animations[state.current];
-          if (anim && anim.frames && anim.frames.length > 0){
-            const msPerFrame = 1000 / (anim.fps || 24);
-            state.elapsed += dt;
-            let frameChanged = false;
-            while (state.elapsed >= msPerFrame && !frameChanged){
-              state.elapsed -= msPerFrame;
-              state.frameIndex++; 
-              frameChanged = true;
-              if (state.frameIndex >= anim.frames.length){
-                if (anim.loop){
-                   // --- CORREÇÃO DO LOOP IMEDIATO ---
-                   // Mantém o último frame e espera um tempo (simulando beat) antes de reiniciar
-                   state.frameIndex = anim.frames.length - 1; 
-                   if (!state._idleBeatTimeout) {
-                       const beatDelay = 650; // Ajuste este valor para mais rápido/lento (ms)
-                       state._idleBeatTimeout = setTimeout(() => {
-                           state._idleBeatTimeout = null;
-                           state.current = "idle";
-                           state.frameIndex = 0;
-                           state.elapsed = 0;
-                           if (animations.idle) applyFrameToAllObjects(animations.idle.frames[0]);
-                       }, beatDelay);
-                   }
-                } else {
-                  state.frameIndex = anim.frames.length - 1; 
-                  if (state._isPlayingSingAnimation){ state._isPlayingSingAnimation = false; }
-                }
-              }
-            }
-            if (frameChanged){
-              const tex = anim.frames[state.frameIndex];
-              if (tex) applyFrameToAllObjects(tex);
-              
-              if (state.current !== "idle"){
-                if (watchdogLastFrameIndex === state.frameIndex) watchdogCounter++;
-                else watchdogCounter = 0;
-                watchdogLastFrameIndex = state.frameIndex;
-                if (watchdogCounter > WATCHDOG_MAX_TICKS){
-                  clearAllTimeouts(); state.current = "idle"; state.frameIndex = 0; state.elapsed = 0;
-                  if (animations.idle) applyFrameToAllObjects(animations.idle.frames[0]);
-                }
-              } else { watchdogCounter = 0; }
-            }
-          } else {
-            if (state.current !== "idle") scheduleReturnToIdle(120);
-          }
-          rafHandle = requestAnimationFrame(tick);
-        }
-        rafHandle = requestAnimationFrame(tick);
-
-        function cleanup(){
-          if (rafHandle) cancelAnimationFrame(rafHandle);
-          clearAllTimeouts();
-          try { for (const b of state._createdBlobUrls){ try{ URL.revokeObjectURL(b); }catch(e){} } } catch(e){}
-        }
-
-        const instance = { animations, state, cleanup, target: TARGET_NAME };
-        if (!window[PLAYER_GLOBAL]) window[PLAYER_GLOBAL] = {};
-        window[PLAYER_GLOBAL][TARGET_NAME] = instance; 
-        
-        return instance;
-      }
-
-      function clearCache(){
-          if(window.GD_SKIN_CACHE){
-              window.GD_SKIN_CACHE.textures.forEach(item => {
-                  try { if(item.tex) item.tex.destroy(true); if(item.url) URL.revokeObjectURL(item.url); } catch(e){}
-              });
-              window.GD_SKIN_CACHE.textures = [];
-              window.GD_SKIN_CACHE.zips = {};
-          }
-          if(window[PLAYER_GLOBAL]){
-             Object.keys(window[PLAYER_GLOBAL]).forEach(key => {
-                 try{ if(window[PLAYER_GLOBAL][key]) window[PLAYER_GLOBAL][key].cleanup(); }catch(e){}
-             });
-          }
-      }
-
-      async function fetchAndCacheZip(url){
-        if (window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.zips[url]) return window.GD_SKIN_CACHE.zips[url];
-        const r = await fetch(url);
-        if (!r.ok) throw new Error("Fetch failed " + r.status);
-        const arr = await r.arrayBuffer();
-        if (window.GD_SKIN_CACHE) window.GD_SKIN_CACHE.zips[url] = arr;
-        return arr;
-      }
-
-      async function autoApplySelectedSkin(runtimeScene, opts = {}) {
-        let selStr = null;
-        try { const gv = runtimeScene.getGame().getVariables(); if (gv.has("SelectedSkin")) selStr = gv.get("SelectedSkin").getAsString(); } catch(e){}
-        if ((!selStr || selStr.trim() === "") && window.localStorage) try { selStr = localStorage.getItem("gd_selected_skin"); } catch(e){}
-        if (!selStr) return null;
-        const parsed = safeParseJson(selStr); if (!parsed) return null;
-
-        const candidates = [];
-        if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
-        if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); }
-        
-        for (const c of candidates) {
-          try {
-            const arr = await fetchAndCacheZip(c);
-            const pkg = await loadFromArrayBuffer(runtimeScene, arr);
-            return await applyPackageToScene(runtimeScene, pkg, opts);
-          } catch(err){}
-        }
-        return null;
-      }
-
-      async function autoApplySelectedDadSkin(runtimeScene, opts = {}) {
-        let selStr = null;
-        try { const gv = runtimeScene.getGame().getVariables(); if (gv.has("SelectedDadSkin")) selStr = gv.get("SelectedDadSkin").getAsString(); } catch(e){}
-        if ((!selStr || selStr.trim() === "") && window.localStorage) try { selStr = localStorage.getItem("gd_selected_dad_skin"); } catch(e){}
-        if (!selStr) return null;
-        const parsed = safeParseJson(selStr); if (!parsed) return null;
-
-        const candidates = [];
-        if (parsed.zip_cdn) candidates.push(parsed.zip_cdn);
-        if (parsed.zip) { candidates.push(parsed.zip); candidates.push("resources/" + parsed.zip); candidates.push("./" + parsed.zip); }
-        
-        for (const c of candidates) {
-          try {
-            const arr = await fetchAndCacheZip(c);
-            const pkg = await loadFromArrayBuffer(runtimeScene, arr);
-            return await applyPackageToScene(runtimeScene, pkg, { ...opts, targetName: "BFPixel", targetAnimVar: "OPPAnim" });
-          } catch(err){}
-        }
-        return null;
-      }
-
-      window.GD_SKIN_PLAYER = Object.assign(window.GD_SKIN_PLAYER || {}, { 
-        autoApplySelectedSkin, autoApplySelectedDadSkin, loadFromArrayBuffer, applyPackageToScene, clearCache, cleanup: clearCache 
-      });
-      window.GD_SKIN_PLAYER_DEFINED = true;
-  }
-
-  // --- AUTO EXECUÇÃO ---
-  (async ()=>{
-    try {
-      let rs = null;
-      try { if (typeof runtimeScene !== "undefined") rs = runtimeScene; } catch(e){}
-      if (!rs && window.__gd_runtimeScene_for_skin) rs = window.__gd_runtimeScene_for_skin;
-      if (!rs) return;
-
-      await window.GD_SKIN_PLAYER.autoApplySelectedSkin(rs, { extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } });
-      await window.GD_SKIN_PLAYER.autoApplySelectedDadSkin(rs, { extraDefaults: { owner:"LucyYuih", repo:"gdev-custom-skins", branch:"main" } });
-    } catch(e){}
-  })();
-})();
-};
-gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
+};gdjs.PlayonlineCode.eventsList5 = function(runtimeScene) {
 
 {
 
 
-gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xd0aac8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x13fed08 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (async function(runtimeScene) {
   // --- 1. CONFIGURAÇÃO DE CLEANUP ---
@@ -1173,45 +648,60 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
   function clearPixiTextureCache(skinName) {
     if (!window.PIXI) return;
     try {
-        for (const key in PIXI.utils.TextureCache) { if (key.includes(skinName)) { try { PIXI.utils.TextureCache[key].destroy(true); delete PIXI.utils.TextureCache[key]; } catch(e) {} } }
+        for (const key in PIXI.utils.TextureCache) { if (key.includes(skinName)) { try { PIXI.utils.TextureCache[key].destroy(true); delete PIXI.utils.TextureCache[key]; } catch(e) 
+        {} } }
         for (const key in PIXI.utils.BaseTextureCache) { if (key.includes(skinName)) { try { delete PIXI.utils.BaseTextureCache[key]; } catch(e) {} } }
     } catch (e) {}
   }
 
-  function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20'); }
-  function buildCdnUrl(owner, repo, branch, path){ if (!owner || !repo) return null; const br = branch || "main"; return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
+  function encodePathForCdn(p){ return String(p).replace(/^\.\//,'').replace(/\\/g,'/').replace(/ /g,'%20');
+  }
+  function buildCdnUrl(owner, repo, branch, path){ if (!owner || !repo) return null; const br = branch || "main";
+  return `${JSDELIVR_PREFIX}/${owner}/${repo}@${br}/${encodePathForCdn(path)}`; }
 
   async function fetchCdnFirst(pathOrUrl, as="json", cdnBase=null){
     const isAbs = typeof pathOrUrl === "string" && (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://"));
     const tries = []; if (isAbs) tries.push(pathOrUrl);
-    if (!isAbs && cdnBase && cdnBase.owner) { const c = buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, pathOrUrl); if (c) tries.push(c); }
+    if (!isAbs && cdnBase && cdnBase.owner) { const c = buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, pathOrUrl);
+    if (c) tries.push(c); }
     tries.push(pathOrUrl); tries.push("resources/" + pathOrUrl);
-    for (const u of tries) { try { const r = await fetch(u); if (!r.ok) continue; if (as==="json") return await r.json(); if (as==="arraybuffer") return await r.arrayBuffer(); if (as==="blob") return await r.blob(); return await r.text(); } catch (e) {} }
+    for (const u of tries) { try { const r = await fetch(u); if (!r.ok) continue;
+    if (as==="json") return await r.json(); if (as==="arraybuffer") return await r.arrayBuffer(); if (as==="blob") return await r.blob(); return await r.text();
+    } catch (e) {} }
     throw new Error("Fetch failed");
   }
 
-  function getSkinName(sk) { if (sk.name) return sk.name; if (sk.path) return sk.path.split('/').pop(); return ""; }
-  function buildFilePathFromSkin(sk, field) { const v = sk[field] || ""; if (!v) return ""; if (v.startsWith("http")) return v; if (sk.path) return sk.path.replace(/\\/g,'/') + "/" + v; return v; }
+  function getSkinName(sk) { if (sk.name) return sk.name; if (sk.path) return sk.path.split('/').pop(); return "";
+  }
+  function buildFilePathFromSkin(sk, field) { const v = sk[field] || ""; if (!v) return ""; if (v.startsWith("http")) return v;
+  if (sk.path) return sk.path.replace(/\\/g,'/') + "/" + v; return v;
+  }
 
   // --- 3. UI LOADING ---
   function showLoadingModal() {
-    const existing = document.getElementById("skin-download-loading"); if (existing) return existing;
+    const existing = document.getElementById("skin-download-loading");
+    if (existing) return existing;
     const modal = document.createElement("div"); modal.id = "skin-download-loading";
-    modal.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100000; color: white; font-family: Arial, sans-serif; flex-direction: column; gap: 16px;`;
+    modal.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center; z-index: 100000; color: white; font-family: Arial, sans-serif; flex-direction: column; gap: 16px;`;
     modal.innerHTML = `<div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #1976d2; animation: spin 1s linear infinite;"></div><div>Baixando...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
     document.body.appendChild(modal); return modal;
   }
-  function hideLoadingModal() { const m = document.getElementById("skin-download-loading"); if (m) m.remove(); }
+  function hideLoadingModal() { const m = document.getElementById("skin-download-loading"); if (m) m.remove();
+  }
 
   // --- 4. MULTIPLAYER HELPERS ---
   function getPlayerOnlineValue(rs){
-    try { const gv = rs.getGame().getVariables(); if (gv.has("PlayerOnline")) return gv.get("PlayerOnline").getAsNumber(); } catch(e){}
-    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer) { const pn = gdjs.multiplayer.getCurrentPlayerNumber(); if (typeof pn === 'number') return pn===1?1:2; } } catch(e){}
-    return 0; 
+    try { const gv = rs.getGame().getVariables();
+    if (gv.has("PlayerOnline")) return gv.get("PlayerOnline").getAsNumber(); } catch(e){}
+    try { if (typeof gdjs !== 'undefined' && gdjs.multiplayer) { const pn = gdjs.multiplayer.getCurrentPlayerNumber();
+    if (typeof pn === 'number') return pn===1?1:2; } } catch(e){}
+    return 0;
   }
 
   // --- 5. LOGIC ---
-  let modalOwner = null, modalRepo = null, modalBranch = null; let globalManifest = null;
+  let modalOwner = null, modalRepo = null, modalBranch = null;
+  let globalManifest = null;
 
   async function applyNow(modName, skinObj, target){
     if (applyNow._busy) return; applyNow._busy = true;
@@ -1220,25 +710,39 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
     try {
       const cdnBase = { owner: modalOwner, repo: modalRepo, branch: modalBranch };
       const cdnCandidate = (zipPath.startsWith("http")) ? zipPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, zipPath);
+      
       const arrbuf = await fetchCdnFirst(cdnCandidate || zipPath, "arraybuffer", cdnBase);
-      const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath, zip_cdn: cdnCandidate };
+      
+      // --- CAPTURA A ESCALA DO SELECT UI ---
+      const scaleEl = document.getElementById("skin-quality-select");
+      const scaleVal = scaleEl ? parseFloat(scaleEl.value) : 1.0;
+      if(scaleEl) localStorage.setItem("gd_skin_last_scale", scaleVal.toString());
+      // -------------------------------------
+
+      // Salva a escala no JSON para Multiplayer
+      const sel = { mod: modName, name: getSkinName(skinObj), zip: zipPath, zip_cdn: cdnCandidate, scale: scaleVal };
+      
       clearPixiTextureCache(getSkinName(skinObj));
       const varName = target === "BF" ? "SelectedSkin" : "SelectedDadSkin";
       const storageKey = target === "BF" ? "gd_selected_skin" : "gd_selected_dad_skin";
       const gv = runtimeScene.getGame().getVariables();
       if (gv.has(varName)) gv.get(varName).setString(JSON.stringify(sel)); else gv.pushNew(varName).setString(JSON.stringify(sel));
       localStorage.setItem(storageKey, JSON.stringify(sel));
+      
       if (window.GD_SKIN_PLAYER) {
-          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel" });
-          await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: target === "BF" ? "BF" : "BFPixel", targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim" });
+          // Passa a escala para redimensionar (Load) e compensar (Apply)
+          const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(runtimeScene, arrbuf, { targetName: target === "BF" ? "BF" : "BFPixel", scale: scaleVal });
+          await window.GD_SKIN_PLAYER.applyPackageToScene(runtimeScene, pkg, { targetName: target === "BF" ? "BF" : "BFPixel", targetAnimVar: target === "BF" ? "BFAnim" : "OPPAnim", scale: scaleVal });
       }
-    } catch(e){ console.error(e); } finally { hideLoadingModal(); applyNow._busy = false; }
+    } catch(e){ console.error(e); } finally { hideLoadingModal(); applyNow._busy = false;
+    }
   }
 
   async function resetAndRedownload(modName, skinObj, auto=false){
     if (resetAndRedownload._busy) return; resetAndRedownload._busy = true;
     if(!auto && !confirm("Resetar?")) { resetAndRedownload._busy = false; return; }
-    const skinName = typeof skinObj === "object" ? getSkinName(skinObj) : skinObj; showLoadingModal();
+    const skinName = typeof skinObj === "object" ?
+    getSkinName(skinObj) : skinObj; showLoadingModal();
     try {
         const gv = runtimeScene.getGame().getVariables();
         if (gv.has("SelectedSkin")) gv.get("SelectedSkin").setString("");
@@ -1247,37 +751,72 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
         if (window.GD_SKIN_PLAYER) await window.GD_SKIN_PLAYER.clearCache();
         clearPixiTextureCache(skinName);
         if(!auto) alert("Resetado.");
-    } catch(e){} finally { hideLoadingModal(); resetAndRedownload._busy = false; }
+    } catch(e){} finally { hideLoadingModal(); resetAndRedownload._busy = false;
+    }
   }
 
   // --- 6. UI ---
   function createModal(defaultOwner, defaultRepo, defaultBranch) {
     const css = `
-      :root { --modal-gap:12px; --panel-bg:#0f0f11; --panel-radius:12px; --accent:#1976d2; }
-      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; padding:20px; }
-      .skin-panel { width: min(1100px,98%); max-width:1100px; height: min(86vh,820px); background:var(--panel-bg); color:#eee; border-radius:var(--panel-radius); display:grid; grid-template-columns:300px 1fr; gap:var(--modal-gap); overflow:hidden; font-family:Arial, sans-serif; box-shadow: 0 12px 32px rgba(0,0,0,0.6); }
-      @media (max-width:720px){ .skin-panel{ grid-template-columns:1fr; height:calc(100vh-36px); width:100%; } .skin-left{ order:0; max-height:160px; overflow:auto; } .skin-right{ order:1; } }
-      .skin-left{ padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto; min-width:180px; }
+      :root { --modal-gap:12px;
+      --panel-bg:#0f0f11; --panel-radius:12px; --accent:#1976d2; }
+      .skin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center;
+      z-index:99999; padding:20px; }
+      .skin-panel { width: min(1100px,98%); max-width:1100px; height: min(86vh,820px); background:var(--panel-bg); color:#eee; border-radius:var(--panel-radius); display:grid;
+      grid-template-columns:300px 1fr; gap:var(--modal-gap); overflow:hidden; font-family:Arial, sans-serif; box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      }
+      @media (max-width:720px){ .skin-panel{ grid-template-columns:1fr; height:calc(100vh-36px); width:100%; } .skin-left{ order:0; max-height:160px; overflow:auto; } .skin-right{ order:1;
+      } }
+      .skin-left{ padding:14px; border-right:1px solid rgba(255,255,255,0.05); overflow:auto; min-width:180px;
+      }
       .skin-right{ padding:14px; display:flex; flex-direction:column; overflow:auto; }
-      .skin-mod{ padding:8px; margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .skin-mod:hover { background: rgba(255,255,255,0.03); }
-      .skin-btn{ padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px; }
+      .skin-mod{ padding:8px;
+      margin:6px 0; background:rgba(255,255,255,0.02); border-radius:8px; cursor:pointer; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .skin-mod:hover { background: rgba(255,255,255,0.03);
+      }
+      .skin-btn{ padding:8px 10px; border-radius:8px; background: var(--accent); color:white; border:none; cursor:pointer; font-size:13px;
+      }
       .skin-btn.opponent{ background:#d32f2f; } .skin-btn.bf{ background:#1976d2; }
-      .skin-list{ display:flex; flex-wrap:wrap; gap:10px; overflow:auto; padding:6px; align-content:flex-start; }
-      .skin-card{ width: clamp(110px,22%,160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer; display:flex; flex-direction:column; gap:8px; }
-      .skin-card img{ width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; transition: opacity 0.3s; opacity: 0; }
-      .skin-card img.loaded { opacity: 1; }
+      .skin-list{ display:flex; flex-wrap:wrap;
+      gap:10px; overflow:auto; padding:6px; align-content:flex-start; }
+      .skin-card{ width: clamp(110px,22%,160px); min-width:110px; background: rgba(255,255,255,0.02); border-radius:8px; padding:8px; text-align:center; cursor:pointer;
+      display:flex; flex-direction:column; gap:8px; }
+      .skin-card img{ width:100%; height:90px; object-fit:contain; background:#222; border-radius:6px; transition: opacity 0.3s;
+      opacity: 0; }
+      .skin-card img.loaded { opacity: 1;
+      }
       .skin-card button.skin-btn{ padding:6px 8px; font-size:12px; border-radius:6px; width:100%; }
     `;
     const style = document.createElement("style"); style.textContent = css; document.head.appendChild(style);
     const modal = document.createElement("div"); modal.className = "skin-modal";
-    const panel = document.createElement("div"); panel.className = "skin-panel";
+    const panel = document.createElement("div");
+    panel.className = "skin-panel";
     const left = document.createElement("div"); left.className = "skin-left";
     const leftList = document.createElement("div"); left.appendChild(leftList);
-    const right = document.createElement("div"); right.className = "skin-right";
+    const right = document.createElement("div");
+    right.className = "skin-right";
     const top = document.createElement("div"); 
+    
+    // --- NOVO: SELECT DE QUALIDADE ---
+    const qualitySel = document.createElement("select");
+    qualitySel.id = "skin-quality-select";
+    qualitySel.style.cssText = "background: #222; color: #ddd; border: 1px solid rgba(255,255,255,0.1); padding: 7px; border-radius: 6px; font-size: 13px; margin-right: 8px;";
+    const opts = [
+        {txt: "100% (Original)", val: "1.0"},
+        {txt: "75% (Leve)", val: "0.75"},
+        {txt: "50% (Rápido)", val: "0.5"},
+        {txt: "25% (Batata)", val: "0.25"}
+    ];
+    opts.forEach(o => { const op = document.createElement("option"); op.value = o.val; op.textContent = o.txt; qualitySel.appendChild(op); });
+    try { const ls = localStorage.getItem("gd_skin_last_scale"); if(ls) qualitySel.value = ls; } catch(e){}
+    // ---------------------------------
+
     const closeBtn = document.createElement("button"); closeBtn.className = "skin-btn"; closeBtn.textContent = "Fechar";
-    top.appendChild(closeBtn); right.appendChild(top);
+    
+    top.appendChild(qualitySel); // Adiciona na barra
+    top.appendChild(closeBtn); 
+    
+    right.appendChild(top);
     const skinListWrap = document.createElement("div"); skinListWrap.style.flex="1"; skinListWrap.style.overflow="auto";
     right.appendChild(skinListWrap); panel.append(left, right); modal.appendChild(panel); document.body.appendChild(modal);
     return { modal, leftList, closeBtn, skinListWrap };
@@ -1285,9 +824,11 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
 
   // --- 7. MAIN ---
   async function openSkinSelector(manifest){
-    globalManifest = manifest || { "": [] };
+    globalManifest = manifest ||
+    { "": [] };
     let baseOwner="LucyYuih", baseRepo="gdev-custom-skins", baseBranch="main";
-    if (manifest && manifest._base) { const [or, br] = manifest._base.split("@"); const [o, r] = or.split("/"); baseOwner=o; baseRepo=r; baseBranch=br; }
+    if (manifest && manifest._base) { const [or, br] = manifest._base.split("@");
+    const [o, r] = or.split("/"); baseOwner=o; baseRepo=r; baseBranch=br; }
     
     const { modal, leftList, closeBtn, skinListWrap } = createModal(baseOwner, baseRepo, baseBranch);
     modalOwner = baseOwner; modalRepo = baseRepo; modalBranch = baseBranch;
@@ -1298,14 +839,14 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
             const img = entry.target; const src = img.dataset.src;
             if (src) { const cdnBase = JSON.parse(img.dataset.cdnBase); fetchCdnFirst(src, "blob", cdnBase).then(blob => { img.src = URL.createObjectURL(blob); img.classList.add("loaded"); }).catch(()=>{}); }
             lazyObserver.unobserve(img);
+      
         }});
     }, { root: skinListWrap, rootMargin: "100px" });
-
     // MODS
     const mods = manifest[""] || [];
-    for (const m of mods) { const el=document.createElement("div"); el.className="skin-mod"; el.textContent=m; el.onclick=()=>selectMod(m); leftList.appendChild(el); }
+    for (const m of mods) { const el=document.createElement("div"); el.className="skin-mod";
+    el.textContent=m; el.onclick=()=>selectMod(m); leftList.appendChild(el); }
     closeBtn.onclick = () => { modal.style.display = 'none'; };
-
     async function selectMod(modName){
       skinListWrap.innerHTML=""; const list=document.createElement("div"); list.className="skin-list"; skinListWrap.appendChild(list);
       const skins = manifest[modName] || [];
@@ -1313,18 +854,21 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
       const playerOnline = getPlayerOnlineValue(runtimeScene);
       const showBF = (playerOnline === 0 || playerOnline === 1);
       const showOpp = (playerOnline === 0 || playerOnline === 2);
-
       for (const sk of skins){
         const card=document.createElement("div"); card.className="skin-card";
         const img=document.createElement("img"); img.alt=getSkinName(sk);
         let thumbPath = buildFilePathFromSkin(sk, "thumb");
-        if(thumbPath) { const cand = (thumbPath.startsWith("http")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath); img.dataset.src = cand; img.dataset.cdnBase = JSON.stringify(cdnBase); lazyObserver.observe(img); }
+        if(thumbPath) { const cand = (thumbPath.startsWith("http")) ? thumbPath : buildCdnUrl(cdnBase.owner, cdnBase.repo, cdnBase.branch, thumbPath);
+        img.dataset.src = cand; img.dataset.cdnBase = JSON.stringify(cdnBase); lazyObserver.observe(img); }
         else img.style.background="#333";
         const lbl=document.createElement("div"); lbl.textContent=getSkinName(sk);
-        
-        if(showBF){ const btn = document.createElement("button"); btn.className = "skin-btn bf"; btn.textContent = "BF"; btn.onclick = (e)=>{ e.stopPropagation(); applyNow(modName, sk, "BF"); }; card.appendChild(btn); }
-        if(showOpp){ const btn = document.createElement("button"); btn.className = "skin-btn opponent"; btn.textContent = "Opp"; btn.onclick = (e)=>{ e.stopPropagation(); applyNow(modName, sk, "Opponent"); }; card.appendChild(btn); }
-        const rst = document.createElement("button"); rst.className="skin-btn"; rst.textContent="Rst"; rst.onclick=(e)=>{ e.stopPropagation(); resetAndRedownload(modName, sk, false); }; card.appendChild(rst);
+        if(showBF){ const btn = document.createElement("button"); btn.className = "skin-btn bf"; btn.textContent = "BF"; btn.onclick = (e)=>{ e.stopPropagation(); applyNow(modName, sk, "BF"); };
+        card.appendChild(btn); }
+        if(showOpp){ const btn = document.createElement("button"); btn.className = "skin-btn opponent";
+        btn.textContent = "Opp"; btn.onclick = (e)=>{ e.stopPropagation(); applyNow(modName, sk, "Opponent"); }; card.appendChild(btn);
+        }
+        const rst = document.createElement("button"); rst.className="skin-btn"; rst.textContent="Rst"; rst.onclick=(e)=>{ e.stopPropagation(); resetAndRedownload(modName, sk, false); };
+        card.appendChild(rst);
         
         card.insertBefore(lbl, card.firstChild); card.insertBefore(img, lbl); list.appendChild(card);
       }
@@ -1336,15 +880,22 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
   let _skinWatcherLast = { SelectedSkin: null, SelectedDadSkin: null };
 
   async function applySelectionString(rs, selStr, opts = {}){ 
-    if (!selStr) return; const parsed = JSON.parse(selStr);
+    if (!selStr) return;
+    const parsed = JSON.parse(selStr);
     const zipUrl = parsed.zip_cdn || parsed.zip; if(!zipUrl) return;
+    
+    // --- EXTRAIR ESCALA DA STRING SINCRONIZADA ---
+    const remoteScale = (typeof parsed.scale === 'number') ? parsed.scale : 1.0;
+    
     try {
         let arr = null;
         if(window.GD_SKIN_CACHE && window.GD_SKIN_CACHE.zips[zipUrl]) arr = window.GD_SKIN_CACHE.zips[zipUrl];
-        else { const r = await fetch(zipUrl); if(r.ok) arr = await r.arrayBuffer(); }
+        else { const r = await fetch(zipUrl); if(r.ok) arr = await r.arrayBuffer();
+        }
         if(arr && window.GD_SKIN_PLAYER) {
-            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(rs, arr);
-            return window.GD_SKIN_PLAYER.applyPackageToScene(rs, pkg, opts);
+            // Passa escala para Load (resize) e Apply (compensação)
+            const pkg = await window.GD_SKIN_PLAYER.loadFromArrayBuffer(rs, arr, { scale: remoteScale });
+            return window.GD_SKIN_PLAYER.applyPackageToScene(rs, pkg, { ...opts, scale: remoteScale });
         }
     } catch(e){}
   }
@@ -1357,7 +908,8 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
         const cur = { SelectedSkin: gv.get('SelectedSkin').getAsString(), SelectedDadSkin: gv.get('SelectedDadSkin').getAsString() };
         const playerOnline = getPlayerOnlineValue(rs);
         if ((cur.SelectedSkin||'') !== (_skinWatcherLast.SelectedSkin||'')){ if (playerOnline !== 1 && cur.SelectedSkin) await applySelectionString(rs, cur.SelectedSkin, { targetName: "BF", targetAnimVar: "BFAnim" }); }
-        if ((cur.SelectedDadSkin||'') !== (_skinWatcherLast.SelectedDadSkin||'')){ if (playerOnline !== 2 && cur.SelectedDadSkin) await applySelectionString(rs, cur.SelectedDadSkin, { targetName: "BFPixel", targetAnimVar: "OPPAnim" }); }
+        if ((cur.SelectedDadSkin||'') !== (_skinWatcherLast.SelectedDadSkin||'')){ if (playerOnline !== 2 && cur.SelectedDadSkin) await applySelectionString(rs, cur.SelectedDadSkin, { targetName: "BFPixel", targetAnimVar: 
+        "OPPAnim" }); }
         _skinWatcherLast = cur;
       } catch(e){}
     }, 700);
@@ -1366,13 +918,15 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
   // --- 9. BOOTSTRAP + AUTO CLEANUP ---
   try {
     let manifest = null;
-    try { const r = await fetch(GITHUB_RAW_URL); if(r.ok) { manifest = await r.json(); localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(manifest)); } } catch(e){}
-    if(!manifest) try { manifest = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)); } catch(e){}
-    if(!manifest) try { manifest = await fetchCdnFirst(MANIFEST_NAME, "json"); } catch(e){}
+    try { const r = await fetch(GITHUB_RAW_URL); if(r.ok) { manifest = await r.json(); localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(manifest));
+    } } catch(e){}
+    if(!manifest) try { manifest = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY));
+    } catch(e){}
+    if(!manifest) try { manifest = await fetchCdnFirst(MANIFEST_NAME, "json");
+    } catch(e){}
     
     await openSkinSelector(manifest);
     startSkinWatcher(runtimeScene);
-
     // VIGILANTE DA CENA (CLEANUP)
     const watcher = setInterval(() => {
         let currentSceneName = "";
@@ -1388,7 +942,6 @@ gdjs.PlayonlineCode.userFunc0xa8b168(runtimeScene);
             clearInterval(watcher);
         }
     }, 1000);
-
   } catch(e){}
 
 })(runtimeScene);
@@ -1398,12 +951,12 @@ gdjs.PlayonlineCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xd0aac8(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x13fed08(runtimeScene);
 
 }
 
 
-};gdjs.PlayonlineCode.userFunc0xdbfa60 = function GDJSInlineCode(runtimeScene) {
+};gdjs.PlayonlineCode.userFunc0x8f4d28 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A (MULTIPLAYER) — OTIMIZADO + AUTO-CLEANUP (Scene Watcher)
 (function () {
@@ -1551,7 +1104,7 @@ gdjs.PlayonlineCode.eventsList7 = function(runtimeScene) {
 {
 
 
-gdjs.PlayonlineCode.userFunc0xdbfa60(runtimeScene);
+gdjs.PlayonlineCode.userFunc0x8f4d28(runtimeScene);
 
 }
 
