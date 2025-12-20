@@ -11,7 +11,7 @@ gdjs.evtsExt__ObjectPickingTools__PickHighestZCondition.GDObjectObjects1= [];
 gdjs.evtsExt__ObjectPickingTools__PickHighestZCondition.GDObjectObjects2= [];
 
 
-gdjs.evtsExt__ObjectPickingTools__PickHighestZCondition.userFunc0x1164218 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
+gdjs.evtsExt__ObjectPickingTools__PickHighestZCondition.userFunc0x11bfb08 = function GDJSInlineCode(runtimeScene, eventsFunctionContext) {
 "use strict";
 // Create an empty array to hold the objects with the highest value
 let highestValueObjects = [];
@@ -51,7 +51,7 @@ gdjs.evtsExt__ObjectPickingTools__PickHighestZCondition.eventsList0 = function(r
 {
 
 
-gdjs.evtsExt__ObjectPickingTools__PickHighestZCondition.userFunc0x1164218(runtimeScene, eventsFunctionContext);
+gdjs.evtsExt__ObjectPickingTools__PickHighestZCondition.userFunc0x11bfb08(runtimeScene, eventsFunctionContext);
 
 }
 

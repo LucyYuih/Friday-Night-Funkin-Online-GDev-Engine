@@ -339,7 +339,7 @@ let isConditionTrue_0 = false;
 
 };gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
 gdjs.InicioCode.mapOfGDgdjs_9546InicioCode_9546GDbegfontObjects1Objects = Hashtable.newFrom({"begfont": gdjs.InicioCode.GDbegfontObjects1});
-gdjs.InicioCode.userFunc0x136d570 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0x1f5e878 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // ===================================================================
 // PlayerUniversal Export/Import (mobile-friendly) - Removed fallback button
@@ -848,492 +848,33 @@ gdjs.InicioCode.userFunc0x136d570 = function GDJSInlineCode(runtimeScene) {
 })();
 
 };
-gdjs.InicioCode.userFunc0x16358e8 = function GDJSInlineCode(runtimeScene) {
-"use strict";
-(async function(runtimeScene) {
-    // =========================================================================
-    // 1. CONFIGURAÇÕES E IMPORTAÇÕES (FIREBASE & CRYPTO & UPDATE)
-    // =========================================================================
-    
-    // --- Configuração do Update ---
-    const CHECK_INTERVAL = 1 * 60 * 60 * 1000; // 1 hora
-    const REPO_OWNER = "LucyYuih";
-    const REPO_NAME = "Friday-Night-Funkin-Online-GDev-Engine";
-
-    // --- Configuração da UI de Auth ---
-    const UI_ID = "gd-firebase-auth-overlay";
-    
-    // Remove UI antiga se existir
-    const existingUI = document.getElementById(UI_ID);
-    if (existingUI) existingUI.remove();
-
-    // --- Imports Dinâmicos ---
-    const { initializeApp, getApps, getApp } = await import('https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js');
-    const { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } = await import('https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js');
-    const { getFirestore, doc, setDoc, getDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js');
-
-    // --- Configuração do Firebase ---
-    function _obfDecode(b64xor) {
-        const raw = atob(b64xor);
-        let out = '';
-        for (let i=0;i<raw.length;i++) out += String.fromCharCode(raw.charCodeAt(i) ^ 13);
-        return out;
-    }
-    const _OBF_APIKEY = "TER3bF50T2hHOGNmQV9IQ2ZnX2FJYE46QWVBfko4VU9sPU9ESlJm";
-    const firebaseConfig = {
-        apiKey: _obfDecode(_OBF_APIKEY),
-        authDomain: "fnf-gdev-online.firebaseapp.com",
-        projectId: "fnf-gdev-online",
-        storageBucket: "fnf-gdev-online.firebasestorage.app",
-        messagingSenderId: "595615246122",
-        appId: "1:595615246122:web:4b545361c1f01ea1c7a053",
-        measurementId: "G-MD2E4G1195"
-    };
-
-    const app = (getApps().length > 0) ? getApp() : initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    // =========================================================================
-    // 2. CRYPTO & HELPERS (AUTOSSUFICIENTE)
-    // =========================================================================
-    const PBKDF2_ITERATIONS = 150000; const SALT_BYTES = 16; const IV_BYTES = 12; const DERIVED_BITS = 512;
-    function strToU8(s){ return new TextEncoder().encode(String(s)); }
-    function u8ToStr(u){ return new TextDecoder().decode(u); }
-    function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
-    function abToB64(buf){ let binary=''; const bytes=new Uint8Array(buf); for(let i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]); return btoa(binary); }
-    function b64ToU8(b64){ const binary=atob(b64); const bytes=new Uint8Array(binary.length); for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i); return bytes; }
-    function concatU8(...arrs){ const total=arrs.reduce((s,a)=>s+a.length,0); const out=new Uint8Array(total); let off=0; for(const a of arrs){ out.set(a, off); off+=a.length;} return out; }
-
-    async function deriveKeys(password, saltU8){
-        const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-        const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
-        const dbuf = new Uint8Array(derived);
-        const aesBytes = dbuf.slice(0,32); const hmacBytes = dbuf.slice(32,64);
-        const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
-        const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
-        return { aesKey, hmacKey };
-    }
-    async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8); return new Uint8Array(sig); }
-    async function encryptFilePayload(secret, jsonText){
-        const salt = randomBytes(SALT_BYTES); const iv = randomBytes(IV_BYTES);
-        const { aesKey, hmacKey } = await deriveKeys(secret, salt);
-        const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(jsonText));
-        const cipher = new Uint8Array(cipherBuf);
-        const macData = concatU8(salt, iv, cipher);
-        const hmac = await computeHmac(hmacKey, macData);
-        return `${abToB64(salt.buffer)}.${abToB64(iv.buffer)}.${abToB64(cipher.buffer)}.${abToB64(hmac.buffer)}`;
-    }
-    async function decryptFilePayload(secret, fileText){
-        const parts = fileText.trim().split('.');
-        if (parts.length !== 4) throw new Error("Save inválido");
-        const salt = b64ToU8(parts[0]); const iv = b64ToU8(parts[1]); const cipher = b64ToU8(parts[2]); const hmac = b64ToU8(parts[3]);
-        const { aesKey, hmacKey } = await deriveKeys(secret, salt);
-        const macData = concatU8(salt, iv, cipher);
-        const expected = await computeHmac(hmacKey, macData);
-        let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("HMAC mismatch");
-        const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv: iv}, aesKey, cipher);
-        return u8ToStr(new Uint8Array(plainBuf));
-    }
-    async function sha256Hex(text){
-        const buf = await crypto.subtle.digest('SHA-256', strToU8(text));
-        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-    }
-
-    // --- Helpers de Usuário e Jogo ---
-    function getUsername(){
-        try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication) return gdjs.playerAuthentication.getUsername(); }catch(e){}
-        try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : ''); } catch(e){}
-        return 'guest';
-    }
-    function getToken(){
-        try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication) return gdjs.playerAuthentication.getUserToken() || ''; } catch(e) {}
-        return '';
-    }
-
-    const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
-    function readGameData(scene) {
-        try {
-            const pu = scene.getGame().getVariables().get('PlayerUniversal');
-            if (!pu) return {};
-            const payload = {};
-            if (typeof pu.toJSObject === 'function') {
-                const obj = pu.toJSObject();
-                for (const k of EXPORT_FIELDS) payload[k] = Number(obj[k]) || 0;
-            } else {
-                for (const k of EXPORT_FIELDS) {
-                    const child = pu.getChild(k);
-                    payload[k] = child ? (Number(child.getAsNumber()) || 0) : 0;
-                }
-            }
-            return payload;
-        } catch(e) { return {}; }
-    }
-    function applyGameData(scene, payload) {
-        const pu = scene.getGame().getVariables().get('PlayerUniversal');
-        if(!pu) return;
-        for (const k of EXPORT_FIELDS){
-            const val = payload[k] || 0;
-            try { pu.getChild(k).setNumber(val); } catch(e){}
-        }
-    }
-
-    // =========================================================================
-    // 3. LÓGICA DE SAVE/LOAD/PROFILE
-    // =========================================================================
-    let _userProfileCache = null; 
-    async function getUserProfile(uid, force = false) {
-        if (_userProfileCache && _userProfileCache.uid === uid && !force) return _userProfileCache;
-        try {
-            const snap = await getDoc(doc(db, 'users', uid));
-            _userProfileCache = snap.exists() ? { uid, ...snap.data() } : { uid };
-            return _userProfileCache;
-        } catch(e) { return { uid }; }
-    }
-
-    async function internalCloudSave(scene) {
-        const user = auth.currentUser;
-        if (!user) throw new Error("Não conectado.");
-        const rawData = readGameData(scene);
-        const ordered = {}; for(const k of EXPORT_FIELDS) ordered[k] = rawData[k] || 0;
-        const plainJson = JSON.stringify({ version: 1, payload: ordered });
-        const hash = await sha256Hex(plainJson);
-        const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-        const encrypted = await encryptFilePayload(secret, plainJson);
-
-        await setDoc(doc(db, 'users', user.uid), { playerSave: { save: encrypted, hash: hash, updatedAt: serverTimestamp() } }, { merge: true });
-        localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({ encSave: encrypted, hash, uid: user.uid, ts: Date.now(), synced: true }));
-        return true;
-    }
-
-    async function internalCloudLoad(scene) {
-        const user = auth.currentUser;
-        if (!user) throw new Error("Não conectado.");
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        if (!snap.exists()) throw new Error("Save não encontrado.");
-        const data = snap.data();
-        if (!data.playerSave || !data.playerSave.save) throw new Error("Save inválido.");
-        
-        const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-        const decryptedJson = await decryptFilePayload(secret, data.playerSave.save);
-        const parsed = JSON.parse(decryptedJson);
-        applyGameData(scene, parsed.payload || parsed);
-        localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({ encSave: data.playerSave.save, hash: data.playerSave.hash, uid: user.uid, ts: Date.now(), synced: true }));
-        return true;
-    }
-
-    async function saveProfileInternal({ displayName, description, avatarURL }) {
-        const user = auth.currentUser;
-        if (!user) throw new Error("Não conectado.");
-        window.showToast("Salvando...");
-        const updateData = { updatedAt: serverTimestamp() };
-        if (displayName !== undefined) updateData.displayName = displayName;
-        if (description !== undefined) updateData.description = description;
-        if (avatarURL !== undefined) updateData.avatarURL = avatarURL;
-
-        await setDoc(doc(db, 'users', user.uid), updateData, { merge: true });
-        const authUpdates = {};
-        if (displayName) authUpdates.displayName = displayName;
-        if (avatarURL && !avatarURL.startsWith("data:")) authUpdates.photoURL = avatarURL; // Evita URL too long
-        if (Object.keys(authUpdates).length > 0) await updateProfile(user, authUpdates);
-
-        if (_userProfileCache) { Object.assign(_userProfileCache, updateData); delete _userProfileCache.updatedAt; }
-        updateUIWithProfile(user, _userProfileCache || {});
-        window.showToast("Perfil salvo!");
-        return true;
-    }
-
-    async function handleProfileAndSaveLogic(user) {
-        if(!user) return;
-        const profile = await getUserProfile(user.uid);
-        updateUIWithProfile(user, profile);
-        const hasLocal = localStorage.getItem("GD_FNF_LOCAL_SAVE_V1");
-        if (!hasLocal && profile.playerSave && profile.playerSave.save) {
-            try {
-                const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-                const plain = await decryptFilePayload(secret, profile.playerSave.save);
-                applyGameData(window._gd_runtimeScene, JSON.parse(plain).payload);
-                localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({ encSave: profile.playerSave.save, hash: profile.playerSave.hash, uid: user.uid, ts: Date.now(), synced: true }));
-                if(window.showToast) window.showToast("Progresso restaurado!");
-            } catch(e){}
-        }
-    }
-
-    // =========================================================================
-    // 4. UI CREATION (Auth & Update)
-    // =========================================================================
-    
-    function resizeAndOptimizeImage(file, w, h, cb) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                let width = img.width, height = img.height;
-                if (width > w || height > h) { const r = Math.min(w/width, h/height); width*=r; height*=r; }
-                const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
-                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-                cb(canvas.toDataURL('image/jpeg', 0.85));
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-
-    function createUI() {
-        if (document.getElementById(UI_ID)) return;
-        const css = `
-            #gd-firebase-auth-overlay { position: fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:999999; background: rgba(0,0,0,0.75); font-family: 'Segoe UI', sans-serif; backdrop-filter: blur(5px); }
-            #gd-firebase-auth-card { width: 480px; max-width: 90%; background: #0f1219; color: #fff; border-radius: 16px; box-shadow: 0 0 40px rgba(0,0,0,0.8); padding: 25px; position:relative; border: 1px solid #2a303c; }
-            .gd-input { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #374151; background: #1f2937; color:#fff; box-sizing:border-box; outline:none; }
-            .gd-btn { padding:12px; border-radius:8px; border:none; cursor:pointer; font-weight:bold; font-size:14px; width:100%; margin-top:5px; transition:0.2s; }
-            .gd-btn:hover { opacity:0.9; transform:translateY(-1px); }
-            .gd-btn-primary { background:#6366f1; color:white; }
-            .gd-btn-sec { background:#374151; color:#d1d5db; }
-            .gd-btn-danger { background:#ef4444; color:white; width:auto; padding:8px 16px; font-size:12px; }
-            #gd-toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#1f2937; color:#fff; padding:10px 20px; border-radius:30px; opacity:0; pointer-events:none; transition:0.3s; z-index:1000000; border:1px solid #374151; }
-            .user-header { display:flex; justify-content:space-between; gap:15px; margin-bottom:20px; }
-            .pfp-preview-container { width:80px; text-align:center; }
-            #gd-pfp-display, #gd-pfp-preview { width:80px; height:80px; border-radius:12px; object-fit:cover; border:2px solid #374151; background:#111; }
-            .cloud-area { margin-top:20px; padding-top:15px; border-top:1px solid #2a303c; }
-            .btn-cloud-up { background:#8b5cf6; color:white; }
-            .btn-cloud-down { background:#0ea5e9; color:white; }
-            /* Update Modal */
-            #gd-update-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 10000001; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: sans-serif; color: white; }
-            .gd-upd-card { background: #111; border: 1px solid #333; padding: 30px; border-radius: 12px; text-align: center; max-width: 400px; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
-            .gd-upd-btn { width: 100%; padding: 12px; margin-top: 10px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; }
-            .gd-btn-dl.unlocked { background: #10b981; color: white; animation: pulse 2s infinite; }
-            @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
-        `;
-        const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
-
-        const overlay = document.createElement('div'); overlay.id = UI_ID; overlay.style.display = 'none';
-        overlay.innerHTML = `
-            <div id="gd-firebase-auth-card">
-                <div id="gd-auth-close" style="position:absolute;right:20px;top:20px;cursor:pointer;color:#9ca3af;font-size:20px;">✕</div>
-                <h2 id="gd-auth-title" style="margin:0 0 20px 0;">Entrar</h2>
-                
-                <div id="gd-login-form">
-                    <input id="gd-email" class="gd-input" type="email" placeholder="Email"/>
-                    <input id="gd-password" class="gd-input" type="password" placeholder="Senha"/>
-                    <div style="display:flex;gap:10px;margin-top:10px;">
-                        <button id="gd-login-btn" class="gd-btn gd-btn-primary">Entrar</button>
-                        <button id="gd-go-reg-btn" class="gd-btn gd-btn-sec">Criar Conta</button>
-                    </div>
-                    <div id="gd-msg" style="color:#f87171;font-size:13px;margin-top:10px;"></div>
-                </div>
-
-                <div id="gd-register-form" style="display:none;">
-                    <input id="gd-reg-name" class="gd-input" placeholder="Nome"/>
-                    <input id="gd-reg-email" class="gd-input" type="email" placeholder="Email"/>
-                    <input id="gd-reg-pass" class="gd-input" type="password" placeholder="Senha"/>
-                    <div style="display:flex;gap:10px;margin-top:10px;">
-                        <button id="gd-register-btn" class="gd-btn gd-btn-primary">Criar</button>
-                        <button id="gd-go-login-btn" class="gd-btn gd-btn-sec">Voltar</button>
-                    </div>
-                </div>
-
-                <div id="gd-profile-view" style="display:none;">
-                    <div class="user-header">
-                        <div>
-                            <span id="gd-display-name" style="font-size:20px;font-weight:bold;">...</span>
-                            <div style="font-size:13px;color:#9ca3af;" id="gd-display-email">...</div>
-                            <div id="gd-display-desc" style="font-size:13px;color:#d1d5db;margin-top:8px;background:#1f2937;padding:5px;border-radius:4px;"></div>
-                        </div>
-                        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">
-                            <img id="gd-pfp-display" src=""/>
-                            <button id="gd-logout-btn" class="gd-btn gd-btn-danger">Sair</button>
-                        </div>
-                    </div>
-                    <button id="gd-open-settings" class="gd-btn gd-btn-sec">⚙ Configurações</button>
-                    <div class="cloud-area">
-                        <div style="font-size:11px;color:#fbbf24;text-align:center;margin-bottom:10px;">⚠ Backup na Nuvem ⚠</div>
-                        <button id="gd-cloud-up" class="gd-btn btn-cloud-up">☁ Enviar Save</button>
-                        <button id="gd-cloud-down" class="gd-btn btn-cloud-down">☁ Baixar Save</button>
-                    </div>
-                </div>
-
-                <div id="gd-settings-view" style="display:none;">
-                    <div style="display:flex;gap:15px;margin-bottom:10px;">
-                        <div class="pfp-preview-container">
-                            <img id="gd-pfp-preview" src=""/>
-                            <label for="gd-file-input" style="font-size:11px;cursor:pointer;color:#818cf8;">Alterar</label>
-                            <input type="file" id="gd-file-input" style="display:none;" accept="image/*"/>
-                        </div>
-                        <div style="flex:1;">
-                            <input id="gd-set-name" class="gd-input" placeholder="Novo Nome" style="margin-top:0;"/>
-                            <input id="gd-set-url" class="gd-input" placeholder="URL do Avatar"/>
-                        </div>
-                    </div>
-                    <textarea id="gd-set-desc" class="gd-input" placeholder="Descrição" style="resize:vertical;height:80px;"></textarea>
-                    <div style="display:flex;gap:10px;margin-top:10px;">
-                        <button id="gd-save-settings" class="gd-btn gd-btn-primary">Salvar</button>
-                        <button id="gd-cancel-settings" class="gd-btn gd-btn-sec">Voltar</button>
-                    </div>
-                </div>
-            </div>
-            <div id="gd-toast"><span>Msg</span></div>
-        `;
-        document.body.appendChild(overlay);
-
-        // Bindings
-        const $ = id => document.getElementById(id);
-        window.showToast = (msg) => { const t=$('gd-toast'); t.querySelector('span').textContent=msg; t.style.opacity=1; setTimeout(()=>t.style.opacity=0, 3000); };
-        
-        $('gd-auth-close').onclick = () => overlay.style.display='none';
-        const switchView = (v) => {
-            $('gd-login-form').style.display = v==='login'?'block':'none';
-            $('gd-register-form').style.display = v==='reg'?'block':'none';
-            $('gd-profile-view').style.display = v==='prof'?'block':'none';
-            $('gd-settings-view').style.display = v==='set'?'block':'none';
-            $('gd-auth-title').textContent = v==='login'?'Entrar':v==='reg'?'Criar':v==='prof'?'Perfil':'Editar';
-        };
-
-        $('gd-go-reg-btn').onclick = () => switchView('reg');
-        $('gd-go-login-btn').onclick = () => switchView('login');
-        $('gd-open-settings').onclick = () => {
-            const u = auth.currentUser, c = _userProfileCache||{};
-            $('gd-set-name').value = c.displayName||u.displayName||"";
-            $('gd-set-desc').value = c.description||"";
-            $('gd-set-url').value = c.avatarURL||u.photoURL||"";
-            $('gd-pfp-preview').src = c.avatarURL||u.photoURL||"";
-            switchView('set');
-        };
-        $('gd-cancel-settings').onclick = () => switchView('prof');
-
-        $('gd-login-btn').onclick = async () => { try{ await signInWithEmailAndPassword(auth,$('gd-email').value,$('gd-password').value); }catch(e){$('gd-msg').textContent="Erro: "+e.message;} };
-        $('gd-register-btn').onclick = async () => { try{ const c = await createUserWithEmailAndPassword(auth,$('gd-reg-email').value,$('gd-reg-pass').value); await saveProfileInternal({displayName:$('gd-reg-name').value}); }catch(e){alert(e.message);} };
-        $('gd-logout-btn').onclick = async () => { await signOut(auth); overlay.style.display='none'; };
-        $('gd-save-settings').onclick = async () => { try{ await saveProfileInternal({displayName:$('gd-set-name').value, description:$('gd-set-desc').value, avatarURL:$('gd-set-url').value||null}); switchView('prof'); }catch(e){showToast("Erro: "+e.message);} };
-        $('gd-file-input').onchange = (e) => { if(e.target.files[0]) resizeAndOptimizeImage(e.target.files[0],240,240,(b64)=>{ $('gd-set-url').value=b64; $('gd-pfp-preview').src=b64; }); };
-        
-        $('gd-cloud-up').onclick = async () => { window.showToast("Enviando..."); try{ await internalCloudSave(window._gd_runtimeScene); window.showToast("Salvo!"); }catch(e){window.showToast("Erro:"+e.message);} };
-        $('gd-cloud-down').onclick = async () => { window.showToast("Baixando..."); try{ await internalCloudLoad(window._gd_runtimeScene); window.showToast("Restaurado!"); }catch(e){window.showToast("Erro:"+e.message);} };
-    }
-
-    function updateUIWithProfile(user, profile) {
-        if (!document.getElementById(UI_ID)) return;
-        const $ = id => document.getElementById(id);
-        const loginVis = $('gd-login-form').style.display !== 'none' || $('gd-register-form').style.display !== 'none';
-        if (loginVis) {
-            $('gd-login-form').style.display = 'none'; $('gd-register-form').style.display = 'none';
-            $('gd-profile-view').style.display = 'block'; $('gd-auth-title').textContent = 'Perfil';
-        }
-        $('gd-display-name').textContent = profile.displayName || user.displayName || "Usuário";
-        $('gd-display-email').textContent = user.email;
-        $('gd-display-desc').textContent = profile.description || "";
-        $('gd-display-desc').style.display = profile.description ? 'block' : 'none';
-        $('gd-pfp-display').src = profile.avatarURL || user.photoURL || "https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/firebase_28dp.png";
-        
-        if(window._gd_runtimeScene) {
-             try { window._gd_runtimeScene.getGame().getVariables().get('auth_name').setString(profile.displayName||""); } catch(e){}
-        }
-    }
-
-    onAuthStateChanged(auth, async (user) => {
-        if (user) { await handleProfileAndSaveLogic(user); }
-        else { 
-            _userProfileCache = null;
-            if(document.getElementById(UI_ID) && document.getElementById(UI_ID).style.display!=='none') {
-                document.getElementById('gd-login-form').style.display='block';
-                document.getElementById('gd-profile-view').style.display='none';
-                document.getElementById('gd-settings-view').style.display='none';
-            }
-        }
-    });
-
-    // =========================================================================
-    // 5. UPDATE CHECKER (CORRIGIDO: REMOVE .online)
-    // =========================================================================
-    function createUpdateModal(tag, url) {
-        if(document.getElementById("gd-update-modal")) return;
-        const div = document.createElement("div"); div.id = "gd-update-modal";
-        div.innerHTML = `
-            <div class="gd-upd-card">
-                <div style="font-size:24px;font-weight:bold;color:#f87171;margin-bottom:10px;">ATUALIZAÇÃO NECESSÁRIA</div>
-                <div style="font-size:14px;color:#aaa;margin-bottom:20px;">Versão: <strong>${tag}</strong></div>
-                <div style="background:#422006;color:#fdba74;padding:10px;border-radius:6px;font-size:13px;margin-bottom:20px;">⚠ Sincronize seu progresso para liberar o download.</div>
-                <button id="gd-upd-backup" class="gd-upd-btn" style="background:#2563eb;color:white;">☁ ENVIAR SAVE</button>
-                <button id="gd-upd-download" class="gd-upd-btn gd-btn-dl" disabled style="background:#333;color:#777;cursor:not-allowed;">⬇ BAIXAR ATUALIZAÇÃO</button>
-                <div id="gd-upd-status" style="margin-top:10px;font-size:12px;color:#888;"></div>
-            </div>`;
-        document.body.appendChild(div);
-
-        const btnBackup = document.getElementById("gd-upd-backup");
-        const btnDl = document.getElementById("gd-upd-download");
-        const st = document.getElementById("gd-upd-status");
-
-        btnBackup.onclick = async () => {
-            st.textContent = "Salvando...";
-            try { await internalCloudSave(runtimeScene); 
-                st.textContent = "✔ Sucesso!"; btnBackup.style.display="none"; 
-                btnDl.disabled=false; btnDl.classList.add("unlocked"); btnDl.textContent="⬇ BAIXAR AGORA";
-                btnDl.onclick = () => window.open(url, '_blank');
-            } catch(e) { st.textContent = "Erro: " + e.message; }
-        };
-    }
-
-    async function checkForUpdates(force = false) {
-        if (!force) {
-            const last = localStorage.getItem("gd_last_update_check");
-            if (last && (Date.now() - Number(last) < CHECK_INTERVAL)) return;
-        }
-
-        let localVer = "0.0.0";
-        try { if (runtimeScene.getGame().getGameData().properties) localVer = runtimeScene.getGame().getGameData().properties.version; } catch(e){}
-        
-        try {
-            const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`);
-            if (!res.ok) return;
-            const data = await res.json();
-            const remoteTag = data.tag_name;
-            const downloadUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/${remoteTag}`;
-            localStorage.setItem("gd_last_update_check", Date.now());
-
-            // --- CORREÇÃO AQUI: Remove .online do final e v do começo ---
-            const cleanLocal = localVer.toLowerCase().replace(/^v/, '').replace('.online', '').trim();
-            const cleanRemote = remoteTag.toLowerCase().replace(/^v/, '').replace('.online', '').trim();
-
-            console.log("Verificando update:", cleanLocal, "vs", cleanRemote);
-
-            if (cleanRemote !== cleanLocal) {
-                createUpdateModal(remoteTag, downloadUrl);
-            } else if (force) {
-                alert(`Versão atual: ${localVer}\nVersão remota: ${remoteTag}\n(Você está atualizado)`);
-            }
-        } catch(e) { if(force) alert("Erro check update: " + e.message); }
-    }
-
-    // EXPORT GLOBAL API
-    window.gdFirebaseAuthUI = window.gdFirebaseAuthUI || {};
-    window.gdFirebaseAuthUI.show = () => { createUI(); document.getElementById(UI_ID).style.display = 'flex'; };
-    window.gdFirebaseAuthUI.checkAuth = () => { if(auth.currentUser) handleProfileAndSaveLogic(auth.currentUser); };
-
-    // START
-    createUI();
-    setTimeout(() => checkForUpdates(false), 2000);
-
-})(runtimeScene);
-};
-gdjs.InicioCode.userFunc0x124e978 = function GDJSInlineCode(runtimeScene) {
+gdjs.InicioCode.userFunc0xc0f9a0 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (function(runtimeScene){
-  // --- GESTÃO DE UI E REFERÊNCIAS ---
+  // --- GESTÃO DE UI E CENA (AUTO-CLEANUP) ---
   const UI_ID = "gd-firebase-auth-overlay";
+  
   window._gd_runtimeScene = runtimeScene;
 
-  // Remove UI antiga
+  // Limpeza para evitar duplicação
   const existingUI = document.getElementById(UI_ID);
-  if (existingUI) existingUI.remove();
-
-  // SINGLETON CHECK
-  if (window._gd_firebase_auth_standalone_v9) {
-      if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.rebuildUI) {
-          window.gdFirebaseAuthUI.rebuildUI();
-          if(window.gdFirebaseAuthUI.checkAuth) window.gdFirebaseAuthUI.checkAuth();
-      }
-      return;
+  if (existingUI) {
+      existingUI.remove();
   }
-  window._gd_firebase_auth_standalone_v9 = true;
+
+  // --- SINGLETON DA LÓGICA ---
+  if (window._gd_firebase_users_combined_v1) {
+    if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.rebuildUI) {
+        window.gdFirebaseAuthUI.rebuildUI();
+    }
+    // Reconciliação segura usando cache se disponível
+    if (window.gdFirebaseAuthUI.reconcileSafe) {
+        window.gdFirebaseAuthUI.reconcileSafe(runtimeScene);
+    }
+    return;
+  }
+  
+  window._gd_firebase_users_combined_v1 = true;
 
   const moduleCode = `
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js';
@@ -1343,17 +884,21 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail
 } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js';
 import {
   getFirestore,
   doc,
   setDoc,
   getDoc,
-  serverTimestamp
+  updateDoc,
+  serverTimestamp,
+  arrayUnion,
+  arrayRemove
 } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
 
-/* ---------- 1. Configuração Firebase ---------- */
+/* ---------- API Config ---------- */
 function _obfDecode(b64xor) {
   const raw = atob(b64xor);
   let out = '';
@@ -1375,8 +920,12 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* ---------- 2. Criptografia & Helpers ---------- */
-const PBKDF2_ITERATIONS = 150000; const SALT_BYTES = 16; const IV_BYTES = 12; const DERIVED_BITS = 512;
+/* ---------- Crypto primitives ---------- */
+const PBKDF2_ITERATIONS = 150000;
+const SALT_BYTES = 16;
+const IV_BYTES = 12;
+const DERIVED_BITS = 512;
+
 function strToU8(s){ return new TextEncoder().encode(String(s)); }
 function u8ToStr(u){ return new TextDecoder().decode(u); }
 function randomBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
@@ -1388,15 +937,18 @@ async function deriveKeys(password, saltU8){
   const baseKey = await crypto.subtle.importKey("raw", strToU8(password), {name:"PBKDF2"}, false, ["deriveBits"]);
   const derived = await crypto.subtle.deriveBits({name:"PBKDF2", salt: saltU8, iterations: PBKDF2_ITERATIONS, hash:"SHA-256"}, baseKey, DERIVED_BITS);
   const dbuf = new Uint8Array(derived);
-  const aesBytes = dbuf.slice(0,32); const hmacBytes = dbuf.slice(32,64);
+  const aesBytes = dbuf.slice(0,32);
+  const hmacBytes = dbuf.slice(32,64);
   const aesKey = await crypto.subtle.importKey("raw", aesBytes, {name:"AES-GCM"}, false, ["encrypt","decrypt"]);
   const hmacKey = await crypto.subtle.importKey("raw", hmacBytes, {name:"HMAC", hash:"SHA-256"}, false, ["sign","verify"]);
   return { aesKey, hmacKey };
 }
+
 async function computeHmac(hmacKey, dataU8){ const sig = await crypto.subtle.sign("HMAC", hmacKey, dataU8); return new Uint8Array(sig); }
 
 async function encryptFilePayload(secret, jsonText){
-  const salt = randomBytes(SALT_BYTES); const iv = randomBytes(IV_BYTES);
+  const salt = randomBytes(SALT_BYTES);
+  const iv = randomBytes(IV_BYTES);
   const { aesKey, hmacKey } = await deriveKeys(secret, salt);
   const cipherBuf = await crypto.subtle.encrypt({name:"AES-GCM", iv: iv}, aesKey, strToU8(jsonText));
   const cipher = new Uint8Array(cipherBuf);
@@ -1407,411 +959,520 @@ async function encryptFilePayload(secret, jsonText){
 
 async function decryptFilePayload(secret, fileText){
   const parts = fileText.trim().split('.');
-  if (parts.length !== 4) throw new Error("Save corrompido");
-  const salt = b64ToU8(parts[0]); const iv = b64ToU8(parts[1]); const cipher = b64ToU8(parts[2]); const hmac = b64ToU8(parts[3]);
+  if (parts.length !== 4) throw new Error("Invalid file format");
+  const salt = b64ToU8(parts[0]);
+  const iv = b64ToU8(parts[1]);
+  const cipher = b64ToU8(parts[2]);
+  const hmac = b64ToU8(parts[3]);
   const { aesKey, hmacKey } = await deriveKeys(secret, salt);
   const macData = concatU8(salt, iv, cipher);
   const expected = await computeHmac(hmacKey, macData);
-  let r = 0; for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("Senha incorreta");
+  if (expected.length !== hmac.length) throw new Error("HMAC mismatch");
+  let r = 0;
+  for (let i=0;i<expected.length;i++) r |= expected[i] ^ hmac[i]; if (r !== 0) throw new Error("HMAC mismatch");
   const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv: iv}, aesKey, cipher);
   return u8ToStr(new Uint8Array(plainBuf));
 }
 
 async function sha256Hex(text){
   const buf = await crypto.subtle.digest('SHA-256', strToU8(text));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  const u8 = new Uint8Array(buf);
+  return Array.from(u8).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
+/* ---------- GDevelop helpers ---------- */
 function getUsername(){
-  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && gdjs.playerAuthentication.getUsername()) return gdjs.playerAuthentication.getUsername(); }catch(e){}
-  try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : 'guest'); } catch(e){}
+  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUsername === 'function') return gdjs.playerAuthentication.getUsername(); }catch(e){}
+  try { if (auth && auth.currentUser) return auth.currentUser.displayName || (auth.currentUser.email ? auth.currentUser.email.split('@')[0] : ''); } catch(e){}
   return 'guest';
 }
 function getToken(){
-  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication) return gdjs.playerAuthentication.getUserToken() || ''; } catch(e) {}
+  try{ if (typeof gdjs !== 'undefined' && gdjs.playerAuthentication && typeof gdjs.playerAuthentication.getUserToken === 'function') return gdjs.playerAuthentication.getUserToken() || ''; } catch(e) {}
   return '';
 }
-
-// --- LEITURA E ESCRITA DE DADOS (UNIVERSAL + SONGS) ---
-const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
-
 function parseToNumberOrZero(v){
   if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
   if (typeof v === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v)) return Number(v);
-  if (v && typeof v === 'object') { if (v.getAsNumber) return v.getAsNumber(); if ('value' in v) return Number(v.value) || 0; }
+  if (v && typeof v === 'object') {
+    try { if ('getAsNumber' in v && typeof v.getAsNumber === 'function') return v.getAsNumber();
+    if ('value' in v && typeof v.value === 'number') return v.value;
+    if ('value' in v && typeof v.value === 'string' && /^\\s*[+-]?(?:\\d+)(?:\\.\\d+)?\\s*$/.test(v.value)) return Number(v.value); } catch(e){}
+  }
   return 0;
 }
 
-function readGameData(scene) {
+const EXPORT_FIELDS = ['BestScore','Pfcs','Points'];
+function readNumericChildrenOrdered(runtimeScene){
+  try {
+    const gameVars = runtimeScene.getGame().getVariables();
+    const pu = gameVars.get('PlayerUniversal');
+    if (!pu) throw new Error('PlayerUniversal not found');
     const payload = {};
     try {
-        const gameVars = scene.getGame().getVariables();
-        
-        // 1. PlayerUniversal
-        const pu = gameVars.get('PlayerUniversal');
-        if (pu) {
-            payload.universal = {};
-            if (typeof pu.toJSObject === 'function') {
-                const obj = pu.toJSObject();
-                for (const k of EXPORT_FIELDS) payload.universal[k] = parseToNumberOrZero(obj[k]);
-            } else {
-                for (const k of EXPORT_FIELDS) {
-                    const child = pu.getChild(k);
-                    payload.universal[k] = child ? parseToNumberOrZero(child.getAsNumber ? child.getAsNumber() : child.value) : 0;
-                }
-            }
+      if (typeof pu.toJSObject === 'function') {
+        const obj = pu.toJSObject();
+        for (const k of EXPORT_FIELDS) payload[k] = parseToNumberOrZero(obj[k]);
+        return payload;
+      }
+    } catch(e){}
+    for (const k of EXPORT_FIELDS){
+      try {
+        const child = pu.getChild(k);
+        let val = null;
+        if (child) {
+          if (typeof child.getAsNumber === 'function') val = child.getAsNumber();
+          else if (typeof child.getAsString === 'function') val = child.getAsString();
+          else if ('value' in child) val = child.value;
         }
-
-        // 2. SongScores (NOVO: Salva músicas individuais)
-        const songVars = gameVars.get('SongScores');
-        if (songVars) {
-            payload.songs = typeof songVars.toJSObject === 'function' ? songVars.toJSObject() : {};
-        }
-    } catch(e) { console.warn("Erro lendo vars:", e); }
+        payload[k] = parseToNumberOrZero(val);
+      } catch(e){ payload[k] = 0; }
+    }
     return payload;
+  } catch(e){
+    const payload = {};
+    for (const k of EXPORT_FIELDS) payload[k] = 0; return payload;
+  }
+}
+function buildPlaintextSaveJson(runtimeScene){
+  const ordered = {};
+  const payload = readNumericChildrenOrdered(runtimeScene);
+  for (const k of EXPORT_FIELDS) ordered[k] = payload[k];
+  return JSON.stringify({ version: 1, payload: ordered });
 }
 
-function applyGameData(scene, payload) {
-    try {
-        const gameVars = scene.getGame().getVariables();
+/* ---------- Firestore helpers (COM OTIMIZAÇÃO E CACHE LOCAL) ---------- */
+// Cache em memória
+const _gd_userDocCache = {};
+// Prefixo do LocalStorage
+const _GD_CACHE_PREFIX = 'gd_opt_cache_';
 
-        // 1. PlayerUniversal
-        if (payload.universal) {
-            const pu = gameVars.get('PlayerUniversal');
-            if (pu) {
-                for (const k of EXPORT_FIELDS) {
-                    const val = payload.universal[k] || 0;
-                    try { pu.getChild(k).setNumber(val); } catch(e){}
-                }
-            }
-        }
+// Função OTIMIZADA: Lê do LocalStorage antes de gastar leitura no Firebase
+async function readUsersDoc(uid, opts = { force:false }){
+  if (!uid) return null;
+  
+  // 1. Tenta Memória RAM (Mais rápido)
+  if (!opts.force && _gd_userDocCache[uid] && _gd_userDocCache[uid].data) return _gd_userDocCache[uid].data;
 
-        // 2. SongScores (NOVO: Carrega músicas individuais)
-        if (payload.songs) {
-            const sv = gameVars.get('SongScores');
-            if (sv) {
-                // Tenta usar o método nativo se disponível (GDevelop 5 modern)
-                if (typeof sv.fromJSObject === 'function') {
-                    sv.fromJSObject(payload.songs);
-                } else {
-                    console.warn("SongScores: fromJSObject não disponível. Songs não carregadas.");
-                }
-            }
-        }
-        
-        // Sinaliza fim do carregamento
-        if (gameVars.has('PlayerOnSave')) gameVars.get('PlayerOnSave').setNumber(1);
+  // 2. Tenta LocalStorage (Evita leitura após F5 ou re-login)
+  if (!opts.force) {
+      try {
+          const cachedStr = localStorage.getItem(_GD_CACHE_PREFIX + uid);
+          if (cachedStr) {
+              const parsed = JSON.parse(cachedStr);
+              // Atualiza memória e retorna sem ir ao Firebase
+              _gd_userDocCache[uid] = { data: parsed, ts: Date.now() };
+              return parsed;
+          }
+      } catch(e){}
+  }
 
-    } catch(e){ console.warn("Erro aplicando vars:", e); }
-}
-
-/* ---------- 4. Lógica de Save/Load Autossuficiente ---------- */
-let _userProfileCache = null; 
-async function getUserProfile(uid, force = false) {
-    if (_userProfileCache && _userProfileCache.uid === uid && !force) return _userProfileCache;
-    try {
-        const snap = await getDoc(doc(db, 'users', uid));
-        _userProfileCache = snap.exists() ? { uid, ...snap.data() } : { uid };
-        return _userProfileCache;
-    } catch(e) { return { uid }; }
-}
-
-async function internalCloudSave(scene) {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Não conectado.");
-
-    const rawData = readGameData(scene);
-    // Usa version 2 para indicar estrutura nova (universal + songs)
-    const plainJson = JSON.stringify({ version: 2, payload: rawData });
-    const hash = await sha256Hex(plainJson);
-    const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-    const encrypted = await encryptFilePayload(secret, plainJson);
-
-    await setDoc(doc(db, 'users', user.uid), {
-        playerSave: { save: encrypted, hash: hash, updatedAt: serverTimestamp() }
-    }, { merge: true });
-
-    localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({
-        encSave: encrypted, hash, uid: user.uid, ts: Date.now(), synced: true
-    }));
-
-    return true;
-}
-
-async function internalCloudLoad(scene) {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Não conectado.");
-
-    const snap = await getDoc(doc(db, 'users', user.uid));
-    if (!snap.exists()) throw new Error("Save não encontrado na nuvem.");
+  // 3. Lê do Firebase (Consome Cota) e salva no cache
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (!snap.exists()) { _gd_userDocCache[uid] = { data: null, ts: Date.now() }; return null; }
     const data = snap.data();
-    if (!data.playerSave || !data.playerSave.save) throw new Error("Save inválido na nuvem.");
-
-    const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-    const decryptedJson = await decryptFilePayload(secret, data.playerSave.save);
     
-    const parsed = JSON.parse(decryptedJson);
-    applyGameData(scene, parsed.payload || parsed);
-
-    localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({
-        encSave: data.playerSave.save, 
-        hash: data.playerSave.hash, 
-        uid: user.uid, 
-        ts: Date.now(), 
-        synced: true
-    }));
-
-    return true;
+    // Atualiza caches
+    _gd_userDocCache[uid] = { data, ts: Date.now() };
+    try { localStorage.setItem(_GD_CACHE_PREFIX + uid, JSON.stringify(data)); } catch(e){}
+    
+    return data;
+  } catch(e){ console.warn('readUsersDoc failed', e); return null; }
 }
 
-// Auto-Load ao Logar
-async function handleProfileAndSaveLogic(user) {
-    if(!user) return;
-    const profile = await getUserProfile(user.uid);
-    updateUIWithProfile(user, profile);
+// Função OTIMIZADA: Atualiza o cache local imediatamente ao salvar
+async function writeUsersDocPartial(uid, partial){
+  if (!uid) throw new Error('uid required');
+  const ref = doc(db, 'users', uid);
+  
+  await setDoc(ref, partial, { merge: true });
+  
+  // Atualiza cache local para refletir mudança sem nova leitura
+  _gd_userDocCache[uid] = _gd_userDocCache[uid] || { data: {}, ts: 0 };
+  const merged = Object.assign({}, _gd_userDocCache[uid].data || {}, partial);
+  _gd_userDocCache[uid].data = merged;
+  _gd_userDocCache[uid].ts = Date.now();
+  
+  try { localStorage.setItem(_GD_CACHE_PREFIX + uid, JSON.stringify(merged)); } catch(e){}
+  
+  return true;
+}
 
-    // 1. Tenta Local
-    const localRaw = localStorage.getItem("GD_FNF_LOCAL_SAVE_V1");
-    let loadedLocal = false;
-    if (localRaw) {
-        try {
-            const localData = JSON.parse(localRaw);
-            if (localData.uid === user.uid) {
-                const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-                const plain = await decryptFilePayload(secret, localData.encSave);
-                const parsed = JSON.parse(plain);
-                applyGameData(window._gd_runtimeScene, parsed.payload || parsed);
-                console.log("[Auth] Save Local carregado.");
-                loadedLocal = true;
-            }
-        } catch(e) { console.warn("[Auth] Erro local:", e); }
+async function applyDecryptedSaveToGame(runtimeScene, decryptedJsonText){
+  const parsed = JSON.parse(decryptedJsonText);
+  const payload = parsed.payload || parsed;
+  const gvars = runtimeScene.getGame().getVariables();
+  const pu = gvars.get('PlayerUniversal');
+  if (!pu) throw new Error('PlayerUniversal missing');
+  try {
+    try { pu.getChild('Encpt'); } catch(e){}
+    for (const k of EXPORT_FIELDS){
+      const v = (payload && (k in payload)) ? payload[k] : 0;
+      const num = parseToNumberOrZero(v);
+      try { pu.getChild(k).setNumber(num); } catch(e){ try { pu.getChild(k).setNumber(Number(num) || 0); } catch(e2){} }
+      try {
+        const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+        const ctxt = await encryptFilePayload(secret, String(num));
+        pu.getChild('Encpt').getChild(k).setString(ctxt);
+      } catch(e){ console.warn('Per-field encrypt failed for', k, e); }
     }
+    try { const pv = gvars.get('PlayerOnSave'); if (pv && typeof pv.setNumber === 'function') pv.setNumber(1); } catch(e){}
+  } catch(e){ console.warn('applyDecryptedSaveToGame error', e); }
+}
 
-    // 2. Tenta Nuvem se falhou local
-    if (!loadedLocal && profile.playerSave && profile.playerSave.save) {
-        try {
-            const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
-            const plain = await decryptFilePayload(secret, profile.playerSave.save);
-            const parsed = JSON.parse(plain);
-            applyGameData(window._gd_runtimeScene, parsed.payload || parsed);
-            
-            localStorage.setItem("GD_FNF_LOCAL_SAVE_V1", JSON.stringify({
-                encSave: profile.playerSave.save, hash: profile.playerSave.hash, uid: user.uid, ts: Date.now(), synced: true
-            }));
-            if(window.showToast) window.showToast("Dados recuperados da nuvem!");
-        } catch(e){ console.warn("[Auth] Erro nuvem:", e); }
+async function reconcilePlayerSave_ReadOnly(runtimeScene, opts = { forceRead:false }){
+  const user = auth.currentUser;
+  if (!user) return;
+  const uid = user.uid;
+  window._gd_reconcile_ran = window._gd_reconcile_ran || {};
+  if (window._gd_reconcile_ran[uid] && !opts.forceRead) return;
+  try {
+    // Usa readUsersDoc otimizado (vai ler do cache se existir)
+    const docData = await readUsersDoc(uid, { force: !!opts.forceRead });
+    if (docData && docData.playerSave && docData.playerSave.save) {
+      const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+      try {
+        const remotePlain = await decryptFilePayload(secret, docData.playerSave.save);
+        await applyDecryptedSaveToGame(runtimeScene || window._gd_runtimeScene, remotePlain);
+        console.log('Applied remote playerSave');
+      } catch(e){ console.warn('Failed to decrypt remote save', e); }
     }
+    window._gd_reconcile_ran[uid] = true;
+  } catch(e){ console.error('reconcile error', e); }
 }
 
-async function saveProfileInternal({ displayName, description, avatarURL }) {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Não conectado.");
-    window.showToast("Salvando...");
-    
-    const updateData = { updatedAt: serverTimestamp() };
-    if (displayName !== undefined) updateData.displayName = displayName;
-    if (description !== undefined) updateData.description = description;
-    if (avatarURL !== undefined) updateData.avatarURL = avatarURL;
-
-    await setDoc(doc(db, 'users', user.uid), updateData, { merge: true });
-    
-    const authUpdates = {};
-    if (displayName) authUpdates.displayName = displayName;
-    if (avatarURL && !avatarURL.startsWith("data:")) authUpdates.photoURL = avatarURL;
-    if (Object.keys(authUpdates).length > 0) await updateProfile(user, authUpdates);
-
-    if (_userProfileCache) { Object.assign(_userProfileCache, updateData); delete _userProfileCache.updatedAt; }
-    updateUIWithProfile(user, _userProfileCache || {});
-    window.showToast("Perfil salvo!");
-    return true;
+async function createAndSaveEncryptedSaveInternal(runtimeScene){
+  runtimeScene = runtimeScene || window._gd_runtimeScene;
+  if (!runtimeScene) throw new Error('runtimeScene required');
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  const uid = user.uid;
+  const plain = buildPlaintextSaveJson(runtimeScene);
+  const hashHex = await sha256Hex(plain);
+  const secret = getUsername() + (getToken() ? ('|' + getToken()) : '');
+  const enc = await encryptFilePayload(secret, plain);
+  
+  // writeUsersDocPartial já atualiza o cache local
+  await writeUsersDocPartial(uid, { playerSave: { save: enc, hash: hashHex, updatedAt: serverTimestamp() } });
+  
+  try {
+    const gs = runtimeScene.getGame().getVariables();
+    const v = gs.get('PlayerOnSave');
+    if (v && typeof v.setNumber === 'function') v.setNumber(1);
+  } catch(e){}
+  return { uid, hash: hashHex };
 }
 
-/* ---------- 5. UI ---------- */
-function resizeAndOptimizeImage(file, w, h, cb) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-            let width = img.width, height = img.height;
-            if (width > w || height > h) { const r = Math.min(w/width, h/height); width*=r; height*=r; }
-            const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
-            canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-            cb(canvas.toDataURL('image/jpeg', 0.85));
-        }; img.src = e.target.result;
-    }; reader.readAsDataURL(file);
+async function saveProfileInternal({ name, avatarURL, description }){
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  const uid = user.uid;
+  const toWrite = {};
+  if (name !== undefined) toWrite.displayName = name;
+  if (avatarURL !== undefined) toWrite.avatarURL = avatarURL;
+  if (description !== undefined) toWrite.description = description;
+  toWrite.updatedAt = serverTimestamp();
+  
+  // Escreve e atualiza cache
+  await writeUsersDocPartial(uid, toWrite);
+  
+  try { await updateProfile(user, { displayName: name || user.displayName, photoURL: avatarURL || user.photoURL }); } catch(e){}
+  return true;
 }
 
+/* ---------- UI CREATION (CÓDIGO ORIGINAL PURO PARA EVITAR BUGS VISUAIS) ---------- */
 function createAuthOverlayAndBind(){
   if (document.getElementById('gd-firebase-auth-overlay')) return;
-
   const css = \`
-    #gd-firebase-auth-overlay { position: fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:999999; background: rgba(0,0,0,0.75); font-family: 'Segoe UI', sans-serif; backdrop-filter: blur(5px); }
-    #gd-firebase-auth-card { width: 480px; max-width: 90%; background: #0f1219; color: #fff; border-radius: 16px; box-shadow: 0 0 40px rgba(0,0,0,0.8); padding: 25px; position:relative; border: 1px solid #2a303c; }
-    .gd-input { width:100%; padding:12px; margin:8px 0; border-radius:8px; border:1px solid #374151; background: #1f2937; color:#fff; box-sizing:border-box; outline:none; font-size:14px; }
-    .gd-btn { padding:12px; border-radius:8px; border:none; cursor:pointer; font-weight:bold; font-size:14px; width:100%; margin-top:5px; transition:0.2s; }
-    .gd-btn:hover { opacity:0.9; transform:translateY(-1px); }
-    .gd-btn-primary { background:#6366f1; color:white; }
-    .gd-btn-sec { background:#374151; color:#d1d5db; }
-    .gd-btn-danger { background:#ef4444; color:white; width:auto; padding:8px 16px; font-size:12px; }
-    .gd-link { cursor:pointer; color:#818cf8; text-decoration:none; font-size:13px; margin-top:10px; display:inline-block; }
-    #gd-auth-close { position:absolute; right:20px; top:20px; cursor:pointer; color:#9ca3af; font-size: 20px; }
-    #gd-auth-title { margin: 0 0 20px 0; font-size: 22px; font-weight: 700; color: #f3f4f6; }
-    .user-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
-    .user-info-text { flex: 1; }
-    .user-name { font-size: 20px; font-weight: bold; color: #fff; display: block; }
-    .user-email-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-    .user-email { font-size: 13px; color: #9ca3af; opacity: 0; transition: opacity 0.2s; }
-    .user-desc { font-size: 13px; color: #d1d5db; margin-top: 8px; font-style: italic; background: #1f2937; padding: 8px; border-radius: 6px; display:none; }
-    #gd-pfp-display { width: 80px; height: 80px; border-radius: 12px; object-fit: cover; border: 2px solid #374151; background: #111; }
-    #gd-settings-view { display: none; }
-    .settings-row { display: flex; gap: 15px; margin-bottom: 10px; }
-    .pfp-preview-container { width: 80px; text-align: center; }
-    #gd-pfp-preview { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; border: 1px solid #4b5563; margin-bottom: 5px; }
-    .cloud-area { margin-top: 20px; padding-top: 15px; border-top: 1px solid #2a303c; }
-    .cloud-warn { font-size: 11px; color: #fbbf24; text-align: center; margin-bottom: 10px; }
-    .btn-cloud-up { background: #8b5cf6; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .btn-cloud-down { background: #0ea5e9; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    #gd-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 10px 20px; border-radius: 30px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 1000000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); border: 1px solid #374151; }
-  \`;
+#gd-firebase-auth-overlay { position: fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:999999; background: rgba(0,0,0,0.45); font-family: system-ui, -apple-system, sans-serif; }
+#gd-firebase-auth-card { width: 520px; max-width: calc(100% - 32px); background: #0f1724; color: #e6eef8; border-radius: 12px; box-shadow: 0 10px 30px rgba(2,6,23,0.6); padding: 18px; position:relative; min-height:120px; }
+.gd-input { width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color:inherit; box-sizing:border-box; }
+.gd-btn { padding:10px 12px; border-radius:8px; border:none; background:#2563eb; color:white; cursor:pointer; font-weight:600; }
+.gd-link { cursor:pointer; color:#60a5fa; text-decoration:underline; margin-top:8px; display:inline-block; }
+.gd-small { font-size:13px; color:#bcd7ff; margin-top:6px; }
+#gd-auth-error { color:#ffd1d1; min-height:18px; margin-top:6px; font-size:13px; }
+#gd-auth-close { position:absolute; right:14px; top:10px; cursor:pointer; color:#9fb8ff; font-weight:700; }
+#gd-pfp-preview { width:96px; height:96px; border-radius:10px; object-fit:cover; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); }
+#gd-pfp-mini { width:64px; height:64px; border-radius:8px; object-fit:cover; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); }
+#gd-settings-actions { display:flex; gap:8px; margin-top:10px; }
+#gd-auth-title { margin-bottom:6px; }
+#gd-eye-btn { background: transparent; color: #9fb8ff; border: none; cursor: pointer; font-size: 14px; }
+\`;
   
-  const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
-  const overlay = document.createElement('div'); overlay.id = 'gd-firebase-auth-overlay'; overlay.style.display = 'none';
-  
+  if(!document.getElementById('gd-firebase-auth-style')) {
+      const style = document.createElement('style');
+      style.id = 'gd-firebase-auth-style';
+      style.textContent = css;
+      document.head.appendChild(style);
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'gd-firebase-auth-overlay';
+  overlay.style.display = 'none';
   overlay.innerHTML = \`
-    <div id="gd-firebase-auth-card">
-      <div id="gd-auth-close">✕</div>
+    <div id="gd-firebase-auth-card" role="dialog" aria-modal="true">
+      <div id="gd-auth-close" title="Fechar">✕</div>
       <h2 id="gd-auth-title">Entrar</h2>
-      <div id="gd-login-form">
-        <input id="gd-email" class="gd-input" type="email" placeholder="Email" />
-        <input id="gd-password" class="gd-input" type="password" placeholder="Senha" />
-        <div style="display:flex; gap:10px; margin-top:10px;">
-           <button id="gd-login-btn" class="gd-btn gd-btn-primary">Entrar</button>
-           <button id="gd-go-reg-btn" class="gd-btn gd-btn-sec">Criar Conta</button>
+      <div id="gd-auth-forms">
+        <div id="gd-login-form">
+          <input id="gd-email" class="gd-input" type="email" placeholder="Email" autocomplete="email" />
+          <input id="gd-password" class="gd-input" type="password" placeholder="Senha" autocomplete="current-password" />
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button id="gd-login-btn" class="gd-btn" style="flex:1;">Entrar</button>
+            <button id="gd-show-register-btn" class="gd-btn" style="flex:1; background:#10B981;">Criar</button>
+          </div>
+          <div id="gd-auth-error"></div>
+          <div id="gd-auth-footer"> <span class="gd-link" id="gd-forgot">Esqueci a senha</span> </div>
         </div>
-        <div id="gd-msg" style="color:#f87171; font-size:13px; margin-top:10px; min-height:18px;"></div>
-        <div class="gd-link" id="gd-forgot-btn">Esqueci a senha</div>
-      </div>
-      <div id="gd-register-form" style="display:none;">
-        <input id="gd-reg-name" class="gd-input" type="text" placeholder="Nome de Usuário" />
-        <input id="gd-reg-email" class="gd-input" type="email" placeholder="Email" />
-        <input id="gd-reg-pass" class="gd-input" type="password" placeholder="Senha (6+ chars)" />
-        <div style="display:flex; gap:10px; margin-top:10px;">
-           <button id="gd-register-btn" class="gd-btn gd-btn-primary" style="background:#10b981;">Criar Conta</button>
-           <button id="gd-go-login-btn" class="gd-btn gd-btn-sec">Voltar</button>
-        </div>
-        <div id="gd-reg-msg" style="color:#f87171; font-size:13px; margin-top:10px;"></div>
-      </div>
-      <div id="gd-profile-view" style="display:none;">
-        <div class="user-header">
-           <div class="user-info-text">
-               <span id="gd-display-name" class="user-name">...</span>
-               <div class="user-email-row">
-                   <button id="gd-eye-btn" title="Ver Email" style="background:none;border:none;cursor:pointer;color:#6b7280;">👁</button>
-                   <span id="gd-display-email" class="user-email">email@exemplo.com</span>
-               </div>
-               <div id="gd-display-desc" class="user-desc"></div>
-           </div>
-           <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
-               <img id="gd-pfp-display" src="" alt="Avatar" />
-               <button id="gd-logout-btn" class="gd-btn gd-btn-danger">Sair</button>
-           </div>
-        </div>
-        <button id="gd-open-settings" class="gd-btn gd-btn-sec">⚙ Configurações da Conta</button>
-        <div class="cloud-area">
-             <div class="cloud-warn">⚠ Backup na Nuvem ⚠</div>
-             <button id="gd-cloud-up" class="gd-btn btn-cloud-up">☁ Enviar Save (Backup)</button>
-             <button id="gd-cloud-down" class="gd-btn btn-cloud-down">☁ Baixar Save da Nuvem</button>
+        <div id="gd-register-form" style="display:none;">
+          <input id="gd-reg-name" class="gd-input" type="text" placeholder="Nome (obrigatório)" />
+          <input id="gd-reg-email" class="gd-input" type="email" placeholder="Email" autocomplete="email" />
+          <input id="gd-reg-password" class="gd-input" type="password" placeholder="Senha (6+ caracteres)" />
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button id="gd-register-btn" class="gd-btn" style="flex:1; background:#10B981;">Criar Conta</button>
+            <button id="gd-show-login-btn" class="gd-btn" style="flex:1; background:#64748b;">Voltar</button>
+          </div>
+          <div id="gd-auth-error-reg" style="color:#ffd1d1; min-height:18px; margin-top:6px; font-size:13px;"></div>
         </div>
       </div>
-      <div id="gd-settings-view">
-        <div class="settings-row">
-            <div class="pfp-preview-container">
-                <img id="gd-pfp-preview" src="" />
-                <label for="gd-file-input" style="font-size:11px; cursor:pointer; color:#818cf8;">Alterar Foto</label>
-                <input type="file" id="gd-file-input" style="display:none;" accept="image/*" />
+      <div id="gd-auth-user" style="display:none;">
+        <div id="gd-user-info">
+          <div id="gd-user-display" class="gd-small">Conectado</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+            <button id="gd-eye-btn" title="Mostrar/Ocultar email">👁️</button>
+            <div id="gd-user-email" class="gd-small" style="opacity:0.9;"></div>
+          </div>
+          <div id="gd-user-avatar-url" class="gd-small" style="opacity:0.8; margin-top:8px; word-break:break-all;"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+          <img id="gd-pfp-mini" src="" alt="PFP" />
+          <div style="display:flex; gap:8px;">
+            <button id="gd-settings-btn" class="gd-btn" style="background:#0ea5a4;">Configurar</button>
+            <button id="gd-logout-btn" class="gd-btn" style="background:#ef4444;">Sair</button>
+          </div>
+        </div>
+      </div>
+      <div id="gd-settings-panel" style="display:none;">
+        <h3 style="margin:0 0 8px 0;font-size:15px;color:#cbe7ff;">Configurações da Conta</h3>
+        <input id="gd-settings-name" class="gd-input" type="text" placeholder="Nome (obrigatório)" />
+        <textarea id="gd-settings-desc" class="gd-input" placeholder="Descrição (visível ao público)" style="height:80px; resize:vertical;"></textarea>
+        <div id="gd-pfp-row" style="display:flex; gap:12px; align-items:flex-start; margin-top:8px;">
+          <img id="gd-pfp-preview" src="" alt="Preview" />
+          <div style="flex:1;">
+            <input id="gd-pfp-url" class="gd-input" type="text" placeholder="URL da imagem (apenas URL)" />
+            <div style="margin-top:8px;"> <input id="gd-pfp-file" type="file" accept="image/*" /> </div>
+            <div id="gd-settings-actions">
+              <button id="gd-save-settings" class="gd-btn" style="background:#2563eb;">Salvar</button>
+              <button id="gd-remove-pfp" class="gd-btn" style="background:#6b7280;">Remover PFP</button>
+              <button id="gd-settings-back" class="gd-btn" style="background:#94a3b8;">Voltar</button>
             </div>
-            <div style="flex:1;">
-                <input id="gd-set-name" class="gd-input" placeholder="Novo Nome" style="margin-top:0;" />
-                <input id="gd-set-url" class="gd-input" placeholder="URL do Avatar (Opcional)" />
-            </div>
-        </div>
-        <textarea id="gd-set-desc" class="gd-input" placeholder="Descrição do Perfil" style="resize:vertical; height:80px;"></textarea>
-        <div style="display:flex; gap:10px; margin-top:10px;">
-            <button id="gd-save-settings" class="gd-btn gd-btn-primary">Salvar Alterações</button>
-            <button id="gd-cancel-settings" class="gd-btn gd-btn-sec">Voltar</button>
+            <div id="gd-settings-msg" class="gd-small" style="margin-top:6px;"></div>
+          </div>
         </div>
       </div>
     </div>
-    <div id="gd-toast"><span>Msg</span></div>
   \`;
   document.body.appendChild(overlay);
 
   const $ = id => document.getElementById(id);
-  window.showToast = (msg) => { const t=$('gd-toast'); t.querySelector('span').textContent=msg; t.style.opacity=1; setTimeout(()=>t.style.opacity=0, 3000); };
-  
-  $('gd-auth-close').onclick = () => overlay.style.display='none';
-  $('gd-go-reg-btn').onclick = () => switchView('register');
-  $('gd-go-login-btn').onclick = () => switchView('login');
+  function showOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='flex'; }
+  function hideOverlay(){ const o=$('gd-firebase-auth-overlay'); if(o) o.style.display='none'; }
 
-  function switchView(viewName) {
-      $('gd-login-form').style.display = 'none'; $('gd-register-form').style.display = 'none'; $('gd-profile-view').style.display = 'none'; $('gd-settings-view').style.display = 'none';
-      if(viewName === 'login') { $('gd-login-form').style.display = 'block'; $('gd-auth-title').textContent = 'Entrar'; }
-      else if (viewName === 'register') { $('gd-register-form').style.display = 'block'; $('gd-auth-title').textContent = 'Criar Conta'; }
-      else if (viewName === 'profile') { $('gd-profile-view').style.display = 'block'; $('gd-auth-title').textContent = 'Perfil'; }
-      else if (viewName === 'settings') { $('gd-settings-view').style.display = 'block'; $('gd-auth-title').textContent = 'Editar Perfil'; }
-  }
-
-  $('gd-login-btn').onclick = async () => { try { await signInWithEmailAndPassword(auth, $('gd-email').value, $('gd-password').value); } catch(e) { $('gd-msg').textContent = "Erro: " + e.message; } };
-  $('gd-register-btn').onclick = async () => {
-      const name = $('gd-reg-name').value; if(!name) return $('gd-reg-msg').textContent = "Nome obrigatório.";
-      try { const cred = await createUserWithEmailAndPassword(auth, $('gd-reg-email').value, $('gd-reg-pass').value); await saveProfileInternal({ displayName: name }); } catch(e) { $('gd-reg-msg').textContent = e.message; }
-  };
-  $('gd-logout-btn').onclick = async () => { await signOut(auth); overlay.style.display='none'; };
-
-  let emailVis = false; $('gd-eye-btn').onclick = () => { emailVis=!emailVis; $('gd-display-email').style.opacity = emailVis ? 1 : 0; };
-
-  $('gd-open-settings').onclick = () => {
-      const u = auth.currentUser; const cached = _userProfileCache || {};
-      $('gd-set-name').value = cached.displayName || u.displayName || ""; $('gd-set-desc').value = cached.description || ""; $('gd-set-url').value = cached.avatarURL || u.photoURL || ""; $('gd-pfp-preview').src = cached.avatarURL || u.photoURL || "";
-      switchView('settings');
-  };
-  $('gd-cancel-settings').onclick = () => switchView('profile');
-  $('gd-save-settings').onclick = async () => {
-      try { await saveProfileInternal({ displayName: $('gd-set-name').value, description: $('gd-set-desc').value, avatarURL: $('gd-set-url').value || null }); switchView('profile'); } catch(e) { window.showToast("Erro: " + e.message); }
-  };
-  $('gd-file-input').onchange = (e) => { const f = e.target.files[0]; if(f) resizeAndOptimizeImage(f, 240, 240, (b64) => { $('gd-set-url').value = b64; $('gd-pfp-preview').src = b64; }); };
-
-  $('gd-cloud-up').onclick = async () => { window.showToast("Enviando..."); try { await internalCloudSave(window._gd_runtimeScene); window.showToast("Backup Enviado!"); } catch(e) { window.showToast("Erro: " + e.message); } };
-  $('gd-cloud-down').onclick = async () => { window.showToast("Baixando..."); try { await internalCloudLoad(window._gd_runtimeScene); window.showToast("Progresso restaurado!"); } catch(e) { window.showToast("Erro: " + e.message); } };
-
-  if(auth.currentUser) handleProfileAndSaveLogic(auth.currentUser);
+  $('gd-auth-close').addEventListener('click', hideOverlay);
+  $('gd-show-register-btn').addEventListener('click', ()=>{ $('gd-login-form').style.display='none'; $('gd-register-form').style.display=''; });
+  $('gd-show-login-btn').addEventListener('click', ()=>{ $('gd-login-form').style.display=''; $('gd-register-form').style.display='none'; });
+  $('gd-forgot').addEventListener('click', async ()=>{
+    const readyEmail = $('gd-email').value.trim(); const email = readyEmail || prompt('Digite seu email para reset de senha:');
+    if (!email) return;
+    try { await sendPasswordResetEmail(auth, email); alert('Email de redefinição enviado!'); } catch(err){ alert('Erro: '+(err.message||err)); }
+  });
+  $('gd-register-btn').addEventListener('click', async ()=>{
+    const name = $('gd-reg-name').value.trim(); const email = $('gd-reg-email').value.trim(); const password = $('gd-reg-password').value;
+    if (!name) { $('gd-auth-error-reg').textContent = 'Nome é obrigatório.'; return; }
+    try {
+      const allRef = doc(db, 'names', 'AllNames'); const allSnap = await getDoc(allRef); const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
+      if (list.includes(name)) { $('gd-auth-error-reg').textContent = 'Nome já em uso.'; return; }
+      const uc = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = uc.user.uid;
+      await writeUsersDocPartial(uid, { displayName: name, avatarURL: null, description: '', playerSave: null, updatedAt: serverTimestamp() });
+      if (allSnap.exists()) await updateDoc(allRef, { list: arrayUnion(name) }); else await setDoc(allRef, { list: [name] });
+      try { await updateProfile(uc.user, { displayName: name }); } catch(e){}
+      await handleUserAfterLogin(uc.user || auth.currentUser);
+    } catch(err){ console.warn('register error', err); $('gd-auth-error-reg').textContent = err && err.message ? err.message : String(err); }
+  });
+  $('gd-login-btn').addEventListener('click', async ()=>{
+    const email = $('gd-email').value.trim(); const password = $('gd-password').value;
+    $('gd-auth-error').textContent = '';
+    try { const cred = await signInWithEmailAndPassword(auth, email, password); await handleUserAfterLogin(cred && cred.user ? cred.user : auth.currentUser); } catch(err){ console.warn('signIn error', err); $('gd-auth-error').textContent = err && err.message ? err.message : String(err); }
+  });
+  $('gd-logout-btn').addEventListener('click', async ()=>{ try { await signOut(auth); hideOverlay(); } catch(err){ alert('Erro ao sair: ' + (err && err.message ? err.message : String(err))); } });
+  let emailVisible = false; $('gd-eye-btn').addEventListener('click', ()=>{ emailVisible = !emailVisible; $('gd-user-email').style.opacity = emailVisible ? '1' : '0'; });
+  $('gd-settings-btn').addEventListener('click', async ()=>{ const u = auth.currentUser; if (!u) { $('gd-login-form').style.display=''; showOverlay(); return; } $('gd-settings-panel').style.display = 'block'; $('gd-auth-user').style.display='none'; showOverlay(); setTimeout(()=> populateSettingsFields(u),60); });
+  $('gd-settings-back').addEventListener('click', ()=>{ $('gd-settings-panel').style.display='none'; $('gd-auth-user').style.display=''; });
+  $('gd-remove-pfp').addEventListener('click', async ()=>{ const u = auth.currentUser; if (!u) { $('gd-settings-msg').textContent = 'Faça login primeiro.'; return; } try { await saveProfileInternal({ avatarURL: null }); $('gd-pfp-preview').src=''; $('gd-pfp-mini').src=''; $('gd-pfp-url').value=''; $('gd-settings-msg').textContent='PFP removida.'; updateGDevelopVarsFromUser(u); } catch(err){ $('gd-settings-msg').textContent = 'Erro: '+(err.message||err); } });
+  $('gd-save-settings').addEventListener('click', async ()=>{
+    const u = auth.currentUser; if (!u) { $('gd-settings-msg').textContent='Faça login primeiro.'; return; }
+    const newName = $('gd-settings-name').value.trim(); const description=$('gd-settings-desc').value||''; const urlCandidate=$('gd-pfp-url').value.trim();
+    if (!newName) { $('gd-settings-msg').textContent='Nome é obrigatório.'; return; }
+    try {
+      const allRef = doc(db, 'names', 'AllNames'); const allSnap = await getDoc(allRef); const list = (allSnap.exists() && Array.isArray(allSnap.data().list)) ? allSnap.data().list : [];
+      let currentName = null; try { const ud = await readUsersDoc(u.uid); if (ud && ud.displayName) currentName = ud.displayName; } catch(e){}
+      if (list.includes(newName) && newName !== currentName) { $('gd-settings-msg').textContent='Nome já em uso.'; return; }
+      try { if (currentName && currentName !== newName) await updateDoc(allRef, { list: arrayRemove(currentName) }).catch(()=>{});
+      if (!list.includes(newName)){ if (allSnap.exists()) await updateDoc(allRef, { list: arrayUnion(newName) }); else await setDoc(allRef, { list: [newName] });
+      } }catch(e){}
+      await saveProfileInternal({ name: newName, avatarURL: urlCandidate || null, description: description || '' });
+      $('gd-settings-msg').textContent='Configurações salvas.'; updateGDevelopVarsFromUser(u);
+    } catch(err){ console.error('save settings error', err); $('gd-settings-msg').textContent='Erro ao salvar: '+(err&&err.message?err.message:String(err)); }
+  });
+  (function attachFileHandler(){
+    const fileInput = $('gd-pfp-file'); if (!fileInput) return;
+    fileInput.addEventListener('change', async (e)=>{
+      const u = auth.currentUser; if (!u) { alert('Faça login primeiro'); return; }
+      const file = e.target.files && e.target.files[0] ? e.target.files[0] : null; if (!file) return;
+      $('gd-settings-msg').textContent='Convertendo...';
+      try {
+        const dataUrl = await (async (file)=> {
+           return new Promise((res, rej)=>{
+             const img = new Image(); const reader = new FileReader();
+            reader.onload = ()=> { img.src = reader.result; }; reader.onerror = rej;
+            img.onload = ()=> { try {
+                const max = 256; const canvas = document.createElement('canvas'); canvas.width=max; canvas.height=max; const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,max,max);
+                const scale = Math.min(max/img.width, max/img.height); const w = Math.round(img.width*scale); const h=Math.round(img.height*scale); const x = Math.round((max-w)/2); const y = Math.round((max-h)/2);
+                ctx.drawImage(img, x, y, w, h); res(canvas.toDataURL('image/png'));
+              } catch(e){ rej(e); } };
+            reader.readAsDataURL(file);
+          });
+        })(file);
+        await saveProfileInternal({ avatarURL: dataUrl });
+        $('gd-pfp-preview').src = dataUrl; $('gd-pfp-mini').src = dataUrl; $('gd-pfp-url').value = dataUrl; $('gd-settings-msg').textContent='Avatar salvo.'; updateGDevelopVarsFromUser(u);
+      } catch(err){ console.error('avatar upload failed', err); $('gd-settings-msg').textContent='Erro ao salvar avatar.'; }
+    });
+  })();
+  if(auth.currentUser) handleUserAfterLogin(auth.currentUser).catch(()=>{});
 }
 
-function updateUIWithProfile(user, profile) {
-    const $ = id => document.getElementById(id); if(!$('gd-firebase-auth-overlay')) return;
-    if($('gd-login-form').style.display !== 'none' || $('gd-register-form').style.display !== 'none') { $('gd-login-form').style.display = 'none'; $('gd-register-form').style.display = 'none'; $('gd-profile-view').style.display = 'block'; $('gd-auth-title').textContent = 'Perfil'; }
-    const name = profile.displayName || user.displayName || "Usuário"; $('gd-display-name').textContent = name; $('gd-display-email').textContent = user.email;
-    if(profile.description) { $('gd-display-desc').textContent = profile.description; $('gd-display-desc').style.display = 'block'; } else { $('gd-display-desc').style.display = 'none'; }
-    const pfp = profile.avatarURL || user.photoURL || "https://www.gstatic.com/mobilesdk/160503_mobilesdk/logo/2x/firebase_28dp.png"; $('gd-pfp-display').src = pfp;
-    if(window._gd_runtimeScene) { try { const vars = window._gd_runtimeScene.getGame().getVariables(); vars.get('auth_name').setString(name); vars.get('auth_uid').setString(user.uid); } catch(e){} }
+async function populateSettingsFields(user){
+    try {
+      const nameEl = document.getElementById('gd-settings-name');
+      const urlEl = document.getElementById('gd-pfp-url'); const preview=document.getElementById('gd-pfp-preview'); const mini=document.getElementById('gd-pfp-mini'); const msg=document.getElementById('gd-settings-msg'); const descEl=document.getElementById('gd-settings-desc'); const avatarUrlDisplay=document.getElementById('gd-user-avatar-url');
+      // readUsersDoc agora é otimizado e pode retornar do LocalStorage instantaneamente
+      const ud = await readUsersDoc(user.uid, { force:false });
+      if(nameEl) nameEl.value = (ud && ud.displayName) ? ud.displayName : (user.displayName || '');
+      const avatar = (ud && ud.avatarURL) ? ud.avatarURL : (user.photoURL || '');
+      if(urlEl) urlEl.value = avatar || '';
+      if(preview) preview.src = avatar || '';
+      if(mini) mini.src = avatar || '';
+      if (avatarUrlDisplay) avatarUrlDisplay.textContent = avatar ? ('Avatar: ' + (avatar.length>80 ? avatar.slice(0,80)+'…' : avatar)) : '';
+      if(descEl) descEl.value = (ud && ud.description) ? ud.description : (ud && ud.playerDescription ? ud.playerDescription : '');
+      if (msg) msg.textContent = '';
+    } catch(e){ console.warn('populateSettingsFields error', e); }
+}
+
+async function updateGDevelopVarsFromUser(user){
+    try {
+      const rs = window._gd_runtimeScene;
+      if (!rs) return;
+      const vars = rs.getVariables ? rs.getVariables() : (rs.getScene ? rs.getScene().getVariables() : null); if (!vars) return;
+      vars.get('auth_uid').setString(user ? user.uid : '');
+      vars.get('auth_email').setString(user ? (user.email||'') : ''); vars.get('auth_name').setString(user ? (user.displayName||'') : ''); vars.get('auth_photo').setString(user ? (user.photoURL||'') : '');
+      try {
+        if (user) {
+          const ud = await readUsersDoc(user.uid, { force:false });
+          const url = (ud && ud.avatarURL) ? ud.avatarURL : (user.photoURL || '');
+          vars.get('auth_avatar_url').setString(url || '');
+          const desc = (ud && ud.description) ? ud.description : '';
+          vars.get('auth_description').setString(desc || '');
+          const game = rs.getGame ? rs.getGame() : (typeof runtimeGame !== 'undefined' ? runtimeGame : null);
+          if (game && game.getVariables){ game.getVariables().get('auth_avatar_url').setString(url||''); game.getVariables().get('auth_description').setString(desc||''); }
+        } else { vars.get('auth_avatar_url').setString(''); vars.get('auth_description').setString(''); }
+      } catch(e){ console.warn('updateGDevelopVarsFromUser avatar/desc read failed', e); }
+    } catch(e){ console.warn('updateGDevelopVarsFromUser error', e); }
+}
+
+// RESTAURADO: handleUserAfterLogin EXATAMENTE como no original
+async function handleUserAfterLogin(user){
+    if (!user) return;
+    try {
+      const title = document.getElementById('gd-auth-title'); if(title) title.textContent = 'Perfil';
+      const login = document.getElementById('gd-login-form');
+      if(login) login.style.display='none'; // Esconde formulário de login (Correção do bug visual)
+      const reg = document.getElementById('gd-register-form'); if(reg) reg.style.display='none';
+      const panel = document.getElementById('gd-settings-panel'); if(panel) panel.style.display='none';
+      const authUser = document.getElementById('gd-auth-user'); if(authUser) authUser.style.display=''; // Mostra usuário
+      
+      const disp = document.getElementById('gd-user-display'); if(disp) disp.textContent = user.displayName || user.email || 'Usuário';
+      const emailEl = document.getElementById('gd-user-email');
+      if(emailEl) { emailEl.textContent = user.email || ''; emailEl.style.opacity='0'; }
+      
+      try { 
+        // readUsersDoc aqui vai puxar do LocalStorage se disponível (CUSTO 0)
+        const ud = await readUsersDoc(user.uid, { force:false });
+        const url = (ud && ud.avatarURL) ? ud.avatarURL : (user.photoURL||''); 
+        
+        // Atualização da PFP como no original
+        const mini = document.getElementById('gd-pfp-mini'); if(mini) mini.src = url || '';
+        const ad = document.getElementById('gd-user-avatar-url'); if (ad) ad.textContent = url ? ('Avatar: ' + (url.length>80?url.slice(0,80)+'…':url)) : '';
+      } catch(e){ 
+        const mini = document.getElementById('gd-pfp-mini'); if(mini) mini.src = user.photoURL || '';
+      }
+      
+      updateGDevelopVarsFromUser(user);
+      try { await reconcilePlayerSave_ReadOnly(window._gd_runtimeScene); } catch(e){ console.warn('reconcile read-only failed', e); }
+    } catch(e){ console.warn('handleUserAfterLogin error', e); }
 }
 
 onAuthStateChanged(auth, async (user) => {
-    if (user) { await handleProfileAndSaveLogic(user); }
-    else {
-        _userProfileCache = null;
-        const ui = document.getElementById('gd-firebase-auth-overlay');
-        if(ui && ui.style.display !== 'none') { document.getElementById('gd-login-form').style.display = 'block'; document.getElementById('gd-profile-view').style.display = 'none'; document.getElementById('gd-settings-view').style.display = 'none'; document.getElementById('gd-auth-title').textContent = 'Entrar'; }
+    if (user) { await handleUserAfterLogin(user); }
+    else { 
+        const overlay = document.getElementById('gd-firebase-auth-overlay'); 
+        if (overlay && overlay.style.display === 'flex') { 
+            const l=document.getElementById('gd-login-form'); if(l)l.style.display=''; 
+            const r=document.getElementById('gd-register-form'); if(r)r.style.display='none'; 
+            const a=document.getElementById('gd-auth-user'); if(a)a.style.display='none'; 
+            const s=document.getElementById('gd-settings-panel'); if(s)s.style.display='none'; 
+        } 
+        updateGDevelopVarsFromUser(null); 
     }
 });
 
 window.gdFirebaseAuthUI = window.gdFirebaseAuthUI || {};
-window.gdFirebaseAuthUI.show = () => { createAuthOverlayAndBind(); document.getElementById('gd-firebase-auth-overlay').style.display = 'flex'; };
+window.gdFirebaseAuthUI.show = () => { 
+    createAuthOverlayAndBind();
+    const o = document.getElementById('gd-firebase-auth-overlay'); if(o) o.style.display='flex';
+    const user = auth.currentUser; 
+    if (user) { handleUserAfterLogin(user).catch(()=>{}); return; } 
+    const l=document.getElementById('gd-login-form'); if(l)l.style.display=''; 
+};
+window.gdFirebaseAuthUI.hide = () => { const o=document.getElementById('gd-firebase-auth-overlay'); if(o) o.style.display='none'; };
+window.gdFirebaseAuthUI.setRuntimeScene = (rs) => { window._gd_runtimeScene = rs; updateGDevelopVarsFromUser(auth.currentUser); };
+window.gdFirebaseAuthUI.openSettings = () => { 
+    createAuthOverlayAndBind();
+    const user = auth.currentUser; if (!user) { window.gdFirebaseAuthUI.show(); return; } 
+    const o=document.getElementById('gd-firebase-auth-overlay'); if(o) o.style.display='flex';
+    const title=document.getElementById('gd-auth-title'); if(title) title.textContent='Perfil — Configurações'; 
+    const l=document.getElementById('gd-login-form'); if(l)l.style.display='none';
+    const r=document.getElementById('gd-register-form'); if(r)r.style.display='none'; 
+    const a=document.getElementById('gd-auth-user'); if(a)a.style.display='none'; 
+    const s=document.getElementById('gd-settings-panel'); if(s)s.style.display='block'; 
+    setTimeout(()=> populateSettingsFields(user),60); 
+};
+window.gdFirebaseAuthUI.savePlayerNow = async function(maybeRuntimeScene){ const rs = maybeRuntimeScene || window._gd_runtimeScene; return await createAndSaveEncryptedSaveInternal(rs); };
+window.gdFirebaseAuthUI.saveProfile = async function(profile){ return await saveProfileInternal(profile); };
+window.gdFirebaseAuthUI.readUserDoc = async function(force){ const u = auth.currentUser; if (!u) return null; return await readUsersDoc(u.uid, { force: !!force }); };
 window.gdFirebaseAuthUI.rebuildUI = createAuthOverlayAndBind;
-window.gdFirebaseAuthUI.checkAuth = () => { if(auth.currentUser) handleProfileAndSaveLogic(auth.currentUser); };
-window.gdFirebaseAuthUI.savePlayerNow = async (scene) => { return await internalCloudSave(scene); };
+window.gdFirebaseAuthUI.reconcileSafe = async (rs) => { await reconcilePlayerSave_ReadOnly(rs); };
 
 createAuthOverlayAndBind();
+
+(async ()=>{
+  try {
+    if (auth && auth.currentUser && auth.currentUser.uid) {
+      await new Promise(r=>setTimeout(r,120));
+      await reconcilePlayerSave_ReadOnly(window._gd_runtimeScene || null);
+    }
+  } catch(e){ }
+})();
 `;
 
   const s = document.createElement('script');
@@ -1821,11 +1482,11 @@ createAuthOverlayAndBind();
 
 })(runtimeScene);
 };
-gdjs.InicioCode.asyncCallback34146580 = function (runtimeScene, asyncObjectsList) {
+gdjs.InicioCode.asyncCallback39785564 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34146580, gdjs.InicioCode.asyncCallback34146580);
+gdjs.InicioCode.idToCallbackMap.set(39785564, gdjs.InicioCode.asyncCallback39785564);
 gdjs.InicioCode.eventsList1 = function(runtimeScene) {
 
 {
@@ -1835,7 +1496,7 @@ gdjs.InicioCode.eventsList1 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(5), (runtimeScene) => (gdjs.InicioCode.asyncCallback34146580(runtimeScene, asyncObjectsList)), 34146580, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(5), (runtimeScene) => (gdjs.InicioCode.asyncCallback39785564(runtimeScene, asyncObjectsList)), 39785564, asyncObjectsList);
 }
 }
 
@@ -1871,7 +1532,7 @@ if (isConditionTrue_0) {
 {
 
 
-gdjs.InicioCode.userFunc0x136d570(runtimeScene);
+gdjs.InicioCode.userFunc0x1f5e878(runtimeScene);
 
 }
 
@@ -1897,7 +1558,6 @@ let isConditionTrue_0 = false;
 {
 
 
-gdjs.InicioCode.userFunc0x16358e8(runtimeScene);
 
 }
 
@@ -1905,7 +1565,7 @@ gdjs.InicioCode.userFunc0x16358e8(runtimeScene);
 {
 
 
-gdjs.InicioCode.userFunc0x124e978(runtimeScene);
+gdjs.InicioCode.userFunc0xc0f9a0(runtimeScene);
 
 }
 
@@ -1958,7 +1618,7 @@ if (true) {
 }
 
 
-};gdjs.InicioCode.userFunc0xb4fff8 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xe25738 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 // SCRIPT A (ORIGINAL) — OTIMIZADO + AUTO-CLEANUP (Scene Watcher)
 (function () {
@@ -2751,12 +2411,12 @@ gdjs.InicioCode.eventsList4 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xb4fff8(runtimeScene);
+gdjs.InicioCode.userFunc0xe25738(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xa47220 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xbf5270 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 (async function(runtimeScene) {
   // --- 1. CONFIGURAÇÃO DE CLEANUP (Scene Watcher) ---
@@ -3119,12 +2779,12 @@ gdjs.InicioCode.eventsList5 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xa47220(runtimeScene);
+gdjs.InicioCode.userFunc0xbf5270(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xa47518 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xe1b248 = function GDJSInlineCode(runtimeScene) {
 "use strict";
 if (window.gdFirebaseAuthUI && window.gdFirebaseAuthUI.show) window.gdFirebaseAuthUI.show();
 };
@@ -3133,21 +2793,21 @@ gdjs.InicioCode.eventsList6 = function(runtimeScene) {
 {
 
 
-gdjs.InicioCode.userFunc0xa47518(runtimeScene);
+gdjs.InicioCode.userFunc0xe1b248(runtimeScene);
 
 }
 
 
-};gdjs.InicioCode.userFunc0xb50fa0 = function GDJSInlineCode(runtimeScene) {
+};gdjs.InicioCode.userFunc0xdd8420 = function GDJSInlineCode(runtimeScene) {
 "use strict";
-window.openPlayerSaveImportUI(runtimeScene);
+window.openPlayerSaveExportUI(runtimeScene);
 };
 gdjs.InicioCode.eventsList7 = function(runtimeScene) {
 
 {
 
 
-gdjs.InicioCode.userFunc0xb50fa0(runtimeScene);
+gdjs.InicioCode.userFunc0xdd8420(runtimeScene);
 
 }
 
@@ -3185,7 +2845,7 @@ if (isConditionTrue_0) {
 }
 
 
-};gdjs.InicioCode.asyncCallback34326004 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback40047876 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {gdjs.evtsExt__JSONResourceLoader__LoadJSONToGlobal.func(runtimeScene, "assets\\weeks\\freeplayList.json", runtimeScene.getGame().getVariables().getFromIndex(68), null);
 }
@@ -3199,7 +2859,7 @@ asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables)
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34326004, gdjs.InicioCode.asyncCallback34326004);
+gdjs.InicioCode.idToCallbackMap.set(40047876, gdjs.InicioCode.asyncCallback40047876);
 gdjs.InicioCode.eventsList9 = function(runtimeScene) {
 
 {
@@ -3209,7 +2869,7 @@ gdjs.InicioCode.eventsList9 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback34326004(runtimeScene, asyncObjectsList)), 34326004, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.1), (runtimeScene) => (gdjs.InicioCode.asyncCallback40047876(runtimeScene, asyncObjectsList)), 40047876, asyncObjectsList);
 }
 }
 
@@ -3374,14 +3034,14 @@ let isConditionTrue_0 = false;
 }
 
 
-};gdjs.InicioCode.asyncCallback34289348 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback39828068 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 
 { //Subevents
 gdjs.InicioCode.eventsList17(runtimeScene, asyncObjectsList);} //End of subevents
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34289348, gdjs.InicioCode.asyncCallback34289348);
+gdjs.InicioCode.idToCallbackMap.set(39828068, gdjs.InicioCode.asyncCallback39828068);
 gdjs.InicioCode.eventsList18 = function(runtimeScene) {
 
 {
@@ -3391,20 +3051,20 @@ gdjs.InicioCode.eventsList18 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34289348(runtimeScene, asyncObjectsList)), 34289348, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.3), (runtimeScene) => (gdjs.InicioCode.asyncCallback39828068(runtimeScene, asyncObjectsList)), 39828068, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback34282148 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback39820460 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 {runtimeScene.getScene().getVariables().getFromIndex(3).setBoolean(true);
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34282148, gdjs.InicioCode.asyncCallback34282148);
+gdjs.InicioCode.idToCallbackMap.set(39820460, gdjs.InicioCode.asyncCallback39820460);
 gdjs.InicioCode.eventsList19 = function(runtimeScene) {
 
 {
@@ -3414,14 +3074,14 @@ gdjs.InicioCode.eventsList19 = function(runtimeScene) {
 {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback34282148(runtimeScene, asyncObjectsList)), 34282148, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(0.5), (runtimeScene) => (gdjs.InicioCode.asyncCallback39820460(runtimeScene, asyncObjectsList)), 39820460, asyncObjectsList);
 }
 }
 
 }
 
 
-};gdjs.InicioCode.asyncCallback34177412 = function (runtimeScene, asyncObjectsList) {
+};gdjs.InicioCode.asyncCallback39877236 = function (runtimeScene, asyncObjectsList) {
 asyncObjectsList.restoreLocalVariablesContainers(gdjs.InicioCode.localVariables);
 gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPointsTextObjects2);
 
@@ -3431,7 +3091,7 @@ gdjs.copyArray(asyncObjectsList.getObjects("PointsText"), gdjs.InicioCode.GDPoin
 }
 gdjs.InicioCode.localVariables.length = 0;
 }
-gdjs.InicioCode.idToCallbackMap.set(34177412, gdjs.InicioCode.asyncCallback34177412);
+gdjs.InicioCode.idToCallbackMap.set(39877236, gdjs.InicioCode.asyncCallback39877236);
 gdjs.InicioCode.eventsList20 = function(runtimeScene) {
 
 {
@@ -3442,7 +3102,7 @@ gdjs.InicioCode.eventsList20 = function(runtimeScene) {
 const asyncObjectsList = new gdjs.LongLivedObjectsList();
 asyncObjectsList.backupLocalVariablesContainers(gdjs.InicioCode.localVariables);
 for (const obj of gdjs.InicioCode.GDPointsTextObjects1) asyncObjectsList.addObject("PointsText", obj);
-runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback34177412(runtimeScene, asyncObjectsList)), 34177412, asyncObjectsList);
+runtimeScene.getAsyncTasksManager().addTask(gdjs.evtTools.runtimeScene.wait(3), (runtimeScene) => (gdjs.InicioCode.asyncCallback39877236(runtimeScene, asyncObjectsList)), 39877236, asyncObjectsList);
 }
 }
 
@@ -3460,7 +3120,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34174660);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39874484);
 }
 }
 if (isConditionTrue_0) {
@@ -3496,7 +3156,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDPointsTextObjects1.length;i<l;++i) 
 gdjs.InicioCode.GDPointsTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34177492);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39877316);
 }
 }
 if (isConditionTrue_0) {
@@ -3581,7 +3241,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDNewText2Objects1.length;i<l;++i) {
 gdjs.InicioCode.GDNewText2Objects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34150380);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39790916);
 }
 }
 if (isConditionTrue_0) {
@@ -3609,7 +3269,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDHardObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDHardObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34151676);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39792356);
 }
 }
 if (isConditionTrue_0) {
@@ -3637,7 +3297,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDExportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDExportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34153004);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39793772);
 }
 }
 if (isConditionTrue_0) {
@@ -3665,7 +3325,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDImportObjects1.length;i<l;++i) {
 gdjs.InicioCode.GDImportObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34154428);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39795284);
 }
 }
 if (isConditionTrue_0) {
@@ -3686,7 +3346,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34155364);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39796308);
 }
 }
 if (isConditionTrue_0) {
@@ -3760,7 +3420,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34325820);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(40047668);
 }
 }
 if (isConditionTrue_0) {
@@ -4068,7 +3728,7 @@ isConditionTrue_0 = false;
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34287636);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39826356);
 }
 }
 }
@@ -4130,7 +3790,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34287972);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39827124);
 }
 }
 if (isConditionTrue_0) {
@@ -4201,7 +3861,7 @@ if(isConditionTrue_1) {
 }
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34171972);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39872164);
 }
 }
 if (isConditionTrue_0) {
@@ -4278,7 +3938,7 @@ for (var i = 0, k = 0, l = gdjs.InicioCode.GDUpscrollTextObjects1.length;i<l;++i
 gdjs.InicioCode.GDUpscrollTextObjects1.length = k;
 if (isConditionTrue_0) {
 isConditionTrue_0 = false;
-{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(34189580);
+{isConditionTrue_0 = runtimeScene.getOnceTriggers().triggerOnce(39904260);
 }
 }
 if (isConditionTrue_0) {
